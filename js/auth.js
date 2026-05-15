@@ -38,7 +38,8 @@ const Auth = (() => {
     const { error } = await _supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      _setError('E-mail ou senha incorretos.');
+      _setError(error.message || 'E-mail ou senha incorretos.');
+      console.error('[Auth] Erro login:', error);
       btnEl.disabled    = false;
       btnEl.textContent = 'Entrar';
     }

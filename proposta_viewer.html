@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Proposta Comercial — Bikows</title>
+<style>
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy:    #0c1e3e;
+  --navy2:   #102856;
+  --blue:    #1a4fba;
+  --green:   #8dc53e;
+  --orange:  #f5a623;
+  --text:    #1a1a1a;
+  --muted:   #555;
+  --border:  #d0d0d0;
+}
+body {
+  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  font-size: 9.5pt;
+  color: var(--text);
+  background: #c8cdd4;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ============================================
+   TOOLBAR (screen only)
+   ============================================ */
+.toolbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: #1a2840; color: white;
+  display: flex; align-items: center; gap: 10px; padding: 8px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+.toolbar h3 { flex: 1; font-size: 13px; font-weight: 700; }
+.toolbar button {
+  padding: 7px 18px; border: none; border-radius: 5px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.btn-print { background: #8dc53e; color: #1a1a1a; }
+.btn-close  { background: rgba(255,255,255,.15); color: white; }
+.toolbar-space { height: 44px; }
+
+/* ============================================
+   PAGE BASE
+   ============================================ */
+.page {
+  width: 210mm;
+  min-height: 297mm;
+  background: white;
+  margin: 0 auto 12mm;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================
+   STANDARD PAGE HEADER
+   ============================================ */
+.pg-header {
+  padding: 8mm 14mm 5mm;
+  border-bottom: 1.5px solid #bbb;
+  flex-shrink: 0;
+}
+.pg-header-top {
+  display: flex; align-items: center; gap: 10mm;
+  margin-bottom: 3mm;
+}
+.pg-header-service {
+  flex: 1;
+  font-style: italic; font-size: 7.5pt;
+  color: var(--muted); text-align: center;
+  font-weight: 600; letter-spacing: .3px;
+}
+.pg-contact {
+  text-align: right; font-size: 7pt; color: var(--muted); line-height: 1.6;
+  white-space: nowrap;
+}
+.pg-contact span { display: block; }
+
+/* Logo Bikows */
+.bw-logo {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.bw-badge {
+  width: 42px; height: 42px; background: var(--navy);
+  border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.bw-badge svg { width: 36px; height: 36px; }
+.bw-text { line-height: 1.2; }
+.bw-name { font-size: 12pt; font-weight: 900; color: var(--navy); letter-spacing: -.3px; }
+.bw-sub  { font-size: 6.5pt; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: .5px; }
+
+/* Client logo in header */
+.client-logo-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+}
+.client-logo-img { max-height: 40px; max-width: 120px; object-fit: contain; }
+.client-logo-text { font-size: 14pt; font-weight: 900; color: var(--navy); letter-spacing: -.5px; }
+
+/* ============================================
+   STANDARD PAGE FOOTER
+   ============================================ */
+.pg-footer {
+  margin-top: auto;
+  padding: 4mm 14mm 5mm;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  border-top: none;
+  flex-shrink: 0;
+}
+.pg-footer-copy { font-size: 6.5pt; color: var(--muted); }
+.pg-footer-info { font-size: 6.5pt; color: var(--muted); text-align: right; line-height: 1.5; }
+
+/* ============================================
+   PAGE BODY
+   ============================================ */
+.pg-body { padding: 6mm 14mm; flex: 1; }
+
+/* ============================================
+   SECTION HEADERS (dark navy boxes)
+   ============================================ */
+.sec-tag {
+  display: inline-block;
+  background: var(--navy);
+  color: white;
+  font-size: 10pt; font-weight: 800;
+  padding: 5px 14px;
+  border-radius: 3px;
+  margin-bottom: 5mm;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.sec-tag-dark {
+  display: inline-block;
+  background: #1e3560;
+  color: white;
+  font-size: 9pt; font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 3px;
+  margin-bottom: 3mm;
+}
+
+/* ============================================
+   COVER PAGE (capa)
+   ============================================ */
+.page-cover {
+  background: #0b0f1a;
+  color: white;
+  width: 210mm; min-height: 297mm;
+  margin: 0 auto 12mm;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.cover-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(12,30,62,.92) 0%, rgba(5,10,20,.85) 100%);
+  z-index: 1;
+}
+.cover-grid-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 20mm 20mm;
+}
+.cover-content { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; }
+
+.cover-top {
+  padding: 12mm 14mm 0;
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.cover-logo { display: flex; align-items: center; gap: 8px; }
+.cover-bw-badge {
+  width: 52px; height: 52px; background: white; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.cover-bw-badge svg { width: 44px; height: 44px; }
+.cover-logo-text { line-height: 1.2; }
+.cover-logo-name { font-size: 16pt; font-weight: 900; color: white; }
+.cover-logo-sub  { font-size: 7pt; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+
+.cover-date-block { text-align: right; }
+.cover-month { font-size: 11pt; font-weight: 700; color: #94a3b8; letter-spacing: 4px; }
+.cover-year  { font-size: 52pt; font-weight: 900; color: white; line-height: 1; }
+
+.cover-title {
+  padding: 6mm 14mm 4mm;
+  flex: 1;
+}
+.cover-main-title {
+  font-size: 40pt; font-weight: 900; color: white;
+  line-height: 1; text-transform: uppercase;
+  letter-spacing: -1px;
+}
+.cover-subtitle {
+  font-size: 9pt; font-weight: 700; color: #94a3b8;
+  margin-top: 4mm;
+}
+
+.cover-photos {
+  display: grid;
+  grid-template-columns: 55mm 1fr 1fr 1fr;
+  grid-template-rows: 38mm 34mm;
+  gap: 2mm;
+  padding: 0 14mm 0;
+  margin: 4mm 0;
+}
+.cover-photo {
+  background: #1e2940;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.cover-photo:first-child { grid-row: span 2; }
+.cover-photo img { width: 100%; height: 100%; object-fit: cover; }
+.cover-photo-placeholder {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, #1a3060 0%, #0d1e40 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18pt; opacity: .4;
+}
+
+.cover-contact {
+  padding: 5mm 14mm 10mm;
+  display: flex; gap: 10mm;
+}
+.cover-contact span {
+  font-size: 8.5pt; color: #94a3b8; display: flex; align-items: center; gap: 4px;
+}
+
+/* ============================================
+   COMPANY INFO PAGE (page 2)
+   ============================================ */
+.company-info-box {
+  border: 1.5px solid var(--navy);
+  border-radius: 4px; padding: 5mm 8mm;
+  margin-bottom: 6mm; line-height: 2;
+}
+.company-info-box p { font-size: 9pt; }
+.company-info-box strong { font-weight: 800; }
+
+.clients-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+  border: 1.5px solid var(--border);
+  border-radius: 6px; padding: 5mm; margin-bottom: 6mm;
+}
+.client-logo-cell {
+  display: flex; align-items: center; justify-content: center;
+  padding: 4mm; min-height: 18mm;
+}
+.client-logo-cell img { max-height: 28px; max-width: 110px; object-fit: contain; filter: grayscale(20%); }
+.client-logo-cell span { font-size: 9pt; font-weight: 700; color: var(--navy); }
+
+.company-quote {
+  font-style: italic; font-weight: 700; font-size: 9.5pt;
+  color: var(--navy); margin-bottom: 4mm; text-align: center;
+}
+.company-states {
+  font-style: italic; font-size: 8.5pt; color: var(--muted);
+  text-align: center; font-weight: 600;
+}
+
+/* ============================================
+   CLIENT DATA PAGE
+   ============================================ */
+.client-data-box {
+  border-left: 3px solid var(--navy);
+  padding: 4mm 6mm; margin-bottom: 5mm;
+  line-height: 2;
+}
+.client-data-box p { font-size: 9pt; }
+.client-data-box strong { font-weight: 800; text-transform: uppercase; }
+
+.proposal-ref {
+  display: flex; justify-content: space-between;
+  padding: 3mm 0; margin: 4mm 0;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.proposal-ref-num { font-weight: 800; font-size: 9pt; }
+.proposal-ref-date { font-weight: 800; font-size: 9pt; }
+
+.intro-text { font-size: 9pt; margin-bottom: 5mm; text-align: justify; line-height: 1.6; }
+
+.objective-text {
+  font-size: 9pt; text-align: justify; line-height: 1.7;
+}
+.objective-text p { margin-bottom: 3mm; }
+
+/* ============================================
+   SCOPE SECTION
+   ============================================ */
+.scope-section { margin-bottom: 5mm; }
+.scope-section-title {
+  font-size: 9.5pt; font-weight: 800;
+  text-transform: uppercase;
+  color: var(--navy); margin-bottom: 2mm;
+}
+.scope-section ul { padding-left: 5mm; }
+.scope-section ul li {
+  font-size: 9pt; text-align: justify;
+  line-height: 1.6; margin-bottom: 1.5mm;
+  list-style: disc;
+}
+
+/* ============================================
+   CRONOGRAMA
+   ============================================ */
+.cronograma-table {
+  width: 100%; border-collapse: collapse;
+  margin-bottom: 8mm;
+}
+.cronograma-table th {
+  background: var(--navy); color: white;
+  padding: 4mm 5mm; font-size: 9pt; font-weight: 800;
+  text-align: center; text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.cronograma-table td {
+  padding: 4mm 5mm; border-bottom: 1px solid var(--border);
+  vertical-align: top; font-size: 9pt; line-height: 1.5;
+}
+.cronograma-table tr:nth-child(even) td { background: #f7f9fc; }
+.cronograma-table .etapa-num {
+  text-align: center; font-weight: 800; font-size: 11pt;
+  color: var(--navy);
+}
+.cronograma-table .prazo-cell {
+  text-align: center; font-weight: 700; white-space: nowrap;
+}
+
+/* Flow diagram */
+.flow-wrap { margin: 6mm 0 4mm; }
+.flow-title { font-size: 9.5pt; font-weight: 700; margin-bottom: 3mm; }
+.flow-row { display: flex; gap: 2mm; margin-bottom: 2mm; }
+.flow-box {
+  flex: 1; padding: 3mm 4mm;
+  text-align: center; font-size: 7.5pt; font-weight: 700;
+  border-radius: 4px; position: relative;
+}
+.flow-box.dark  { background: var(--navy); color: white; }
+.flow-box.mid   { background: #2a4f8a; color: white; }
+.flow-box.light { background: #e8eef8; color: var(--navy); }
+.flow-box.green { background: #8dc53e; color: #1a1a1a; }
+.flow-box.orange{ background: #f5a623; color: #1a1a1a; }
+.flow-arrow {
+  display: flex; align-items: center; color: var(--muted); font-size: 10pt;
+  padding: 0 1mm;
+}
+
+.cronograma-obs {
+  font-size: 8pt; font-style: italic; font-weight: 700;
+  color: var(--navy); margin-top: 4mm; text-align: center;
+}
+
+/* ============================================
+   DIFERENCIAIS
+   ============================================ */
+.diferencial-item { margin-bottom: 4mm; font-size: 9pt; text-align: justify; line-height: 1.6; }
+.diferencial-item strong { font-weight: 800; }
+
+/* ============================================
+   PRICING PAGE (dark background)
+   ============================================ */
+.page-pricing {
+  background: var(--navy);
+  width: 210mm; min-height: 297mm;
+  margin: 0 auto 12mm;
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.pricing-header {
+  padding: 8mm 14mm 5mm;
+  border-bottom: 1px solid rgba(255,255,255,.15);
+  display: flex; align-items: center; gap: 10mm;
+  flex-shrink: 0;
+}
+.pricing-hdr-contact { text-align: right; font-size: 7pt; color: rgba(255,255,255,.6); line-height: 1.7; }
+
+.pricing-body { padding: 8mm 14mm; flex: 1; }
+
+.pricing-section-tag {
+  background: #1e3560;
+  color: white; font-weight: 800; font-size: 10pt;
+  padding: 5px 16px; border-radius: 3px;
+  display: inline-block; margin-bottom: 5mm;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.pricing-label {
+  background: #1a3060; color: white;
+  font-size: 8.5pt; font-weight: 800;
+  padding: 3px 12px; border-radius: 3px;
+  display: inline-block; margin-bottom: 3mm;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.pricing-value-text {
+  color: white; font-size: 11pt; font-weight: 700;
+  margin-bottom: 6mm; line-height: 1.6;
+}
+
+.includes-box {
+  background: rgba(255,255,255,.08);
+  border-radius: 6px; padding: 5mm 7mm; margin: 5mm 0 6mm;
+}
+.includes-box p { color: rgba(255,255,255,.8); font-size: 9pt; margin-bottom: 3mm; }
+.includes-box ul { padding-left: 5mm; }
+.includes-box ul li { color: rgba(255,255,255,.75); font-size: 9pt; margin-bottom: 2mm; list-style: disc; }
+
+.value-box {
+  background: var(--green); border-radius: 6px;
+  padding: 7mm 10mm; text-align: center;
+  margin: 6mm 0; display: block;
+}
+.value-box .value-main {
+  font-size: 18pt; font-weight: 900; color: #1a1a1a;
+  display: block;
+}
+.value-box .value-ext { font-size: 9pt; font-weight: 700; color: #2a4a0a; display: block; margin-top: 1mm; }
+
+.validade-box {
+  text-align: center; margin: 5mm 0;
+  font-size: 12pt; font-weight: 800;
+  color: white; text-decoration: underline;
+  letter-spacing: 1px;
+}
+
+.signature-box {
+  background: rgba(255,255,255,.1); border-radius: 8px;
+  padding: 8mm 10mm; text-align: center;
+  margin: 6mm auto; max-width: 80mm;
+}
+.signature-name { color: white; font-size: 11pt; font-weight: 900; margin-bottom: 2mm; }
+.signature-title { color: rgba(255,255,255,.8); font-size: 8pt; font-weight: 600; line-height: 1.7; }
+
+.pricing-footer {
+  padding: 5mm 14mm; border-top: 1px solid rgba(255,255,255,.1);
+  display: flex; justify-content: space-between; flex-shrink: 0;
+}
+.pricing-footer span { font-size: 6.5pt; color: rgba(255,255,255,.4); }
+
+/* ============================================
+   PRINT
+   ============================================ */
+@media print {
+  body { background: white; }
+  .toolbar, .toolbar-space { display: none !important; }
+  .page, .page-cover, .page-pricing {
+    margin: 0; box-shadow: none;
+    page-break-after: always;
+  }
+  @page { size: A4 portrait; margin: 0; }
+}
+
+/* Screen preview shadows */
+@media screen {
+  .page, .page-cover, .page-pricing {
+    box-shadow: 0 4px 24px rgba(0,0,0,.35);
+    margin-bottom: 12mm;
+  }
+  .toolbar-space { display: block; }
+  body { padding: 10mm 0 20mm; }
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <h3 id="toolbarTitle">Proposta Comercial — Bikows</h3>
+  <button class="btn-print" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+  <button class="btn-close" onclick="window.close()">✕ Fechar</button>
+</div>
+<div class="toolbar-space"></div>
+
+<div id="proposta"></div>
+
+<script>
+/* ==========================================
+   DATA + RENDER
+   ========================================== */
+const D = JSON.parse(localStorage.getItem('crm_proposta_gerada') || '{}');
+if (!D.numero) {
+  document.getElementById('proposta').innerHTML = '<div style="padding:40px;text-align:center;font-size:14pt;color:#c00">Dados da proposta não encontrados. Gere a proposta pelo CRM.</div>';
+}
+
+// ---- Utilities ----
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmt(v) {
+  return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)||0);
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+const MONTHS = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+function monthYear(iso) {
+  if (!iso) return { month: 'MAIO', year: new Date().getFullYear() };
+  const d = new Date(iso + 'T00:00:00');
+  return { month: MONTHS[d.getMonth()], year: d.getFullYear() };
+}
+
+// ---- BW Logo SVG ----
+const BW_SVG = `<svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="44" height="44" rx="5" fill="#0c1e3e"/>
+  <text x="22" y="31" text-anchor="middle" fill="white" font-size="20" font-weight="900" font-family="Arial Black,Arial" letter-spacing="-1">BW</text>
+</svg>`;
+const BW_SVG_DARK = `<svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="44" height="44" rx="5" fill="white"/>
+  <text x="22" y="31" text-anchor="middle" fill="#0c1e3e" font-size="20" font-weight="900" font-family="Arial Black,Arial" letter-spacing="-1">BW</text>
+</svg>`;
+
+// ---- Contact block ----
+function contactHtml(dark=false) {
+  const c = dark ? 'rgba(255,255,255,.6)' : '#555';
+  return `<div class="pg-contact" style="color:${c}">
+    <span>🌐 www.bikows.com.br</span>
+    <span>📞 (43) 9 84262950</span>
+    <span>✉ engenharia@bikows.com.br</span>
+  </div>`;
+}
+
+// ---- Standard header ----
+function stdHeader(hasClientLogo=false) {
+  let center = '';
+  if (hasClientLogo && D.cliente?.logoUrl) {
+    center = `<div class="client-logo-wrap"><img class="client-logo-img" src="${esc(D.cliente.logoUrl)}" alt="cliente"></div>`;
+  } else if (hasClientLogo && D.cliente?.nome) {
+    // text fallback — abbreviated
+    const nm = (D.cliente.nome || '').split(' ').slice(0,2).join(' ').toUpperCase();
+    center = `<div class="client-logo-wrap"><span class="client-logo-text" style="font-size:10pt">${esc(nm)}</span></div>`;
+  } else {
+    center = `<div class="pg-header-service">SERVIÇOS DE ENGENHARIA E SOLUÇÕES PARA VOCÊ E SUA EMPRESA</div>`;
+  }
+  return `<div class="pg-header">
+    <div class="pg-header-top">
+      <div class="bw-logo">
+        <div class="bw-badge">${BW_SVG}</div>
+        <div class="bw-text">
+          <div class="bw-name">BIKOWS</div>
+          <div class="bw-sub">SOLUÇÕES EM ENGENHARIA<br>MECÂNICA</div>
+        </div>
+      </div>
+      ${center}
+      ${contactHtml()}
+    </div>
+    ${hasClientLogo ? `<div style="text-align:right;font-style:italic;font-size:7pt;color:#777">SERVIÇOS DE ENGENHARIA E SOLUÇÕES PARA VOCÊ E SUA EMPRESA</div>` : ''}
+  </div>`;
+}
+
+// ---- Standard footer ----
+function stdFooter() {
+  return `<div class="pg-footer">
+    <span class="pg-footer-copy">© Bikows Engenharia. Todos os direitos reservados.</span>
+    <div class="pg-footer-info">Bikows Engenharia LTDA<br>47.121.646/0001-90<br>CREA 83340</div>
+  </div>`;
+}
+
+// ============================================
+// PAGE 1: CAPA
+// ============================================
+function renderCapa() {
+  const { month, year } = monthYear(D.data);
+  const photos = D.coverPhotos || [];
+
+  let photosHtml = '';
+  for (let i = 0; i < 6; i++) {
+    const url = photos[i];
+    photosHtml += `<div class="cover-photo">
+      ${url ? `<img src="${esc(url)}" alt="foto ${i+1}">` : `<div class="cover-photo-placeholder">${['🏭','⚙','🔧','📐','🏗','🔩'][i]}</div>`}
+    </div>`;
+  }
+
+  return `<div class="page-cover">
+    <div class="cover-grid-bg"></div>
+    <div class="cover-overlay"></div>
+    <div class="cover-content">
+      <div class="cover-top">
+        <div class="cover-logo">
+          <div class="cover-bw-badge">${BW_SVG_DARK}</div>
+          <div class="cover-logo-text">
+            <div class="cover-logo-name">BIKOWS</div>
+            <div class="cover-logo-sub">SOLUÇÕES EM ENGENHARIA<br>MECÂNICA</div>
+          </div>
+        </div>
+        <div class="cover-date-block">
+          <div class="cover-month">${month}</div>
+          <div class="cover-year">${year}</div>
+        </div>
+      </div>
+
+      <div class="cover-title">
+        <div class="cover-main-title">PROPOSTA<br>COMERCIAL</div>
+        <div class="cover-subtitle">Data Orçamento: ${fmtDate(D.data) || ''}</div>
+      </div>
+
+      <div class="cover-photos">${photosHtml}</div>
+
+      <div class="cover-contact">
+        <span>🌐 www.bikows.com.br</span>
+        <span>📞 (43) 9 84262950</span>
+        <span>✉ engenharia@bikows.com.br</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ============================================
+// PAGE 2: SOBRE BIKOWS + CLIENTES
+// ============================================
+function renderSobreBikows() {
+  const clientes = D.clientesRef || [
+    'Continental','Elecnor','AUMOVIO','Eneva','FCM — Fábrica de Mancais','MESSER',
+    'emae','EBSERH','Icilegel','Jussara','Prosmaq','enerlab'
+  ];
+  const clientGrid = clientes.map(c => `<div class="client-logo-cell"><span>${esc(c)}</span></div>`).join('');
+
+  return `<div class="page">
+    ${stdHeader()}
+    <div class="pg-body">
+      <div class="company-info-box">
+        <p><strong>Razão Social:</strong> BIKOWS EMPREENDIMENTOS LTDA</p>
+        <p><strong>Endereço:</strong> RUA JOÃO PAULO II, N 39/49/588, CENTRO</p>
+        <p><strong>Cidade:</strong> RIBEIRÃO DO PINHAL &nbsp;|&nbsp; <strong>CEP:</strong> 86.490-000 &nbsp;|&nbsp; <strong>UF:</strong> PR</p>
+        <p><strong>CNPJ/CPF:</strong> 47.121.646/0001-90</p>
+        <p><strong>E-mail:</strong> contato@bikows.com.br &nbsp;|&nbsp; <strong>Telefone:</strong> (43) 98426-2950</p>
+      </div>
+
+      <div class="sec-tag">Alguns dos Nossos Clientes</div>
+      <div class="clients-grid">${clientGrid}</div>
+
+      <div class="company-quote">"25 anos de tradição, inovação e resultados. Transformando desafios em soluções."</div>
+      <div class="company-states" style="font-style:italic">PARANÁ / SANTA CATARINA / SÃO PAULO / MINAS GERAIS / MATO GROSSO DO SUL / RIO GRANDE DO SUL</div>
+    </div>
+    ${stdFooter()}
+  </div>`;
+}
+
+// ============================================
+// PAGE 3: DADOS DO CLIENTE + OBJETIVO
+// ============================================
+function renderDadosCliente() {
+  const c = D.cliente || {};
+  return `<div class="page">
+    ${stdHeader(true)}
+    <div class="pg-body">
+      <div class="client-data-box">
+        ${c.departamento ? `<p><strong>Departamento:</strong> ${esc(c.departamento)}</p>` : ''}
+        <p><strong>Razão Social:</strong> ${esc(c.nome || '')}</p>
+        <p><strong>CNPJ:</strong> ${esc(c.cnpj || '')}${c.unidadeDest ? ` &nbsp;|&nbsp; <strong>Unidade Dest:</strong> ${esc(c.unidadeDest)}` : ''}</p>
+        ${c.endereco ? `<p><strong>Endereço:</strong> ${esc(c.endereco)}</p>` : ''}
+        ${c.cidade ? `<p><strong>Cidade:</strong> ${esc(c.cidade)}${c.cep ? ` &nbsp;|&nbsp; <strong>CEP:</strong> ${esc(c.cep)}` : ''}${c.uf ? ` &nbsp;|&nbsp; <strong>UF:</strong> ${esc(c.uf)}` : ''}</p>` : ''}
+        ${c.email ? `<p><strong>E-mail:</strong> ${esc(c.email)}</p>` : ''}
+        <p><strong>Serviço Solicitado:</strong></p>
+        <p>${esc(D.servicoSolicitado || '')}</p>
+      </div>
+
+      <div class="proposal-ref">
+        <span class="proposal-ref-num">Proposta nº ${esc(D.numero || '')} |</span>
+        <span class="proposal-ref-date">Data: ${fmtDate(D.data)}</span>
+      </div>
+
+      ${D.introTexto ? `<p class="intro-text">${esc(D.introTexto)}</p>` : ''}
+
+      <div class="sec-tag">Objetivo</div>
+      <div class="objective-text">
+        ${(D.objetivo || '').split('\n\n').map(p => `<p>${esc(p)}</p>`).join('')}
+      </div>
+    </div>
+    ${stdFooter()}
+  </div>`;
+}
+
+// ============================================
+// SCOPE PAGES (auto-paginação simples)
+// ============================================
+function renderEscopoPages() {
+  const sections = D.escopoSections || [];
+  if (!sections.length) return '';
+  const SECTIONS_PER_PAGE = 4;
+  let pages = '';
+  for (let i = 0; i < sections.length; i += SECTIONS_PER_PAGE) {
+    const chunk = sections.slice(i, i + SECTIONS_PER_PAGE);
+    pages += `<div class="page">
+      ${stdHeader(true)}
+      <div class="pg-body">
+        <div class="sec-tag">Escopo Técnico</div>
+        ${chunk.map(s => `
+          <div class="scope-section">
+            <div class="scope-section-title">${esc(s.titulo)}</div>
+            <ul>${(s.itens||[]).map(it => `<li>${esc(it)}</li>`).join('')}</ul>
+          </div>
+        `).join('')}
+      </div>
+      ${stdFooter()}
+    </div>`;
+  }
+  return pages;
+}
+
+// ============================================
+// CRONOGRAMA
+// ============================================
+function renderCronograma() {
+  const etapas = D.cronograma || [];
+  const fluxo = D.fluxoResumo || ['1 - Planejamento','2 - Pré-montagem','3 - Execução in loco','4 - Entrega Final'];
+  const fluxoDetalhado = D.fluxoDetalhado || [];
+  const colors = ['dark','mid','light','green','orange','dark','mid','light'];
+
+  const fluxoResHtml = fluxo.map((f,i) => `
+    ${i>0 ? '<div class="flow-arrow">→</div>' : ''}
+    <div class="flow-box ${colors[i]}">${esc(f)}</div>
+  `).join('');
+
+  let fluxoDetHtml = '';
+  if (fluxoDetalhado.length) {
+    // rows of 3
+    for (let i=0; i<fluxoDetalhado.length; i+=3) {
+      const row = fluxoDetalhado.slice(i,i+3);
+      fluxoDetHtml += `<div class="flow-row">${row.map((f,j)=>`
+        ${j>0?'<div class="flow-arrow">→</div>':''}
+        <div class="flow-box ${colors[(i+j)%colors.length]}">${esc(f)}</div>
+      `).join('')}</div>`;
+    }
+  }
+
+  return `<div class="page">
+    ${stdHeader(true)}
+    <div class="pg-body">
+      <div class="sec-tag">Cronograma de Execução</div>
+      <table class="cronograma-table">
+        <thead>
+          <tr>
+            <th style="width:8mm">#</th>
+            <th style="width:45mm">Etapa</th>
+            <th>Descrição</th>
+            <th style="width:18mm">Prazo</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${etapas.map(e => `<tr>
+            <td class="etapa-num">${esc(e.num||'')}</td>
+            <td><strong>${esc(e.nome||'')}</strong></td>
+            <td>${esc(e.descricao||'')}</td>
+            <td class="prazo-cell">${esc(e.prazo||'')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+
+      ${fluxo.length ? `<div class="flow-wrap">
+        <div class="flow-title">Escopo resumido:</div>
+        <div class="flow-row">${fluxoResHtml}</div>
+      </div>` : ''}
+
+      ${fluxoDetalhado.length ? `<div class="flow-wrap">
+        <div class="flow-title">Escopo detalhado:</div>
+        ${fluxoDetHtml}
+      </div>` : ''}
+
+      ${D.cronogramaObs ? `<div class="cronograma-obs">${esc(D.cronogramaObs)}</div>` : ''}
+    </div>
+    ${stdFooter()}
+  </div>`;
+}
+
+// ============================================
+// DIFERENCIAIS
+// ============================================
+function renderDiferenciais() {
+  const items = D.diferenciais || [
+    { titulo: 'Experiência comprovada em interdições fiscais', texto: 'Atuamos diretamente em casos envolvendo MTE, Ministério Público e outros órgãos fiscalizadores, com histórico sólido em regularizações e liberações de máquinas e processos.' },
+    { titulo: 'Conformidade garantida e suporte contínuo', texto: 'Oferecemos segurança imediata e acompanhamento técnico permanente, assegurando que sua operação permaneça em conformidade e livre de autuações.' },
+    { titulo: 'Autoridade em múltiplos segmentos', texto: 'Somos referência em indústrias (NRs, atualizações e automação) e projetos de desenvolvimento mecânico e estrutural.' },
+    { titulo: 'Infraestrutura e capacidade técnica', texto: 'Com mais de 4.000 m² de fábrica, 50+ colaboradores e uma equipe multidisciplinar, garantimos agilidade e robustez em cada entrega.' },
+    { titulo: 'Especialização normativa completa', texto: 'Domínio técnico e prático das principais normas — NR-11, NR-12, NR-13, NR-35 e complementares — assegurando projetos alinhados à legislação e às boas práticas de engenharia.' },
+    { titulo: 'Projetos sob medida para cada cliente', texto: 'Desenvolvemos soluções personalizadas para máquinas, equipamentos, linhas de produção e estruturas metálicas, adaptadas à realidade e aos objetivos de cada operação.' },
+    { titulo: 'Confiança de grandes marcas', texto: 'Atendemos empresas nacionais e multinacionais dos setores automotivo, alimentício, agroindustrial, metalúrgico, siderúrgico, têxtil e papel e celulose, entregando resultados consistentes e mensuráveis.' },
+    { titulo: 'Qualidade e valor agregado', texto: 'Mais que conformidade, entregamos produtividade, segurança e tranquilidade em auditorias. Nossos projetos unem excelência técnica, cumprimento rigoroso de prazos e resultados reais.' },
+    { titulo: 'Filosofia e princípios', texto: 'Baseamos todas as entregas em honestidade, transparência e inovação, garantindo relacionamentos duradouros e resultados que falam por si.' },
+  ];
+  return `<div class="page">
+    ${stdHeader()}
+    <div class="pg-body">
+      <div class="sec-tag">Nossos Diferenciais</div>
+      ${items.map(it => `<div class="diferencial-item">• <strong>${esc(it.titulo)}:</strong> ${esc(it.texto)}</div>`).join('')}
+    </div>
+    ${stdFooter()}
+  </div>`;
+}
+
+// ============================================
+// PRICING PAGE
+// ============================================
+function renderPrecificacao() {
+  const eng = D.engenheiro || {
+    nome: 'MARCOS DA SILVA ISRAEL',
+    titulo1: 'ENGENHEIRO MECÂNICO',
+    titulo2: 'ENG. SEGURANÇA DO TRABALHO',
+    titulo3: 'ENG. AUTOMAÇÃO INDUSTRIAL',
+    crea: 'CREA PR-206397/D'
+  };
+  const incluiItems = D.incluiNoValor || [
+    'Despesas com deslocamento e outros',
+    'Matéria prima',
+    'Garantia de 12 meses',
+    'Emissão de Laudo Técnico de conformidade',
+    'Emissão da ART perante ao CREA-PR',
+    'Nota fiscal — Alíq. Serviços de Engenharia',
+  ];
+
+  const valorFormatado = D.valor ? fmt(D.valor) : 'R$ 0,00';
+  const ext = D.valorPorExtenso ? `(${D.valorPorExtenso})` : '';
+
+  return `<div class="page-pricing">
+    <div class="pricing-header">
+      <div class="bw-logo">
+        <div class="bw-badge" style="background:rgba(255,255,255,.12)">${BW_SVG}</div>
+        <div class="bw-text">
+          <div class="bw-name" style="color:white">BIKOWS</div>
+          <div class="bw-sub" style="color:rgba(255,255,255,.6)">SOLUÇÕES EM ENGENHARIA<br>MECÂNICA</div>
+        </div>
+      </div>
+      <div style="flex:1;text-align:center;font-style:italic;font-size:7pt;color:rgba(255,255,255,.4)">SERVIÇOS DE ENGENHARIA E SOLUÇÕES PARA VOCÊ E SUA EMPRESA</div>
+      ${contactHtml(true)}
+    </div>
+
+    <div class="pricing-body">
+      <div class="pricing-section-tag">Prazo, Forma de Pagamento e Valor da Proposta</div>
+
+      <div style="margin-bottom:5mm">
+        <div class="pricing-label">Prazo de Entrega</div>
+        <div class="pricing-value-text">${esc(D.prazoEntrega || '—')}</div>
+      </div>
+
+      <div style="margin-bottom:5mm">
+        <div class="pricing-label">Forma de Pagamento</div>
+        <div class="pricing-value-text">${(D.formaPagamento || '').split('\n').map(l => esc(l)).join('<br>')}</div>
+      </div>
+
+      <div>
+        <div class="pricing-label">Valor da Proposta</div>
+        <div class="includes-box">
+          <p>O valor da proposta já contempla todos os custos envolvidos no escopo:</p>
+          <ul>${incluiItems.map(it => `<li>${esc(it)}</li>`).join('')}</ul>
+        </div>
+        <div class="value-box">
+          <span class="value-main">${valorFormatado}</span>
+          ${ext ? `<span class="value-ext">${esc(ext)}</span>` : ''}
+        </div>
+        <div class="validade-box">VALIDADE DA PROPOSTA: ${esc(D.validade || '15')} DIAS</div>
+      </div>
+
+      <div class="signature-box">
+        <div class="signature-name">${esc(eng.nome)}</div>
+        <div class="signature-title">
+          ${esc(eng.titulo1)}<br>
+          ${eng.titulo2 ? esc(eng.titulo2)+'<br>' : ''}
+          ${eng.titulo3 ? esc(eng.titulo3)+'<br>' : ''}
+          ${esc(eng.crea)}
+        </div>
+      </div>
+    </div>
+
+    <div class="pricing-footer">
+      <span>© Bikows Engenharia. Todos os direitos reservados.</span>
+      <span>Bikows Engenharia LTDA | 47.121.646/0001-90 | CREA 83340</span>
+    </div>
+  </div>`;
+}
+
+// ============================================
+// RENDER ALL
+// ============================================
+function renderAll() {
+  if (!D.numero) return;
+  const container = document.getElementById('proposta');
+  let html = '';
+  html += renderCapa();
+  if (D.incluirClientesPage !== false) html += renderSobreBikows();
+  html += renderDadosCliente();
+  html += renderEscopoPages();
+  if ((D.cronograma||[]).length) html += renderCronograma();
+  if (D.incluirDiferenciais !== false) html += renderDiferenciais();
+  html += renderPrecificacao();
+  container.innerHTML = html;
+
+  // Update toolbar title
+  const title = `Proposta ${D.numero || ''} — ${(D.cliente||{}).nome || 'Cliente'}`;
+  document.getElementById('toolbarTitle').textContent = title;
+  document.title = title;
+}
+
+renderAll();
+</script>
+</body>
+</html>

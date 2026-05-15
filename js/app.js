@@ -149,8 +149,8 @@ const App = (() => {
 
   function updateBrand() {
     const cfg = DB.getConfig();
-    document.getElementById('brandName').textContent = cfg.empresa || 'CRM';
-    document.title = (cfg.empresa || 'CRM') + ' — CRM';
+    document.getElementById('brandName').textContent = cfg.empresa || 'Bikows CRM';
+    document.title = (cfg.empresa || 'Bikows CRM') + ' — CRM';
   }
 
   function updateUserInfo() {

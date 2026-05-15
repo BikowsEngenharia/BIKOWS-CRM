@@ -316,7 +316,7 @@ const DB = (() => {
      ==================================================== */
   function defaultConfig() {
     return {
-      empresa: 'Minha Empresa de Engenharia',
+      empresa: 'Bikows Soluções em Engenharia',
       cnpj: '', cidade: '', estado: '',
       responsaveis: ['Marcos', 'Ana', 'Carlos', 'Julia'],
       segmentos: ['Alimentos', 'Metal-Mecânica', 'Agro', 'Energia', 'Construção', 'Papel e Celulose', 'Químico', 'Outro'],

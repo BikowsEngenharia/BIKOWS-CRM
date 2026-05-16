@@ -100,6 +100,7 @@ const Projetos = (() => {
                   <td>
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}')">Ver</button>
+                      <button class="btn btn-xs btn-primary" onclick="ProjetoFinanceiro.open('${p.id}')" title="Controle Financeiro do Projeto">💰</button>
                       <button class="btn btn-xs btn-secondary" onclick="Projetos.openForm('${p.id}')">✏</button>
                       <button class="btn btn-xs btn-danger" onclick="Projetos.deleteProjeto('${p.id}')">🗑</button>
                     </div>
@@ -242,6 +243,7 @@ const Projetos = (() => {
         ${p.observacoes ? `<div class="mt-3 detail-field"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(p.observacoes)}</div></div>` : ''}
         <div class="mt-4 flex gap-2">
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="Modal.close();ProjetoFinanceiro.open('${id}')">💰 Financeiro</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
       `,
@@ -419,8 +421,21 @@ const Projetos = (() => {
       etapas: collectEtapas(),
       observacoes: document.getElementById('fpObs').value,
     };
-    if (id) { DB.update('projetos', id, data); Toast.success('Projeto atualizado'); }
-    else { DB.create('projetos', data); Toast.success('Projeto criado'); }
+    if (id) {
+      const anterior = DB.get('projetos', id);
+      const statusAnterior = anterior?.status;
+      DB.update('projetos', id, data);
+      Toast.success('Projeto atualizado');
+      // Hook: ao entrar em andamento, sugere configurar recebimentos
+      if (statusAnterior !== 'em_andamento' && data.status === 'em_andamento') {
+        if (typeof ProjetoFinanceiro !== 'undefined') {
+          ProjetoFinanceiro.sugerirConfiguracaoPagamentos(id);
+        }
+      }
+    } else {
+      const criado = DB.create('projetos', data);
+      Toast.success('Projeto criado');
+    }
     Modal.close();
     render();
   }

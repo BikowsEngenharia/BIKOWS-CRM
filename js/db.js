@@ -8,7 +8,7 @@ const DB = (() => {
   const ENTITIES = [
     'clientes','contatos','leads','projetos','atividades',
     'propostas','recebiveis','funcionarios','lancamentos',
-    'contaspagar','folha','licitacoes',
+    'contaspagar','folha','licitacoes','metas',
   ];
 
   // Cache em memória — populado por loadAll()

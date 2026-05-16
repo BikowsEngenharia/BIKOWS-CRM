@@ -16,6 +16,7 @@ const App = (() => {
     calendario:  { title: 'Calendário',      module: Calendario,   addLabel: '+ Nova Atividade' },
     licitacoes:  { title: 'Licitações',      module: Licitacoes,   addLabel: '+ Nova Licitação' },
     relatorios:  { title: 'Relatórios',      module: Relatorios,   addLabel: null },
+    metas:      { title: 'Metas & KPIs',    module: Metas,       addLabel: '+ Nova Meta' },
     config:     { title: 'Configurações',   module: Config,      addLabel: null },
   };
 
@@ -28,6 +29,7 @@ const App = (() => {
     projetos: 'projetos', atividades: 'atividades', propostas: 'propostas',
     recebiveis: 'financeiro', funcionarios: 'rh', lancamentos: 'financeiro',
     contaspagar: 'financeiro', folha: 'rh', licitacoes: 'licitacoes',
+    metas: 'metas',
   };
 
   function refreshIfNeeded(entity) {
@@ -85,6 +87,7 @@ const App = (() => {
       if (e.key === 'c' || e.key === 'C') { e.preventDefault(); navigate('calendario'); return; }
       if (e.key === 'l' || e.key === 'L') { e.preventDefault(); navigate('licitacoes'); return; }
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); navigate('relatorios'); return; }
+      if (e.key === 'm' || e.key === 'M') { e.preventDefault(); navigate('metas'); return; }
     });
 
     // Clique fora fecha search

@@ -137,6 +137,8 @@ const Dashboard = (() => {
 
       <!-- Alertas Follow-up -->
       ${renderFollowupAlerts(ativos)}
+
+      <div id="dashMetasKpi"></div>
     `;
 
     // Renderizar gráficos
@@ -176,6 +178,51 @@ const Dashboard = (() => {
       data: Object.entries(projStatus).map(([k,v]) => ({ label: Utils.PROJ_STATUS[k]?.label || k, value: v.length })),
       size: 160,
     });
+
+    _renderMetasKpi();
+  }
+
+  function _renderMetasKpi() {
+    const el = document.getElementById('dashMetasKpi');
+    if (!el) return;
+    if (typeof Metas === 'undefined') return;
+
+    const ano = new Date().getFullYear();
+    const qi = Math.floor(new Date().getMonth() / 3);
+    const TRIMESTRES = ['Q1 (Jan–Mar)', 'Q2 (Abr–Jun)', 'Q3 (Jul–Set)', 'Q4 (Out–Dez)'];
+    const meta = DB.getAll('metas').find(m => m.ano === ano && m.trimestre === qi);
+    if (!meta || !meta.receita) { el.innerHTML = ''; return; }
+
+    const lancamentos = DB.getAll('lancamentos');
+    const meses = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]][qi];
+    const inicio = new Date(ano, meses[0], 1).toISOString().split('T')[0];
+    const fim = new Date(ano, meses[2] + 1, 0).toISOString().split('T')[0];
+    const receitaReal = lancamentos
+      .filter(l => l.tipo==='receita' && l.status==='recebido' && l.data >= inicio && l.data <= fim)
+      .reduce((s,l) => s + (l.valor||0), 0);
+    const pct = Math.min(Math.round((receitaReal / meta.receita) * 100), 100);
+    const color = pct >= 100 ? 'var(--success)' : pct >= 70 ? 'var(--warning)' : 'var(--primary)';
+
+    el.innerHTML = `
+      <div style="margin-top:24px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:14px;font-weight:700;color:var(--text);margin:0;">🎯 Metas do Trimestre — ${TRIMESTRES[qi]}</h3>
+          <button class="btn btn-xs btn-ghost" onclick="App.navigate('metas')">Ver tudo →</button>
+        </div>
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:13px;font-weight:600;color:var(--text);">💰 Faturamento</span>
+            <span style="font-size:13px;font-weight:700;color:${color};">${pct}%</span>
+          </div>
+          <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:6px;">
+            <div style="width:${pct}%;height:100%;background:${color};border-radius:99px;transition:width .5s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);">
+            <span>Realizado: ${Utils.formatCurrency(receitaReal)}</span>
+            <span>Meta: ${Utils.formatCurrency(meta.receita)}</span>
+          </div>
+        </div>
+      </div>`;
   }
 
   function renderAtividades(list) {

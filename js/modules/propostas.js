@@ -142,6 +142,8 @@ const Propostas = (() => {
     const p = DB.get('propostas', id);
     if (!p) return;
     const cliente = DB.get('clientes', p.clienteId);
+    const versoes = p.versoes || [];
+
     Modal.open({
       title: `Proposta ${p.numero || ''}`,
       size: 'modal-lg',
@@ -187,9 +189,30 @@ const Propostas = (() => {
 
         ${p.observacoes ? `<div class="detail-field mb-3"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(p.observacoes)}</div></div>` : ''}
 
+        <!-- HISTÓRICO DE VERSÕES -->
+        ${versoes.length > 0 ? `
+        <div class="detail-field mb-3">
+          <div class="detail-label mb-2">📋 Histórico de Versões</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${[...versoes].reverse().map((v, i) => `
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border-radius:var(--radius);border-left:3px solid ${i===0?'var(--primary)':'var(--border)'}">
+                <span style="font-size:11px;font-weight:700;color:${i===0?'var(--primary)':'var(--text-muted)'}">v${versoes.length - i}</span>
+                <div style="flex:1">
+                  <div class="font-bold text-sm">${Utils.formatCurrency(v.valor)}</div>
+                  <div class="text-xs text-muted">${v.motivo || 'Revisão'}</div>
+                </div>
+                <div class="text-xs text-muted">${new Date(v.data).toLocaleDateString('pt-BR')}</div>
+              </div>`).join('')}
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border-radius:var(--radius);border-left:3px solid var(--border);opacity:0.6">
+              <span style="font-size:11px;font-weight:700;color:var(--text-muted)">v1</span>
+              <div style="flex:1"><div class="font-bold text-sm">Versão original</div></div>
+            </div>
+          </div>
+        </div>` : ''}
+
         <div class="form-group">
           <label class="form-label">Alterar Status</label>
-          <div class="flex gap-2">
+          <div class="flex gap-2" style="flex-wrap:wrap">
             ${Object.entries(Utils.PROP_STATUS).map(([k,v]) => `<button class="btn btn-sm ${p.status===k?'btn-primary':'btn-secondary'}" onclick="Propostas.changeStatus('${id}','${k}')">${v.label}</button>`).join('')}
           </div>
         </div>
@@ -197,7 +220,7 @@ const Propostas = (() => {
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
           <button class="btn btn-success btn-sm" onclick="Modal.close();PropostaGenerator.open('${id}')">🖨 Gerar PDF</button>
           ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Propostas.criarRecebivel('${id}')">💰 Criar Recebível</button>` : ''}
-          <button class="btn btn-secondary btn-sm" onclick="Modal.close();Propostas.openForm('${id}')">✏ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="Modal.close();Propostas.openForm('${id}')">✏ Editar / Nova Versão</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
       `,
@@ -294,6 +317,10 @@ const Propostas = (() => {
           <label class="form-label">Observações / Condições de Pagamento</label>
           <textarea class="form-control" id="fpObs" rows="3">${Utils.escHtml(p?.observacoes||'')}</textarea>
         </div>
+        ${id ? `<div class="form-group" style="background:var(--bg);padding:10px;border-radius:var(--radius)">
+          <label class="form-label">Motivo da revisão (se alterar o valor)</label>
+          <input class="form-control" id="fpMotivoRevisao" placeholder="Ex: Ajuste de escopo, negociação de desconto...">
+        </div>` : ''}
       `,
       saveCb: () => saveProposta(id),
     });
@@ -309,6 +336,24 @@ const Propostas = (() => {
     const manualValor = Number(document.getElementById('fpValor').value);
     const valor = autoValor > 0 ? autoValor : manualValor;
     if (!valor) { Toast.error('Informe o valor da proposta ou adicione itens'); return; }
+
+    // Registrar versão anterior se o valor mudou
+    let versoes = [];
+    if (id) {
+      const existing = DB.get('propostas', id);
+      if (existing) {
+        versoes = existing.versoes || [];
+        if (existing.valor && existing.valor !== valor) {
+          versoes = [...versoes, {
+            data: new Date().toISOString(),
+            valor: existing.valor,
+            motivo: document.getElementById('fpMotivoRevisao')?.value || 'Revisão de valor',
+            status: existing.status,
+          }];
+        }
+      }
+    }
+
     const data = {
       numero: document.getElementById('fpNum').value,
       titulo,
@@ -320,8 +365,9 @@ const Propostas = (() => {
       descricao: document.getElementById('fpDesc').value,
       observacoes: document.getElementById('fpObs').value,
       itens: _formItems.map(it => ({ ...it })),
+      versoes,
     };
-    if (id) { DB.update('propostas', id, data); Toast.success('Proposta atualizada'); }
+    if (id) { DB.update('propostas', id, data); Toast.success('Proposta atualizada — nova versão registrada'); }
     else { DB.create('propostas', data); Toast.success('Proposta criada'); }
     Modal.close();
     render();

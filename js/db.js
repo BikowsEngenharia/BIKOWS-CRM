@@ -8,7 +8,7 @@ const DB = (() => {
   const ENTITIES = [
     'clientes','contatos','leads','projetos','atividades',
     'propostas','recebiveis','funcionarios','lancamentos',
-    'contaspagar','folha','licitacoes','metas',
+    'contaspagar','folha','licitacoes','metas','contratos',
     'marketing_posts','marketing_campanhas','marketing_ideias','marketing_kpis',
   ];
 

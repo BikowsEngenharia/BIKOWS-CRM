@@ -1,9 +1,19 @@
 /* ==========================================
-   PROJETOS — Gestão de execução
+   PROJETOS — Gestão de execução + Rentabilidade
    ========================================== */
 const Projetos = (() => {
 
   let _filter = { status: '', responsavel: '' };
+
+  function _calcRentabilidade(p) {
+    const receita = p.valor || 0;
+    const custoHoras = (p.horasTrabalhadas || 0) * (p.valorHora || 0);
+    const custosDirectos = p.custosDirectos || 0;
+    const custoTotal = custoHoras + custosDirectos;
+    const margem = receita - custoTotal;
+    const margemPct = receita > 0 ? Math.round((margem / receita) * 100) : 0;
+    return { receita, custoHoras, custosDirectos, custoTotal, margem, margemPct };
+  }
 
   function render() {
     const projetos = DB.getAll('projetos');
@@ -17,19 +27,32 @@ const Projetos = (() => {
     const concluidos = projetos.filter(p => p.status === 'concluido').length;
     const totalValor = Utils.sum(projetos, 'valor');
 
+    // Rentabilidade consolidada
+    const totalCustos = projetos.reduce((s, p) => {
+      const r = _calcRentabilidade(p);
+      return s + r.custoTotal;
+    }, 0);
+    const margemGeral = totalValor > 0 ? Math.round(((totalValor - totalCustos) / totalValor) * 100) : 0;
+
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
         <h2 class="sec-title">Projetos em Execução</h2>
         <div class="sec-actions">
+          <button class="btn btn-secondary" onclick="Projetos.verRentabilidade()">📊 Rentabilidade</button>
           <button class="btn btn-primary" onclick="Projetos.openForm()">+ Novo Projeto</button>
         </div>
       </div>
 
-      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
         <div class="kpi-card" style="--kpi-color:#3b82f6"><div class="kpi-label">Em Andamento</div><div class="kpi-value">${emAnd}</div><div class="kpi-icon">🔧</div></div>
         <div class="kpi-card" style="--kpi-color:#ef4444"><div class="kpi-label">Atrasados</div><div class="kpi-value">${atrasados}</div><div class="kpi-icon">⚠</div></div>
         <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Concluídos</div><div class="kpi-value">${concluidos}</div><div class="kpi-icon">✅</div></div>
-        <div class="kpi-card" style="--kpi-color:#8b5cf6"><div class="kpi-label">Valor Total</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(totalValor)}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:#8b5cf6"><div class="kpi-label">Valor Total</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalValor)}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:${margemGeral >= 40 ? '#10b981' : margemGeral >= 20 ? '#f59e0b' : '#ef4444'}">
+          <div class="kpi-label">Margem Média</div>
+          <div class="kpi-value">${margemGeral}%</div>
+          <div class="kpi-icon">📈</div>
+        </div>
       </div>
 
       <div class="card">
@@ -49,7 +72,7 @@ const Projetos = (() => {
         <div class="table-wrap">
           ${list.length === 0 ? emptyState() : `
           <table class="tbl">
-            <thead><tr><th>Código</th><th>Projeto</th><th>Cliente</th><th>Responsável</th><th>Valor</th><th>Prazo</th><th>Progresso</th><th>Status</th><th>NF</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Código</th><th>Projeto</th><th>Cliente</th><th>Valor</th><th>Margem</th><th>Prazo</th><th>Progresso</th><th>Status</th><th>NF</th><th>Ações</th></tr></thead>
             <tbody>
               ${list.map(p => {
                 const etapas = p.etapas || [];
@@ -57,12 +80,14 @@ const Projetos = (() => {
                 const dias = Utils.daysUntil(p.prazo);
                 const prazoClass = (p.status !== 'concluido' && dias != null && dias < 0) ? 'text-danger' : 'text-muted';
                 const prazoLabel = dias == null ? '—' : dias < 0 ? `⚠ ${Math.abs(dias)}d atraso` : dias === 0 ? 'Hoje' : `${dias}d`;
+                const rent = _calcRentabilidade(p);
+                const margemColor = rent.margemPct >= 40 ? '#10b981' : rent.margemPct >= 20 ? '#f59e0b' : rent.custoTotal > 0 ? '#ef4444' : '#94a3b8';
                 return `<tr>
                   <td class="text-xs text-muted font-bold">${Utils.escHtml(p.codigo||'—')}</td>
-                  <td><div class="font-bold" style="max-width:180px">${Utils.escHtml(p.titulo)}</div></td>
+                  <td><div class="font-bold" style="max-width:160px">${Utils.escHtml(p.titulo)}</div></td>
                   <td class="text-sm">${Utils.escHtml(Utils.getClientName(p.clienteId))}</td>
-                  <td class="text-sm">${Utils.escHtml(p.responsavel||'—')}</td>
                   <td class="text-sm font-bold">${Utils.formatCurrency(p.valor)}</td>
+                  <td class="text-sm font-bold" style="color:${margemColor}">${rent.custoTotal > 0 ? rent.margemPct + '%' : '—'}</td>
                   <td class="text-sm ${prazoClass}">${Utils.formatDate(p.prazo)} <span class="text-xs">${prazoLabel}</span></td>
                   <td style="min-width:100px">
                     <div class="flex items-center gap-2">
@@ -94,11 +119,62 @@ const Projetos = (() => {
 
   function setFilter(k, v) { _filter[k] = v; render(); }
 
+  function verRentabilidade() {
+    const projetos = DB.getAll('projetos').filter(p => p.valor > 0);
+    const rows = projetos.map(p => {
+      const r = _calcRentabilidade(p);
+      const cor = r.margemPct >= 40 ? '#10b981' : r.margemPct >= 20 ? '#f59e0b' : r.custoTotal > 0 ? '#ef4444' : '#94a3b8';
+      return { p, r, cor };
+    }).sort((a,b) => b.r.margemPct - a.r.margemPct);
+
+    Modal.open({
+      title: '📊 Rentabilidade por Projeto',
+      size: 'modal-lg',
+      body: `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+          <div style="background:var(--bg);padding:12px;border-radius:var(--radius);text-align:center">
+            <div class="text-xs text-muted">Receita Total</div>
+            <div class="font-bold" style="color:var(--primary)">${Utils.formatCurrency(rows.reduce((s,r)=>s+r.r.receita,0))}</div>
+          </div>
+          <div style="background:var(--bg);padding:12px;border-radius:var(--radius);text-align:center">
+            <div class="text-xs text-muted">Custo Total</div>
+            <div class="font-bold" style="color:var(--danger)">${Utils.formatCurrency(rows.reduce((s,r)=>s+r.r.custoTotal,0))}</div>
+          </div>
+          <div style="background:var(--bg);padding:12px;border-radius:var(--radius);text-align:center">
+            <div class="text-xs text-muted">Margem Geral</div>
+            <div class="font-bold" style="color:var(--success)">${Utils.formatCurrency(rows.reduce((s,r)=>s+r.r.margem,0))}</div>
+          </div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Projeto</th><th>Receita</th><th>Custo Horas</th><th>Custos Diretos</th><th>Margem R$</th><th>Margem %</th></tr></thead>
+          <tbody>
+            ${rows.map(({p,r,cor}) => `<tr>
+              <td class="font-bold text-sm">${Utils.escHtml(p.titulo)}<div class="text-xs text-muted">${Utils.escHtml(Utils.getClientName(p.clienteId))}</div></td>
+              <td class="font-bold">${Utils.formatCurrency(r.receita)}</td>
+              <td class="text-sm text-muted">${Utils.formatCurrency(r.custoHoras)}${p.horasTrabalhadas ? `<div class="text-xs">${p.horasTrabalhadas}h × ${Utils.formatCurrency(p.valorHora||0)}</div>` : ''}</td>
+              <td class="text-sm text-muted">${Utils.formatCurrency(r.custosDirectos)}</td>
+              <td class="font-bold" style="color:${cor}">${Utils.formatCurrency(r.margem)}</td>
+              <td><span style="font-weight:700;color:${cor}">${r.margemPct}%</span>
+                <div style="width:60px;height:6px;background:var(--border);border-radius:99px;margin-top:4px"><div style="width:${Math.max(0,Math.min(100,r.margemPct))}%;height:100%;background:${cor};border-radius:99px"></div></div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        <div class="text-xs text-muted mt-3">
+          ⚠ Projetos sem horas ou custos lançados mostram margem zerada. Edite o projeto para registrar os custos reais.
+        </div>
+      `,
+      saveLabel: null,
+    });
+  }
+
   function view(id) {
     const p = DB.get('projetos', id);
     if (!p) return;
     const etapas = p.etapas || [];
     const pct = etapas.length ? Math.round(etapas.reduce((s,e)=>s+(e.pct||0),0)/etapas.length) : 0;
+    const rent = _calcRentabilidade(p);
+    const margemColor = rent.margemPct >= 40 ? 'var(--success)' : rent.margemPct >= 20 ? 'var(--warning)' : rent.custoTotal > 0 ? 'var(--danger)' : 'var(--text-muted)';
 
     Modal.open({
       title: p.titulo,
@@ -109,11 +185,38 @@ const Projetos = (() => {
           <div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${Utils.projBadge(p.status)}</div></div>
           <div class="detail-field"><div class="detail-label">Cliente</div><div class="detail-value">${Utils.escHtml(Utils.getClientName(p.clienteId))}</div></div>
           <div class="detail-field"><div class="detail-label">Responsável</div><div class="detail-value">${Utils.escHtml(p.responsavel||'—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Valor</div><div class="detail-value font-bold text-primary">${Utils.formatCurrency(p.valor)}</div></div>
+          <div class="detail-field"><div class="detail-label">Valor Contrato</div><div class="detail-value font-bold text-primary">${Utils.formatCurrency(p.valor)}</div></div>
           <div class="detail-field"><div class="detail-label">Prazo</div><div class="detail-value">${Utils.formatDate(p.prazo)}</div></div>
           <div class="detail-field"><div class="detail-label">Início</div><div class="detail-value">${Utils.formatDate(p.dataInicio)}</div></div>
           <div class="detail-field"><div class="detail-label">NF Emitida</div><div class="detail-value">${p.nfEmitida?'<span class="badge badge-green">Sim</span>':'<span class="badge badge-gray">Não</span>'}</div></div>
         </div>
+
+        <!-- RENTABILIDADE -->
+        <div style="background:var(--bg);border-radius:var(--radius);padding:16px;margin-bottom:16px;border-left:4px solid ${margemColor}">
+          <div class="font-bold text-sm mb-3">📊 Rentabilidade do Projeto</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+            <div style="text-align:center">
+              <div class="text-xs text-muted">Receita</div>
+              <div class="font-bold" style="color:var(--primary)">${Utils.formatCurrency(rent.receita)}</div>
+            </div>
+            <div style="text-align:center">
+              <div class="text-xs text-muted">Custo Horas</div>
+              <div class="font-bold text-sm">${Utils.formatCurrency(rent.custoHoras)}</div>
+              ${p.horasTrabalhadas ? `<div class="text-xs text-muted">${p.horasTrabalhadas}h × ${Utils.formatCurrency(p.valorHora||0)}</div>` : ''}
+            </div>
+            <div style="text-align:center">
+              <div class="text-xs text-muted">Custos Diretos</div>
+              <div class="font-bold text-sm">${Utils.formatCurrency(rent.custosDirectos)}</div>
+            </div>
+            <div style="text-align:center">
+              <div class="text-xs text-muted">Margem</div>
+              <div class="font-bold" style="color:${margemColor};font-size:20px">${rent.margemPct}%</div>
+              <div class="text-xs" style="color:${margemColor}">${Utils.formatCurrency(rent.margem)}</div>
+            </div>
+          </div>
+          ${rent.custoTotal === 0 ? `<div class="text-xs text-muted mt-2">ℹ Registre horas e custos ao editar o projeto para ver a margem real.</div>` : ''}
+        </div>
+
         <div class="mb-3">
           <div class="flex items-center justify-between mb-2">
             <div class="detail-label">Progresso Geral</div>
@@ -187,7 +290,7 @@ const Projetos = (() => {
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Valor (R$)</label>
+            <label class="form-label">Valor do Contrato (R$)</label>
             <input class="form-control" id="fpValor" type="number" value="${p?.valor||''}" placeholder="0">
           </div>
           <div class="form-group">
@@ -199,6 +302,26 @@ const Projetos = (() => {
             <input class="form-control" id="fpPrazo" type="date" value="${p?.prazo||''}">
           </div>
         </div>
+
+        <!-- CUSTOS PARA RENTABILIDADE -->
+        <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px">
+          <div class="font-bold text-sm mb-2">📊 Custos para Rentabilidade</div>
+          <div class="form-row" style="margin:0">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Horas Trabalhadas</label>
+              <input class="form-control" id="fpHoras" type="number" step="0.5" value="${p?.horasTrabalhadas||''}" placeholder="0">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Custo/Hora (R$)</label>
+              <input class="form-control" id="fpValorHora" type="number" step="0.01" value="${p?.valorHora||''}" placeholder="Ex: 120">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Custos Diretos (R$)</label>
+              <input class="form-control" id="fpCustosDiretos" type="number" step="0.01" value="${p?.custosDirectos||''}" placeholder="Deslocamento, materiais...">
+            </div>
+          </div>
+        </div>
+
         <div class="form-row mb-2">
           <div class="form-group">
             <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
@@ -288,6 +411,9 @@ const Projetos = (() => {
       valor: Number(document.getElementById('fpValor').value) || 0,
       dataInicio: document.getElementById('fpInicio').value,
       prazo: document.getElementById('fpPrazo').value,
+      horasTrabalhadas: Number(document.getElementById('fpHoras').value) || 0,
+      valorHora: Number(document.getElementById('fpValorHora').value) || 0,
+      custosDirectos: Number(document.getElementById('fpCustosDiretos').value) || 0,
       nfEmitida: document.getElementById('fpNf').checked,
       pagamentoRecebido: document.getElementById('fpPgto').checked,
       etapas: collectEtapas(),
@@ -310,5 +436,5 @@ const Projetos = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew };
+  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade };
 })();

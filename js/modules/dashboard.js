@@ -9,6 +9,7 @@ const Dashboard = (() => {
     const atividades = DB.getAll('atividades');
     const clientes = DB.getAll('clientes');
     const recebiveis = DB.getAll('recebiveis');
+    const contasPagar = DB.getAll('contaspagar');
 
     const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
     const ganhos = leads.filter(l => l.status === 'fechado_ganho');
@@ -40,6 +41,9 @@ const Dashboard = (() => {
           <span class="text-muted text-sm">${new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</span>
         </div>
       </div>
+
+      <!-- FAÇA ISSO HOJE -->
+      ${_renderFacaIssoHoje(atividades, leads, contasPagar, recebiveis)}
 
       <!-- KPIs -->
       <div class="kpi-grid">
@@ -180,6 +184,144 @@ const Dashboard = (() => {
     });
 
     _renderMetasKpi();
+  }
+
+  /* ================================================
+     WIDGET: FAÇA ISSO HOJE
+     ================================================ */
+  function _renderFacaIssoHoje(atividades, leads, contasPagar, recebiveis) {
+    const hoje = Utils.todayStr();
+    const items = [];
+
+    // 1. Atividades do dia (status pendente, data = hoje)
+    atividades
+      .filter(a => a.status === 'pendente' && a.data === hoje)
+      .forEach(a => items.push({
+        prioridade: 1,
+        icone: Utils.ATIV_TIPO[a.tipo]?.icon || '📌',
+        cor: '#1a56db',
+        titulo: a.titulo,
+        subtitulo: Utils.getClientName(a.clienteId) || '',
+        hora: a.hora || '',
+        tipo: 'atividade',
+        id: a.id,
+        acao: `App.navigate('atividades')`,
+      }));
+
+    // 2. Atividades atrasadas (ordenadas por atraso)
+    atividades
+      .filter(a => a.status === 'pendente' && a.data && a.data < hoje)
+      .sort((a,b) => a.data.localeCompare(b.data))
+      .slice(0,2)
+      .forEach(a => {
+        const diasAtraso = Math.round((new Date(hoje) - new Date(a.data)) / 86400000);
+        items.push({
+          prioridade: 0,
+          icone: '⚠',
+          cor: '#ef4444',
+          titulo: a.titulo,
+          subtitulo: `Atrasada ${diasAtraso}d — ${Utils.getClientName(a.clienteId)||''}`,
+          hora: '',
+          tipo: 'atraso',
+          id: a.id,
+          acao: `App.navigate('atividades')`,
+        });
+      });
+
+    // 3. Leads com follow-up atrasado
+    leads
+      .filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status) && l.dataProximaAcao && l.dataProximaAcao <= hoje)
+      .sort((a,b) => a.dataProximaAcao.localeCompare(b.dataProximaAcao))
+      .slice(0,2)
+      .forEach(l => {
+        const diasAtraso = Math.round((new Date(hoje) - new Date(l.dataProximaAcao)) / 86400000);
+        items.push({
+          prioridade: l.dataProximaAcao < hoje ? 0 : 1,
+          icone: '💼',
+          cor: diasAtraso > 0 ? '#f59e0b' : '#8b5cf6',
+          titulo: `Follow-up: ${l.titulo}`,
+          subtitulo: diasAtraso > 0 ? `Atrasado ${diasAtraso}d` : 'Para hoje',
+          hora: '',
+          tipo: 'lead',
+          id: l.id,
+          acao: `App.navigate('pipeline')`,
+        });
+      });
+
+    // 4. Contas a pagar vencendo hoje ou vencidas
+    contasPagar
+      .filter(c => c.status === 'pendente' && c.vencimento && c.vencimento <= hoje)
+      .sort((a,b) => a.vencimento.localeCompare(b.vencimento))
+      .slice(0,2)
+      .forEach(c => {
+        const vencida = c.vencimento < hoje;
+        items.push({
+          prioridade: vencida ? 0 : 1,
+          icone: '💸',
+          cor: vencida ? '#ef4444' : '#f59e0b',
+          titulo: `${c.fornecedor} — ${Utils.formatCurrency(c.valor)}`,
+          subtitulo: vencida ? `Vencida em ${Utils.formatDate(c.vencimento)}` : 'Vence hoje',
+          hora: '',
+          tipo: 'conta',
+          id: c.id,
+          acao: `App.navigate('financeiro')`,
+        });
+      });
+
+    // 5. Parcelas vencendo hoje
+    recebiveis.forEach(r => {
+      (r.parcelas||[]).filter(p => p.status !== 'recebido' && p.vencimento === hoje).forEach(p => {
+        const cli = DB.get('clientes', r.clienteId);
+        items.push({
+          prioridade: 1,
+          icone: '💰',
+          cor: '#10b981',
+          titulo: `Receber: ${cli?.nome || 'Cliente'} — ${Utils.formatCurrency(p.valor)}`,
+          subtitulo: 'Parcela vence hoje',
+          hora: '',
+          tipo: 'recebivel',
+          id: p.id,
+          acao: `App.navigate('financeiro')`,
+        });
+      });
+    });
+
+    // Ordenar: atrasados primeiro (prioridade 0), depois por hora
+    items.sort((a, b) => a.prioridade - b.prioridade || (a.hora || '').localeCompare(b.hora || ''));
+
+    const top5 = items.slice(0, 5);
+
+    if (top5.length === 0) {
+      return `<div class="card mb-4" style="border-left:4px solid var(--success)">
+        <div class="card-body" style="display:flex;align-items:center;gap:12px;padding:16px">
+          <span style="font-size:28px">🎉</span>
+          <div>
+            <div class="font-bold">Dia limpo!</div>
+            <div class="text-sm text-muted">Nenhuma tarefa urgente para hoje. Bom momento para trabalhar no pipeline.</div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    return `<div class="card mb-4" style="border-left:4px solid var(--primary)">
+      <div class="card-header">
+        <div class="card-title">⚡ Faça isso hoje</div>
+        <span class="badge badge-blue">${top5.length} item${top5.length > 1 ? 's' : ''}</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        ${top5.map((item, idx) => `
+          <div class="hoje-item" onclick="${item.acao}" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);transition:background .15s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+            <div style="width:8px;height:8px;border-radius:50%;background:${item.cor};flex-shrink:0"></div>
+            <div style="width:32px;height:32px;border-radius:8px;background:${item.cor}20;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${item.icone}</div>
+            <div style="flex:1;min-width:0">
+              <div class="font-bold text-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${Utils.escHtml(item.titulo)}</div>
+              <div class="text-xs text-muted">${Utils.escHtml(item.subtitulo)}</div>
+            </div>
+            ${item.hora ? `<span class="text-xs text-muted">${item.hora}</span>` : ''}
+            <span style="font-size:11px;color:${item.cor};font-weight:600;text-transform:uppercase">${item.tipo === 'atraso' ? 'ATRASADO' : item.tipo === 'conta' && item.prioridade === 0 ? 'VENCIDO' : 'HOJE'}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
   }
 
   function _renderMetasKpi() {

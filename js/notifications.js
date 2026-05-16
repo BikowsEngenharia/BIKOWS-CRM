@@ -41,6 +41,7 @@ const Notifications = (() => {
     await _requestPermission();
     _startPeriodicCheck();
     _checkAll(); // verifica imediatamente ao carregar
+    _checkWeeklySummary(); // verifica se deve mostrar resumo semanal
   }
 
   /* ---- Service Worker ---- */
@@ -259,6 +260,92 @@ const Notifications = (() => {
       setTimeout(() => notif.close(), 8000);
     } catch (e) {
       console.warn('[Notif] Erro ao exibir:', e);
+    }
+  }
+
+  /* ---- Resumo semanal (toda segunda-feira) ---- */
+  function _checkWeeklySummary() {
+    const hoje = new Date();
+    if (hoje.getDay() !== 1) return; // 1 = segunda-feira
+
+    const WEEKLY_KEY = 'crm_weekly_' + hoje.toISOString().split('T')[0];
+    if (sessionStorage.getItem(WEEKLY_KEY)) return; // já mostrou hoje
+
+    sessionStorage.setItem(WEEKLY_KEY, '1');
+
+    // Gerar resumo
+    setTimeout(() => _showWeeklySummary(), 3000); // aguarda app carregar
+  }
+
+  function _showWeeklySummary() {
+    const leads = DB.getAll('leads');
+    const atividades = DB.getAll('atividades');
+    const projetos = DB.getAll('projetos');
+    const recebiveis = DB.getAll('recebiveis');
+    const contasPagar = DB.getAll('contaspagar');
+
+    const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const hoje = new Date();
+    const semanaFim = new Date(hoje); semanaFim.setDate(hoje.getDate() + 7);
+    const semanaFimStr = semanaFim.toISOString().split('T')[0];
+    const hojeStr = hoje.toISOString().split('T')[0];
+
+    const ativsHojeOuMais = atividades.filter(a => a.status === 'pendente' && a.data && a.data >= hojeStr && a.data <= semanaFimStr);
+    const ativsAtrasadas = atividades.filter(a => a.status === 'pendente' && a.data && a.data < hojeStr);
+    const followupsSemana = ativos.filter(l => l.dataProximaAcao && l.dataProximaAcao >= hojeStr && l.dataProximaAcao <= semanaFimStr);
+    const followupsAtrasados = ativos.filter(l => l.dataProximaAcao && l.dataProximaAcao < hojeStr);
+    const projetosAtrasados = projetos.filter(p => p.status === 'em_andamento' && p.prazo && p.prazo < hojeStr);
+
+    let parcelasVencendoSemana = 0, parcelasVencidas = 0;
+    recebiveis.forEach(r => {
+      (r.parcelas||[]).forEach(p => {
+        if (p.status === 'recebido') return;
+        if (p.vencimento >= hojeStr && p.vencimento <= semanaFimStr) parcelasVencendoSemana++;
+        else if (p.vencimento < hojeStr) parcelasVencidas++;
+      });
+    });
+
+    let contasVencendoSemana = 0;
+    contasPagar.filter(c => c.status === 'pendente').forEach(c => {
+      if (c.vencimento >= hojeStr && c.vencimento <= semanaFimStr) contasVencendoSemana++;
+    });
+
+    // Resumo do pipeline
+    const totalPipeline = Utils.sum(ativos, 'valorEstimado');
+
+    const linhas = [
+      ativsAtrasadas.length > 0 ? `⚠ **${ativsAtrasadas.length}** atividade(s) atrasada(s)` : null,
+      followupsAtrasados.length > 0 ? `⚠ **${followupsAtrasados.length}** follow-up(s) em atraso` : null,
+      parcelasVencidas > 0 ? `💸 **${parcelasVencidas}** parcela(s) vencida(s) a receber` : null,
+      ativsHojeOuMais.length > 0 ? `📋 **${ativsHojeOuMais.length}** atividade(s) para essa semana` : null,
+      followupsSemana.length > 0 ? `💼 **${followupsSemana.length}** follow-up(s) essa semana` : null,
+      parcelasVencendoSemana > 0 ? `💰 **${parcelasVencendoSemana}** parcela(s) vencendo essa semana` : null,
+      contasVencendoSemana > 0 ? `💸 **${contasVencendoSemana}** conta(s) a pagar essa semana` : null,
+      projetosAtrasados.length > 0 ? `🔴 **${projetosAtrasados.length}** projeto(s) atrasado(s)` : null,
+      `💼 Pipeline total: **${Utils.formatCurrency(totalPipeline)}** (${ativos.length} leads)`,
+    ].filter(Boolean);
+
+    if (linhas.length === 0) return;
+
+    Toast.info(`📅 <strong>Bom começo de semana!</strong><br>${linhas.slice(0,4).map(l => l.replace(/\*\*/g, '')).join(' · ')}`, 10000);
+
+    // Browser notification
+    const prefs = getPrefs();
+    if (prefs.browser) {
+      _notifyBrowser({
+        tag: 'weekly_summary',
+        title: '📅 Resumo da Semana — Bikows CRM',
+        body: linhas.slice(0,3).map(l => l.replace(/\*\*/g, '')).join(' | '),
+      });
+    }
+
+    // E-mail
+    if (prefs.email && prefs.emailDest) {
+      _sendEmailDigest(linhas.map((l, i) => ({
+        tag: 'weekly_' + i,
+        title: '📅 Resumo Semanal',
+        body: l.replace(/\*\*/g, ''),
+      })), prefs);
     }
   }
 

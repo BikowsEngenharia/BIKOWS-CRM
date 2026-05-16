@@ -11,6 +11,7 @@ const App = (() => {
     projetos:   { title: 'Projetos',        module: Projetos,    addLabel: '+ Novo Projeto' },
     atividades: { title: 'Atividades',      module: Atividades,  addLabel: '+ Nova Atividade' },
     propostas:  { title: 'Propostas',       module: Propostas,   addLabel: '+ Nova Proposta' },
+    contratos:  { title: 'Contratos',       module: Contratos,   addLabel: '+ Novo Contrato' },
     financeiro: { title: 'Financeiro',      module: Financeiro,  addLabel: '+ Novo Recebível' },
     rh:         { title: 'RH / Folha',      module: Folha,       addLabel: '+ Novo Funcionário' },
     calendario:  { title: 'Calendário',      module: Calendario,   addLabel: '+ Nova Atividade' },
@@ -28,6 +29,7 @@ const App = (() => {
   const _ENTITY_PAGE = {
     clientes: 'clientes', contatos: 'contatos', leads: 'pipeline',
     projetos: 'projetos', atividades: 'atividades', propostas: 'propostas',
+    contratos: 'contratos',
     recebiveis: 'financeiro', funcionarios: 'rh', lancamentos: 'financeiro',
     contaspagar: 'financeiro', folha: 'rh', licitacoes: 'licitacoes',
     metas: 'metas',
@@ -92,6 +94,9 @@ const App = (() => {
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); navigate('relatorios'); return; }
       if (e.key === 'm' || e.key === 'M') { e.preventDefault(); navigate('metas'); return; }
       if (e.key === 't' || e.key === 'T') { e.preventDefault(); navigate('marketing'); return; }
+      if (e.key === 'k' || e.key === 'K') { e.preventDefault(); navigate('contratos'); return; }
+      // Q = Captura Rápida
+      if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); quickCapture(); return; }
     });
 
     // Clique fora fecha search
@@ -328,6 +333,156 @@ const App = (() => {
     if (btn) btn.textContent = isDark ? '☀️' : '🌙';
   }
 
+  /* ================================================
+     CAPTURA RÁPIDA — adicionar item em 2 cliques
+     ================================================ */
+  function quickCapture() {
+    const cfg = DB.getConfig();
+    const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
+    const clientOpts = clientes.map(c => `<option value="${c.id}">${Utils.escHtml(c.nome)}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const hoje = Utils.todayStr();
+
+    Modal.open({
+      title: '⚡ Captura Rápida',
+      body: `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">
+          ${[
+            { id:'qc-lead',   icon:'💼', label:'Lead',       color:'#1a56db' },
+            { id:'qc-atv',    icon:'📋', label:'Atividade',  color:'#10b981' },
+            { id:'qc-nota',   icon:'📝', label:'Nota',       color:'#8b5cf6' },
+            { id:'qc-conta',  icon:'💸', label:'Conta a Pagar', color:'#ef4444' },
+          ].map(t => `
+            <div class="qc-tipo ${t.id === 'qc-lead' ? 'active' : ''}" data-tipo="${t.id}"
+              style="cursor:pointer;text-align:center;padding:12px 8px;border-radius:var(--radius);border:2px solid ${t.id==='qc-lead'?t.color:'var(--border)'};background:${t.id==='qc-lead'?t.color+'15':'var(--bg)'};transition:all .15s"
+              onclick="document.querySelectorAll('.qc-tipo').forEach(el=>{el.style.borderColor='var(--border)';el.style.background='var(--bg)';el.classList.remove('active')});this.style.borderColor='${t.color}';this.style.background='${t.color}15';this.classList.add('active');App._renderQcForm('${t.id}')">
+              <div style="font-size:22px;margin-bottom:4px">${t.icon}</div>
+              <div style="font-size:11px;font-weight:600;color:${t.color}">${t.label}</div>
+            </div>`).join('')}
+        </div>
+        <div id="qcFormArea"></div>
+      `,
+      saveLabel: '⚡ Salvar rápido',
+      saveCb: () => _saveQuickCapture(),
+    });
+    setTimeout(() => _renderQcForm('qc-lead'), 50);
+  }
+
+  function _renderQcForm(tipo) {
+    const cfg = DB.getConfig();
+    const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
+    const clientOpts = '<option value="">— Cliente —</option>' + clientes.map(c => `<option value="${c.id}">${Utils.escHtml(c.nome)}</option>`).join('');
+    const respOpts = '<option value="">— Responsável —</option>' + cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const hoje = Utils.todayStr();
+    const el = document.getElementById('qcFormArea');
+    if (!el) return;
+
+    const forms = {
+      'qc-lead': `
+        <div class="form-group"><label class="form-label">Oportunidade *</label><input class="form-control" id="qcTitulo" placeholder="Ex: Adequação NR-12 — Nome da Empresa" autofocus></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Cliente</label><select class="form-control" id="qcCliente">${clientOpts}</select></div>
+          <div class="form-group"><label class="form-label">Valor Est. (R$)</label><input class="form-control" id="qcValor" type="number" placeholder="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Responsável</label><select class="form-control" id="qcResp">${respOpts}</select></div>
+          <div class="form-group"><label class="form-label">Próxima ação em</label><input class="form-control" id="qcDataAcao" type="date" value="${hoje}"></div>
+        </div>`,
+      'qc-atv': `
+        <div class="form-group"><label class="form-label">Atividade *</label><input class="form-control" id="qcTitulo" placeholder="Ex: Ligar para decisor da empresa X" autofocus></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Data</label><input class="form-control" id="qcData" type="date" value="${hoje}"></div>
+          <div class="form-group"><label class="form-label">Hora</label><input class="form-control" id="qcHora" type="time" value="09:00"></div>
+          <div class="form-group"><label class="form-label">Prioridade</label>
+            <select class="form-control" id="qcPrioridade"><option value="media">Média</option><option value="alta">Alta</option><option value="baixa">Baixa</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Cliente</label><select class="form-control" id="qcCliente">${clientOpts}</select></div>
+          <div class="form-group"><label class="form-label">Responsável</label><select class="form-control" id="qcResp">${respOpts}</select></div>
+        </div>`,
+      'qc-nota': `
+        <div class="form-group"><label class="form-label">Título da Nota *</label><input class="form-control" id="qcTitulo" placeholder="Ex: Retorno do cliente sobre proposta" autofocus></div>
+        <div class="form-group"><label class="form-label">Conteúdo da nota</label><textarea class="form-control" id="qcNota" rows="4" placeholder="Escreva aqui..."></textarea></div>
+        <div class="form-group"><label class="form-label">Cliente</label><select class="form-control" id="qcCliente">${clientOpts}</select></div>`,
+      'qc-conta': `
+        <div class="form-group"><label class="form-label">Fornecedor / Descrição *</label><input class="form-control" id="qcTitulo" placeholder="Ex: Combustível campo — maio" autofocus></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="qcValor" type="number" step="0.01" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">Vencimento</label><input class="form-control" id="qcVencimento" type="date" value="${hoje}"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Categoria</label>
+          <select class="form-control" id="qcCategoria">
+            <option>Combustível</option><option>Materiais</option><option>Aluguel</option><option>TI</option><option>Contabilidade</option><option>Marketing</option><option>Subcontratados</option><option>Outros</option>
+          </select>
+        </div>`,
+    };
+    el.innerHTML = forms[tipo] || '';
+  }
+
+  function _saveQuickCapture() {
+    const tipo = document.querySelector('.qc-tipo.active')?.dataset?.tipo || 'qc-lead';
+    const titulo = document.getElementById('qcTitulo')?.value?.trim();
+    if (!titulo) { Toast.error('Título obrigatório'); return; }
+
+    if (tipo === 'qc-lead') {
+      DB.create('leads', {
+        titulo,
+        status: 'lead_identificado',
+        clienteId: document.getElementById('qcCliente')?.value || '',
+        valorEstimado: Number(document.getElementById('qcValor')?.value) || 0,
+        responsavel: document.getElementById('qcResp')?.value || '',
+        dataProximaAcao: document.getElementById('qcDataAcao')?.value || '',
+        proximaAcao: 'Primeiro contato',
+        origemLead: 'Prospecção',
+      });
+      Toast.success('Lead criado!');
+    } else if (tipo === 'qc-atv') {
+      DB.create('atividades', {
+        titulo,
+        tipo: 'task',
+        status: 'pendente',
+        prioridade: document.getElementById('qcPrioridade')?.value || 'media',
+        data: document.getElementById('qcData')?.value || Utils.todayStr(),
+        hora: document.getElementById('qcHora')?.value || '',
+        clienteId: document.getElementById('qcCliente')?.value || '',
+        responsavel: document.getElementById('qcResp')?.value || '',
+      });
+      Toast.success('Atividade criada!');
+    } else if (tipo === 'qc-nota') {
+      DB.create('atividades', {
+        titulo,
+        tipo: 'note',
+        status: 'concluido',
+        prioridade: 'baixa',
+        data: Utils.todayStr(),
+        clienteId: document.getElementById('qcCliente')?.value || '',
+        descricao: document.getElementById('qcNota')?.value || '',
+      });
+      Toast.success('Nota registrada!');
+    } else if (tipo === 'qc-conta') {
+      const valor = Number(document.getElementById('qcValor')?.value);
+      if (!valor) { Toast.error('Valor obrigatório'); return; }
+      DB.create('contaspagar', {
+        fornecedor: titulo,
+        descricao: titulo,
+        categoria: document.getElementById('qcCategoria')?.value || 'Outros',
+        valor,
+        vencimento: document.getElementById('qcVencimento')?.value || Utils.todayStr(),
+        status: 'pendente',
+        recorrente: false,
+      });
+      Toast.success('Conta a pagar criada!');
+    }
+
+    Modal.close();
+    // Refresh a página atual se afetada
+    if (_currentPage === 'pipeline' && tipo === 'qc-lead') PAGES.pipeline.module.render();
+    if (_currentPage === 'atividades' && ['qc-atv','qc-nota'].includes(tipo)) PAGES.atividades.module.render();
+    if (_currentPage === 'financeiro' && tipo === 'qc-conta') PAGES.financeiro.module.render();
+    App.updateNotifBadge();
+  }
+
   function _applyDark() {
     const isDark = localStorage.getItem('crm_dark') === '1';
     if (isDark) {
@@ -337,7 +492,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleDark, refreshIfNeeded };
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleDark, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

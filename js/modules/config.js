@@ -149,6 +149,63 @@ const Config = (() => {
           </div>
         </div>
 
+        <!-- Notificações -->
+        <div class="card" style="grid-column:1/-1;">
+          <div class="card-header"><div class="card-title">🔔 Notificações e Lembretes</div></div>
+          <div class="card-body">
+            <div class="grid-2" style="gap:16px;">
+              <div>
+                <div class="detail-label mb-2">Canais de notificação</div>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="cfgNotifBrowser" ${(cfg.notificacoes?.browser!==false)?'checked':''}>
+                    <span class="text-sm"><strong>🖥 Navegador (push)</strong> — notifica mesmo com app em background</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="cfgNotifInApp" ${(cfg.notificacoes?.inApp!==false)?'checked':''}>
+                    <span class="text-sm"><strong>🔔 In-app</strong> — toast visual ao usar o CRM</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="cfgNotifEmail" ${cfg.notificacoes?.email?'checked':''} onchange="Config.toggleEmailDest()">
+                    <span class="text-sm"><strong>📧 E-mail</strong> — resumo diário (requer configuração)</span>
+                  </label>
+                  <div class="form-group" id="emailDestGrp" style="${cfg.notificacoes?.email?'':'display:none'}">
+                    <label class="form-label">E-mail de destino</label>
+                    <input class="form-control" id="cfgEmailDest" value="${Utils.escHtml(cfg.notificacoes?.emailDest||'')}" placeholder="seu@email.com.br">
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="detail-label mb-2">Antecedência por tipo (dias)</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  ${[
+                    ['atividades','📋 Atividades',1],
+                    ['reunioes','🤝 Reuniões',1],
+                    ['leads','💼 Follow-ups',0],
+                    ['parcelas','💰 Parcelas',3],
+                    ['licitacoes','🏛 Licitações',3],
+                    ['marketing','📢 Posts marketing',1],
+                    ['contasPagar','💸 Contas a pagar',3],
+                  ].map(([key,label,def]) => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                      <span class="text-sm">${label}</span>
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <input type="number" class="form-control form-control-sm" id="cfgAnt_${key}"
+                          value="${cfg.notificacoes?.antecedencia?.[key]??def}" min="0" max="30" style="width:60px;text-align:center;">
+                        <span class="text-xs text-muted">dias antes</span>
+                      </div>
+                    </div>`).join('')}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="Config.saveNotificacoes()">💾 Salvar configurações</button>
+              <button class="btn btn-ghost" onclick="Notifications.requestPermission()">🖥 Ativar push no navegador</button>
+              <button class="btn btn-ghost" onclick="Notifications.checkAll()">🔄 Verificar lembretes agora</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Google Calendar -->
         <div class="card">
           <div class="card-header"><div class="card-title">📅 Google Calendar</div></div>
@@ -364,5 +421,32 @@ const Config = (() => {
     document.getElementById('btnConfirm').textContent = 'SIM, LIMPAR TUDO';
   }
 
-  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, exportData, importData, resetData };
+  function saveNotificacoes() {
+    const prefs = {
+      browser:  document.getElementById('cfgNotifBrowser')?.checked ?? true,
+      inApp:    document.getElementById('cfgNotifInApp')?.checked ?? true,
+      email:    document.getElementById('cfgNotifEmail')?.checked ?? false,
+      emailDest: (document.getElementById('cfgEmailDest')?.value || '').trim(),
+      antecedencia: {
+        atividades:  parseInt(document.getElementById('cfgAnt_atividades')?.value  ?? 1),
+        reunioes:    parseInt(document.getElementById('cfgAnt_reunioes')?.value    ?? 1),
+        leads:       parseInt(document.getElementById('cfgAnt_leads')?.value       ?? 0),
+        parcelas:    parseInt(document.getElementById('cfgAnt_parcelas')?.value    ?? 3),
+        licitacoes:  parseInt(document.getElementById('cfgAnt_licitacoes')?.value  ?? 3),
+        marketing:   parseInt(document.getElementById('cfgAnt_marketing')?.value   ?? 1),
+        contasPagar: parseInt(document.getElementById('cfgAnt_contasPagar')?.value ?? 3),
+      },
+    };
+    Notifications.savePrefs(prefs);
+    Toast.success('Configurações de notificação salvas!');
+    if (prefs.browser) Notifications.requestPermission();
+  }
+
+  function toggleEmailDest() {
+    const show = document.getElementById('cfgNotifEmail')?.checked;
+    const grp  = document.getElementById('emailDestGrp');
+    if (grp) grp.style.display = show ? '' : 'none';
+  }
+
+  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, exportData, importData, resetData, saveNotificacoes, toggleEmailDest };
 })();

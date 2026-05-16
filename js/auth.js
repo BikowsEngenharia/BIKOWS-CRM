@@ -88,6 +88,7 @@ const Auth = (() => {
     _hideLoading();
 
     if (typeof App !== 'undefined') App.init();
+    if (typeof Notifications !== 'undefined') Notifications.init();
   }
 
   /* ---- UI helpers ---- */

@@ -1005,3 +1005,71 @@ body.dark-mode .kpi-meta-card { background: var(--surface); border-color: var(--
   .sec-title { font-size: 16px; margin-bottom: 8px; }
   @page { margin: 1.5cm; }
 }
+
+/* ==========================================
+   MARKETING
+   ========================================== */
+.canal-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  font-size: 11px; font-weight: 600; color: #fff;
+  white-space: nowrap;
+}
+.status-post-badge {
+  display: inline-block;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  font-size: 11px; font-weight: 600; color: #fff;
+  white-space: nowrap;
+}
+.pilar-badge {
+  display: inline-block;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  font-size: 10px; font-weight: 600;
+  background: var(--primary-light); color: var(--primary);
+  white-space: nowrap;
+}
+.mkt-post-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  transition: box-shadow var(--t), transform var(--t);
+  margin-bottom: 8px;
+}
+.mkt-post-card:hover { box-shadow: var(--shadow-sm); transform: translateX(2px); }
+.mkt-post-date { font-size: 11px; color: var(--text-muted); min-width: 70px; text-align: center; }
+.mkt-post-title { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.mkt-post-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.campanha-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 18px;
+  transition: box-shadow var(--t);
+}
+.campanha-card:hover { box-shadow: var(--shadow); }
+.ideia-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-md); padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 8px;
+  transition: box-shadow var(--t);
+}
+.ideia-card:hover { box-shadow: var(--shadow-sm); }
+.kpi-canal-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 18px;
+}
+.kpi-canal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.kpi-canal-metric { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.kpi-canal-metric-label { font-size: 12px; color: var(--text-muted); }
+.kpi-canal-metric-value { font-size: 18px; font-weight: 700; color: var(--text); }
+.estrategia-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px; margin-bottom: 14px;
+}
+.estrategia-section-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.estrategia-section-content { font-size: 13px; color: var(--text-secondary); white-space: pre-wrap; line-height: 1.6; }
+}

@@ -17,6 +17,7 @@ const App = (() => {
     licitacoes:  { title: 'Licitações',      module: Licitacoes,   addLabel: '+ Nova Licitação' },
     relatorios:  { title: 'Relatórios',      module: Relatorios,   addLabel: null },
     metas:      { title: 'Metas & KPIs',    module: Metas,       addLabel: '+ Nova Meta' },
+    marketing:  { title: 'Marketing',       module: Marketing,   addLabel: '+ Novo Conteúdo' },
     config:     { title: 'Configurações',   module: Config,      addLabel: null },
   };
 
@@ -30,6 +31,8 @@ const App = (() => {
     recebiveis: 'financeiro', funcionarios: 'rh', lancamentos: 'financeiro',
     contaspagar: 'financeiro', folha: 'rh', licitacoes: 'licitacoes',
     metas: 'metas',
+    marketing_posts: 'marketing', marketing_campanhas: 'marketing',
+    marketing_ideias: 'marketing', marketing_kpis: 'marketing',
   };
 
   function refreshIfNeeded(entity) {
@@ -88,6 +91,7 @@ const App = (() => {
       if (e.key === 'l' || e.key === 'L') { e.preventDefault(); navigate('licitacoes'); return; }
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); navigate('relatorios'); return; }
       if (e.key === 'm' || e.key === 'M') { e.preventDefault(); navigate('metas'); return; }
+      if (e.key === 't' || e.key === 'T') { e.preventDefault(); navigate('marketing'); return; }
     });
 
     // Clique fora fecha search

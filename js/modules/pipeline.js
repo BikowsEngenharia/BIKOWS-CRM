@@ -19,16 +19,46 @@ const Pipeline = (() => {
 
   /* ---- Mapa de canais de origem ---- */
   const _ORIGENS_MAP = {
-    'Tráfego Pago':    { icon: '🎯', color: '#ef4444', bg: '#fef2f2' },
-    'Indicação':       { icon: '🤝', color: '#10b981', bg: '#f0fdf4' },
-    'Recorrência':     { icon: '🔁', color: '#8b5cf6', bg: '#f5f3ff' },
-    'Prospecção Ativa':{ icon: '📞', color: '#3b82f6', bg: '#eff6ff' },
-    'Site / SEO':      { icon: '🌐', color: '#06b6d4', bg: '#ecfeff' },
-    'LinkedIn':        { icon: '💼', color: '#0a66c2', bg: '#eff6ff' },
-    'Evento / Feira':  { icon: '📅', color: '#f59e0b', bg: '#fffbeb' },
-    'Parceria':        { icon: '🔗', color: '#6366f1', bg: '#eef2ff' },
-    'Outro':           { icon: '❓', color: '#94a3b8', bg: '#f8fafc' },
+    'Tráfego Pago':      { icon: '🎯', color: '#ef4444', bg: '#fef2f2' },
+    'Indicação':         { icon: '🤝', color: '#10b981', bg: '#f0fdf4' },
+    'Recorrência':       { icon: '🔁', color: '#8b5cf6', bg: '#f5f3ff' },
+    'Prospecção Ativa':  { icon: '📞', color: '#3b82f6', bg: '#eff6ff' },
+    'Site / SEO':        { icon: '🌐', color: '#06b6d4', bg: '#ecfeff' },
+    'LinkedIn':          { icon: '💼', color: '#0a66c2', bg: '#eff6ff' },
+    'Evento / Feira':    { icon: '📅', color: '#f59e0b', bg: '#fffbeb' },
+    'Parceria':          { icon: '🔗', color: '#6366f1', bg: '#eef2ff' },
+    'Licitação Pública': { icon: '🏛', color: '#0f766e', bg: '#f0fdfa' },
+    'Outro':             { icon: '❓', color: '#94a3b8', bg: '#f8fafc' },
   };
+
+  const _MODALIDADES_LIC = [
+    'Pregão Eletrônico',
+    'Dispensa Eletrônica',
+    'Concorrência Eletrônica',
+    'Pregão Presencial',
+    'Inexigibilidade',
+    'Outro',
+  ];
+
+  /* Retorna dados da licitação ou null */
+  function _getLic(lead) { return lead?.licitacao && lead.licitacao.edital ? lead.licitacao : null; }
+
+  /* Badge compacto de prazo do edital para o card */
+  function _editalPrazoBadge(dataEntrega) {
+    if (!dataEntrega) return '';
+    const dias = Utils.daysUntil(dataEntrega);
+    if (dias == null) return '';
+    const cor  = dias < 0 ? '#ef4444' : dias <= 3 ? '#f97316' : dias <= 7 ? '#f59e0b' : '#0f766e';
+    const txt  = dias < 0 ? `Prazo vencido ${Math.abs(dias)}d` : dias === 0 ? '⚠ Vence HOJE' : `${dias}d p/ entrega`;
+    return `<div style="font-size:10px;font-weight:700;color:${cor};margin:2px 0">⏱ ${txt}</div>`;
+  }
+
+  /* Toggle da seção de licitação no formulário */
+  function _toggleLicitacaoSection(val) {
+    const sec = document.getElementById('licitacaoSection');
+    if (!sec) return;
+    sec.style.display = val === 'Licitação Pública' ? 'block' : 'none';
+  }
 
   function _origemIcon(o) { return _ORIGENS_MAP[o]?.icon || ''; }
   function _origemBadge(o) {
@@ -39,6 +69,7 @@ const Pipeline = (() => {
   function _previewOrigem(sel) {
     const el = document.getElementById('fOrigemPreview');
     if (el) el.innerHTML = _origemBadge(sel.value);
+    _toggleLicitacaoSection(sel.value);
   }
 
   let dragId = null;
@@ -134,6 +165,7 @@ const Pipeline = (() => {
             <option value="">Todas as origens</option>
             ${Object.keys(_ORIGENS_MAP).map(o => `<option value="${o}">${_origemIcon(o)} ${o}</option>`).join('')}
           </select>
+          <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Ver somente licitações">🏛 Licitações</button>
           <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
           <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
           <button class="btn btn-primary" onclick="Pipeline.openForm()">+ Novo Lead</button>
@@ -224,6 +256,14 @@ const Pipeline = (() => {
     const frio = _isLeadFrio(lead);
     const diasSemAtualizar = _diasSemAtualizacao(lead);
     const proposta = _getPropostaLead(lead.id);
+    const lic = _getLic(lead);
+    const licBadge = lic ? `
+      <div style="background:#f0fdfa;border:1px solid #0f766e33;border-radius:6px;padding:4px 7px;margin:3px 0;font-size:10px;line-height:1.4">
+        <div style="font-weight:700;color:#0f766e">🏛 ${Utils.escHtml(lic.edital||'')}</div>
+        <div style="color:#0f766e88">${Utils.escHtml(lic.orgao||'')}${lic.modalidade ? ' · '+lic.modalidade : ''}</div>
+        ${_editalPrazoBadge(lic.dataEntrega)}
+      </div>` : '';
+
     const propBadge = proposta
       ? `<div style="margin:3px 0;display:flex;align-items:center;gap:4px">
            <span style="font-size:10px;background:${Utils.PROP_STATUS[proposta.status]?.badge==='badge-green'?'#dcfce7':'#eff6ff'};color:${proposta.status==='aprovada'?'#16a34a':'#1d4ed8'};padding:1px 6px;border-radius:99px;font-weight:600">
@@ -246,6 +286,7 @@ const Pipeline = (() => {
         ${lead.origemLead ? _origemBadge(lead.origemLead) : ''}
       </div>
       <div class="kc-valor">${Utils.formatCurrency(lead.valorEstimado)}</div>
+      ${licBadge}
       ${propBadge}
       ${frio ? `<div style="font-size:10px;color:#f59e0b;margin-bottom:4px">⚠ ${diasSemAtualizar}d sem atualização</div>` : ''}
       <div class="kc-footer">
@@ -379,13 +420,37 @@ const Pipeline = (() => {
           <div class="detail-field"><div class="detail-label">Valor Estimado</div><div class="detail-value font-bold text-primary">${Utils.formatCurrency(lead.valorEstimado)}</div></div>
           <div class="detail-field"><div class="detail-label">Valor Fechado</div><div class="detail-value">${Utils.formatCurrency(lead.valorFechado)}</div></div>
           <div class="detail-field"><div class="detail-label">Probabilidade</div><div class="detail-value"><span style="color:${stage?.color};font-weight:700">${prob}%</span> → <strong>${Utils.formatCurrency(receitaEsperada)}</strong> esperado</div></div>
-          <div class="detail-field"><div class="detail-label">Origem</div><div class="detail-value">${Utils.escHtml(lead.origemLead || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Origem</div><div class="detail-value">${_origemBadge(lead.origemLead) || Utils.escHtml(lead.origemLead || '—')}</div></div>
           <div class="detail-field"><div class="detail-label">Responsável</div><div class="detail-value">${Utils.escHtml(lead.responsavel || '—')}</div></div>
           <div class="detail-field"><div class="detail-label">Decisor</div><div class="detail-value">${Utils.escHtml(lead.decisor || '—')}</div></div>
           <div class="detail-field"><div class="detail-label">Segmento</div><div class="detail-value">${Utils.escHtml(lead.segmento || '—')}</div></div>
           <div class="detail-field"><div class="detail-label">Serviços</div><div class="detail-value">${Utils.escHtml(servicos || '—')}</div></div>
           <div class="detail-field"><div class="detail-label">Proposta Nº</div><div class="detail-value">${Utils.escHtml(lead.propostaNum || '—')}</div></div>
         </div>
+        <!-- LICITAÇÃO -->
+        ${(() => {
+          const lic = _getLic(lead);
+          if (!lic) return '';
+          const diasEntrega = Utils.daysUntil(lic.dataEntrega);
+          const prazoColor = diasEntrega == null ? '#94a3b8' : diasEntrega < 0 ? '#ef4444' : diasEntrega <= 3 ? '#f97316' : diasEntrega <= 7 ? '#f59e0b' : '#0f766e';
+          const prazoLabel = diasEntrega == null ? '—' : diasEntrega < 0 ? `⚠ Prazo vencido há ${Math.abs(diasEntrega)} dias` : diasEntrega === 0 ? '⚠ Vence HOJE' : `${diasEntrega} dias restantes`;
+          const desconto = lic.valorOrgao && lic.lance ? Math.round((1 - lic.lance / lic.valorOrgao) * 100) : null;
+          const resultColors = { 'Ganhou': '#10b981', 'Perdeu': '#ef4444', 'Cancelado': '#94a3b8', 'Suspenso': '#f59e0b', 'Em disputa': '#3b82f6' };
+          return `<div style="background:#f0fdfa;border:1px solid #0f766e33;border-radius:var(--radius);padding:14px;margin-bottom:14px">
+            <div style="font-weight:700;color:#0f766e;margin-bottom:10px;font-size:14px">🏛 Dados da Licitação</div>
+            <div class="detail-grid">
+              <div class="detail-field"><div class="detail-label">Edital / Processo</div><div class="detail-value font-bold">${Utils.escHtml(lic.edital||'—')}</div></div>
+              <div class="detail-field"><div class="detail-label">Órgão Licitante</div><div class="detail-value">${Utils.escHtml(lic.orgao||'—')}</div></div>
+              <div class="detail-field"><div class="detail-label">Modalidade</div><div class="detail-value">${Utils.escHtml(lic.modalidade||'—')}</div></div>
+              ${lic.uasg ? `<div class="detail-field"><div class="detail-label">UASG</div><div class="detail-value">${Utils.escHtml(lic.uasg)}</div></div>` : ''}
+              ${lic.dataEntrega ? `<div class="detail-field"><div class="detail-label">Prazo para Proposta</div><div class="detail-value" style="color:${prazoColor};font-weight:700">${Utils.formatDate(lic.dataEntrega)}<br><span class="text-xs">${prazoLabel}</span></div></div>` : ''}
+              ${lic.valorOrgao ? `<div class="detail-field"><div class="detail-label">Valor Estimado Órgão</div><div class="detail-value">${Utils.formatCurrency(lic.valorOrgao)}</div></div>` : ''}
+              ${lic.lance ? `<div class="detail-field"><div class="detail-label">Nosso Lance</div><div class="detail-value font-bold text-primary">${Utils.formatCurrency(lic.lance)}${desconto !== null ? `<span class="text-xs text-muted ml-1">(${desconto}% abaixo do teto)</span>` : ''}</div></div>` : ''}
+              ${lic.resultado ? `<div class="detail-field"><div class="detail-label">Resultado</div><div class="detail-value font-bold" style="color:${resultColors[lic.resultado]||'#64748b'}">${lic.resultado}</div></div>` : ''}
+            </div>
+            ${lic.link ? `<div class="mt-2"><a href="${Utils.escHtml(lic.link)}" target="_blank" class="btn btn-xs btn-secondary">🔗 Abrir Edital</a></div>` : ''}
+          </div>`;
+        })()}
         <div class="detail-field mb-3" style="background:var(--warning-bg);padding:12px;border-radius:var(--radius);border-left:3px solid var(--warning)">
           <div class="detail-label">Próxima Ação</div>
           <div class="detail-value">${Utils.escHtml(lead.proximaAcao || '—')}</div>
@@ -781,6 +846,64 @@ const Pipeline = (() => {
           <label class="form-label">Observações</label>
           <textarea class="form-control" id="fObs" rows="3">${Utils.escHtml(lead?.observacoes||'')}</textarea>
         </div>
+
+        <!-- SEÇÃO LICITAÇÃO (exibida só quando origem = Licitação Pública) -->
+        <div id="licitacaoSection" style="display:${lead?.origemLead==='Licitação Pública'?'block':'none'}">
+          <div style="background:#f0fdfa;border:1px solid #0f766e44;border-radius:var(--radius);padding:14px;margin-top:4px">
+            <div style="font-weight:700;font-size:14px;color:#0f766e;margin-bottom:12px">🏛 Dados da Licitação</div>
+            <div class="form-row">
+              <div class="form-group" style="flex:2">
+                <label class="form-label">Nº do Edital / Processo *</label>
+                <input class="form-control" id="fLicEdital" value="${Utils.escHtml(lead?.licitacao?.edital||'')}" placeholder="Ex: Pregão Eletrônico 003/2026">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Modalidade</label>
+                <select class="form-control" id="fLicModalidade">
+                  <option value="">—</option>
+                  ${_MODALIDADES_LIC.map(m => `<option value="${m}" ${lead?.licitacao?.modalidade===m?'selected':''}>${m}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex:2">
+                <label class="form-label">Órgão Licitante</label>
+                <input class="form-control" id="fLicOrgao" value="${Utils.escHtml(lead?.licitacao?.orgao||'')}" placeholder="Ex: Prefeitura de Ribeirão do Pinhal / Ministério da Saúde">
+              </div>
+              <div class="form-group">
+                <label class="form-label">UASG (ComprasNet)</label>
+                <input class="form-control" id="fLicUasg" value="${Utils.escHtml(lead?.licitacao?.uasg||'')}" placeholder="Ex: 153046">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Data Limite para Proposta ⏱</label>
+                <input class="form-control" id="fLicDataEntrega" type="date" value="${lead?.licitacao?.dataEntrega||''}">
+                <div class="text-xs text-muted mt-1">Gera alerta automático no card</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Valor Estimado pelo Órgão (R$)</label>
+                <input class="form-control" id="fLicValorOrgao" type="number" step="0.01" value="${lead?.licitacao?.valorOrgao||''}" placeholder="Teto declarado no edital">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nosso Lance / Proposta (R$)</label>
+                <input class="form-control" id="fLicLance" type="number" step="0.01" value="${lead?.licitacao?.lance||''}" placeholder="Valor que ofertamos">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex:3">
+                <label class="form-label">Link do Edital</label>
+                <input class="form-control" id="fLicLink" value="${Utils.escHtml(lead?.licitacao?.link||'')}" placeholder="https://comprasnet.gov.br/...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Resultado</label>
+                <select class="form-control" id="fLicResultado">
+                  ${['','Em disputa','Ganhou','Perdeu','Cancelado','Suspenso'].map(r =>
+                    `<option value="${r}" ${lead?.licitacao?.resultado===r?'selected':''}>${r||'— Aguardando —'}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
       `,
       saveCb: () => saveLead(id),
     });
@@ -789,6 +912,7 @@ const Pipeline = (() => {
   function saveLead(id) {
     const titulo = document.getElementById('fTitulo').value.trim();
     if (!titulo) { Toast.error('Título obrigatório'); return; }
+    const existingLead = id ? DB.get('leads', id) : null;
 
     const servicos = [...document.getElementById('fServicos').selectedOptions].map(o => o.value);
     const data = {
@@ -800,6 +924,17 @@ const Pipeline = (() => {
       valorFechado: Number(document.getElementById('fValorFechado').value) || 0,
       responsavel: document.getElementById('fResponsavel').value,
       origemLead: document.getElementById('fOrigem').value,
+      licitacao: document.getElementById('fOrigem').value === 'Licitação Pública' ? {
+        edital:      document.getElementById('fLicEdital')?.value.trim() || '',
+        modalidade:  document.getElementById('fLicModalidade')?.value || '',
+        orgao:       document.getElementById('fLicOrgao')?.value.trim() || '',
+        uasg:        document.getElementById('fLicUasg')?.value.trim() || '',
+        dataEntrega: document.getElementById('fLicDataEntrega')?.value || '',
+        valorOrgao:  Number(document.getElementById('fLicValorOrgao')?.value) || 0,
+        lance:       Number(document.getElementById('fLicLance')?.value) || 0,
+        link:        document.getElementById('fLicLink')?.value.trim() || '',
+        resultado:   document.getElementById('fLicResultado')?.value || '',
+      } : (existingLead?.licitacao || null),
       decisor: document.getElementById('fDecisor').value,
       proximaAcao: document.getElementById('fProximaAcao').value,
       dataProximaAcao: document.getElementById('fDataAcao').value,
@@ -932,11 +1067,21 @@ const Pipeline = (() => {
     });
   }
 
+  /* ---- Atalho para filtrar somente licitações ---- */
+  function filtrarLicitacoes() {
+    const sel = document.getElementById('filterOrigem');
+    if (sel) { sel.value = 'Licitação Pública'; render(); }
+    // Se não tem nenhuma licitação, avisa
+    const total = DB.getAll('leads').filter(l => l.origemLead === 'Licitação Pública').length;
+    if (total === 0) Toast.info('Nenhum lead com origem "Licitação Pública" cadastrado ainda.');
+  }
+
   return {
     render, openForm, saveLead, deleteLead, viewLead, addNew,
     dragStart, dragEnd, dragOver, dragLeave, drop,
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
-    relatorioOrigem, _previewOrigem,
+    relatorioOrigem, filtrarLicitacoes,
+    _previewOrigem, _toggleLicitacaoSection,
   };
 })();

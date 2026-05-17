@@ -807,7 +807,7 @@ const Marketing = (() => {
         ${metricas.map(m => `
           <div class="kpi-canal-metric">
             <span class="kpi-canal-metric-label">${m}</span>
-            <span class="kpi-canal-metric-value">${dados[m] !== undefined ? Number(dados[m]).toLocaleString('pt-BR') : <span style="color:var(--text-muted);font-size:13px">—</span>}</span>
+            <span class="kpi-canal-metric-value">${dados[m] !== undefined ? Number(dados[m]).toLocaleString('pt-BR') : '<span style="color:var(--text-muted);font-size:13px">—</span>'}</span>
           </div>
         `).join('')}
       </div>

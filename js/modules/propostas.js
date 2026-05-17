@@ -228,6 +228,12 @@ const Propostas = (() => {
   }
 
   function changeStatus(id, status) {
+    if (status === 'aprovada') {
+      // Fluxo especial de fechamento
+      Modal.close();
+      setTimeout(() => abrirFluxoContratacao(id), 150);
+      return;
+    }
     DB.update('propostas', id, { status });
     Toast.success('Status atualizado');
     Modal.close();
@@ -399,7 +405,530 @@ const Propostas = (() => {
     render();
   }
 
+  /* ====================================================
+     FLUXO DE FECHAMENTO DE CONTRATO
+     ==================================================== */
+  let _etapasContrato = []; // etapas em edição no modal de fechamento
+
+  function abrirFluxoContratacao(propostaId) {
+    const prop = DB.get('propostas', propostaId);
+    if (!prop) return;
+    _etapasContrato = [];
+
+    const cfg = DB.getConfig();
+    const clientes = DB.getAll('clientes');
+    const cli = clientes.find(c => c.id === prop.clienteId);
+    const respOpts = cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const projCount = String(DB.getAll('projetos').length + 1).padStart(3, '0');
+    const codSuggest = `BIK-${new Date().getFullYear()}-PRJ-${projCount}`;
+
+    Modal.open({
+      title: `🤝 Fechar Contrato — ${Utils.escHtml(prop.titulo)}`,
+      size: 'modal-xl',
+      body: _buildContratoBody(prop, cli, respOpts, codSuggest),
+      saveLabel: '✅ Confirmar e Criar Projeto',
+      saveCb: () => _confirmarContrato(propostaId),
+    });
+
+    // Renderiza etapas iniciais após o modal abrir
+    setTimeout(() => _renderEtapasContrato(), 60);
+  }
+
+  function _buildContratoBody(prop, cli, respOpts, codSuggest) {
+    return `
+      <!-- Banner da proposta -->
+      <div style="background:linear-gradient(135deg,#1a56db15,#7c3aed10);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="text-xs text-muted">Proposta</div>
+          <div class="font-bold">${Utils.escHtml(prop.numero||'—')} · ${Utils.escHtml(prop.titulo)}</div>
+          <div class="text-sm text-muted">${Utils.escHtml(cli?.nome||'—')}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="text-xs text-muted">Valor da proposta</div>
+          <div class="font-bold text-primary" style="font-size:20px">${Utils.formatCurrency(prop.valor)}</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:20px">
+        <button id="ctab-fin" onclick="Propostas._ctab('fin')"
+          style="padding:8px 20px;border:none;background:none;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer">
+          💰 Financeiro
+        </button>
+        <button id="ctab-proj" onclick="Propostas._ctab('proj')"
+          style="padding:8px 20px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer">
+          📋 Projeto & Escopo
+        </button>
+      </div>
+
+      <!-- PAINEL FINANCEIRO -->
+      <div id="cpanel-fin">
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label class="form-label">Valor Fechado (R$) *</label>
+            <input class="form-control" id="cValorFechado" type="number" step="0.01" value="${prop.valor||''}">
+          </div>
+          <div class="form-group" style="flex:3">
+            <label class="form-label">Condição de Pagamento *</label>
+            <select class="form-control" id="cCondicao" onchange="Propostas._toggleCondicao()">
+              <option value="avista">💵 À Vista</option>
+              <option value="parcelas">📅 Parcelas Fixas</option>
+              <option value="medicoes">📐 Medições / Vinculado a Etapas</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- À vista -->
+        <div id="cGrpAvista" style="background:var(--bg);border-radius:var(--radius);padding:14px;margin-bottom:12px">
+          <div class="form-row" style="margin:0">
+            <div class="form-group" style="margin-bottom:0;flex:1">
+              <label class="form-label">Data Prevista de Recebimento</label>
+              <input class="form-control" id="cAvistaData" type="date">
+            </div>
+            <div class="form-group" style="margin-bottom:0;flex:1">
+              <label class="form-label">Forma de Pagamento</label>
+              <select class="form-control" id="cAvistaForma">
+                <option value="PIX">PIX</option>
+                <option value="Transferência">Transferência</option>
+                <option value="Boleto">Boleto</option>
+                <option value="Cheque">Cheque</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parcelas Fixas -->
+        <div id="cGrpParcelas" style="display:none;background:var(--bg);border-radius:var(--radius);padding:14px;margin-bottom:12px">
+          <div class="form-row" style="margin:0">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Nº de Parcelas</label>
+              <input class="form-control" id="cNParcelas" type="number" min="1" max="60" value="3" oninput="Propostas._previewParcelas()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Vencimento da 1ª Parcela</label>
+              <input class="form-control" id="cParc1Data" type="date" oninput="Propostas._previewParcelas()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Intervalo</label>
+              <select class="form-control" id="cParcIntervalo" onchange="Propostas._previewParcelas()">
+                <option value="30">30 dias</option>
+                <option value="15">15 dias</option>
+                <option value="7">7 dias</option>
+                <option value="60">60 dias</option>
+                <option value="90">90 dias</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Forma de Pagamento</label>
+              <select class="form-control" id="cParcForma">
+                <option value="PIX">PIX</option>
+                <option value="Boleto">Boleto</option>
+                <option value="Transferência">Transferência</option>
+              </select>
+            </div>
+          </div>
+          <div id="cParcelasPreview" style="margin-top:12px"></div>
+        </div>
+
+        <!-- Medições (aviso) -->
+        <div id="cGrpMedicoes" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius);padding:12px;margin-bottom:12px;font-size:13px">
+          📐 <strong>Vinculado a Etapas:</strong> configure as etapas na aba "Projeto & Escopo" e marque
+          quais geram recebimento. O valor e data de vencimento de cada recebível serão definidos lá.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Prazo de Vigência do Contrato</label>
+          <div class="form-row" style="margin:0">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label text-xs">Data de Início</label>
+              <input class="form-control" id="cContratoInicio" type="date" value="${Utils.todayStr()}">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label text-xs">Data de Término</label>
+              <input class="form-control" id="cContratoFim" type="date">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Observações do Contrato</label>
+          <textarea class="form-control" id="cContratoObs" rows="2" placeholder="Condições especiais, garantias, SLAs...">${Utils.escHtml(prop.observacoes||'')}</textarea>
+        </div>
+
+        <div style="text-align:right;margin-top:8px">
+          <button class="btn btn-primary btn-sm" onclick="Propostas._ctab('proj')">Próximo: Projeto & Escopo →</button>
+        </div>
+      </div>
+
+      <!-- PAINEL PROJETO -->
+      <div id="cpanel-proj" style="display:none">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Código do Projeto</label>
+            <input class="form-control" id="cProjCodigo" value="${codSuggest}">
+          </div>
+          <div class="form-group" style="flex:3">
+            <label class="form-label">Título do Projeto *</label>
+            <input class="form-control" id="cProjTitulo" value="${Utils.escHtml(prop.titulo||'')}" placeholder="Nome interno do projeto">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Responsável</label>
+            <select class="form-control" id="cProjResp"><option value="">—</option>${respOpts}</select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Início</label>
+            <input class="form-control" id="cProjInicio" type="date" value="${Utils.todayStr()}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prazo Final de Entrega</label>
+            <input class="form-control" id="cProjPrazo" type="date">
+          </div>
+        </div>
+
+        <!-- Etapas -->
+        <div class="flex items-center justify-between mb-2 mt-2">
+          <div class="font-bold text-sm">📌 Etapas do Projeto</div>
+          <button class="btn btn-sm btn-secondary" type="button" onclick="Propostas._addEtapaContrato()">+ Etapa</button>
+        </div>
+        <div id="cEtapasContainer"></div>
+
+        <div style="background:#fef9c3;border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-top:8px;color:#854d0e">
+          ✅ <strong>Criar atividade:</strong> lança a etapa no módulo de Atividades/Agenda com as datas definidas.<br>
+          💰 <strong>Vinc. Pagamento:</strong> cria um recebível no financeiro do projeto com a data fim da etapa como vencimento.
+        </div>
+      </div>
+    `;
+  }
+
+  function _ctab(tab) {
+    ['fin','proj'].forEach(t => {
+      const p = document.getElementById('cpanel-' + t);
+      const b = document.getElementById('ctab-' + t);
+      if (!p || !b) return;
+      const active = t === tab;
+      p.style.display = active ? '' : 'none';
+      b.style.color        = active ? 'var(--primary)' : 'var(--text-muted)';
+      b.style.fontWeight   = active ? '700' : '400';
+      b.style.borderBottom = active ? '2px solid var(--primary)' : '2px solid transparent';
+    });
+  }
+
+  function _toggleCondicao() {
+    const v = document.getElementById('cCondicao').value;
+    document.getElementById('cGrpAvista').style.display    = v === 'avista'    ? '' : 'none';
+    document.getElementById('cGrpParcelas').style.display  = v === 'parcelas'  ? '' : 'none';
+    document.getElementById('cGrpMedicoes').style.display  = v === 'medicoes'  ? '' : 'none';
+    _renderEtapasContrato(); // rebuildtoggle "vinc pagamento" visibility
+  }
+
+  function _previewParcelas() {
+    const n     = parseInt(document.getElementById('cNParcelas')?.value) || 3;
+    const data1 = document.getElementById('cParc1Data')?.value;
+    const intv  = parseInt(document.getElementById('cParcIntervalo')?.value) || 30;
+    const valor = Number(document.getElementById('cValorFechado')?.value) || 0;
+    const prev  = document.getElementById('cParcelasPreview');
+    if (!prev || !data1 || !valor) return;
+
+    const parcVal = valor / n;
+    let rows = '';
+    for (let i = 0; i < n; i++) {
+      const d = new Date(data1 + 'T00:00:00');
+      d.setDate(d.getDate() + i * intv);
+      const ds = d.toISOString().split('T')[0];
+      rows += `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span class="text-muted">Parcela ${i+1}</span>
+        <span>${Utils.formatDate(ds)}</span>
+        <span class="font-bold">${Utils.formatCurrency(parcVal)}</span>
+      </div>`;
+    }
+    prev.innerHTML = `<div style="border-top:1px solid var(--border);padding-top:8px">
+      <div class="text-xs text-muted mb-2">Preview das parcelas</div>${rows}
+    </div>`;
+  }
+
+  function _addEtapaContrato() {
+    _etapasContrato.push({
+      nome: '', inicio: '', fim: '', responsavel: '',
+      criarAtividade: true, vincPagamento: false, valor: 0,
+    });
+    _renderEtapasContrato();
+  }
+
+  function _renderEtapasContrato() {
+    const container = document.getElementById('cEtapasContainer');
+    if (!container) return;
+    const cfg = DB.getConfig();
+    const respOpts = cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const condicao = document.getElementById('cCondicao')?.value || 'avista';
+    const showPgto = condicao === 'medicoes';
+    const valorTotal = Number(document.getElementById('cValorFechado')?.value) || 0;
+
+    if (_etapasContrato.length === 0) {
+      container.innerHTML = `<div class="text-sm text-muted" style="padding:12px;text-align:center">
+        Clique em "+ Etapa" para adicionar etapas do projeto.</div>`;
+      return;
+    }
+
+    container.innerHTML = _etapasContrato.map((e, i) => `
+      <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:10px;border-left:3px solid var(--primary)">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-bold text-sm" style="color:var(--primary)">Etapa ${i+1}</span>
+          <button class="btn btn-xs btn-danger" type="button" onclick="Propostas._removeEtapaContrato(${i})">✕</button>
+        </div>
+        <div class="form-row" style="margin:0 0 8px 0">
+          <div class="form-group" style="flex:3;margin-bottom:0">
+            <label class="form-label">Nome da Etapa *</label>
+            <input class="form-control ec-nome" data-idx="${i}" value="${Utils.escHtml(e.nome)}"
+              placeholder="Ex: Levantamento de campo, Elaboração do laudo..."
+              oninput="Propostas._setEtapaCampo(${i},'nome',this.value)">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Responsável</label>
+            <select class="form-control" onchange="Propostas._setEtapaCampo(${i},'responsavel',this.value)">
+              <option value="">—</option>${respOpts}
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin:0 0 8px 0">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Data de Início</label>
+            <input class="form-control" type="date" value="${e.inicio}"
+              onchange="Propostas._setEtapaCampo(${i},'inicio',this.value)">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Data de Entrega / Fim</label>
+            <input class="form-control" type="date" value="${e.fim}"
+              onchange="Propostas._setEtapaCampo(${i},'fim',this.value)">
+          </div>
+          ${showPgto ? `
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Valor do Recebimento (R$)</label>
+            <input class="form-control" type="number" step="0.01" value="${e.valor||''}"
+              placeholder="${Utils.formatCurrency(valorTotal)}"
+              oninput="Propostas._setEtapaCampo(${i},'valor',+this.value)">
+          </div>` : ''}
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" ${e.criarAtividade?'checked':''}
+              onchange="Propostas._setEtapaCampo(${i},'criarAtividade',this.checked)">
+            <span>📅 Criar atividade/agenda</span>
+          </label>
+          ${showPgto ? `
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" ${e.vincPagamento?'checked':''}
+              onchange="Propostas._setEtapaCampo(${i},'vincPagamento',this.checked)">
+            <span>💰 Vinculada a recebimento</span>
+          </label>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function _setEtapaCampo(i, campo, valor) {
+    if (!_etapasContrato[i]) return;
+    _etapasContrato[i][campo] = valor;
+  }
+
+  function _removeEtapaContrato(i) {
+    _etapasContrato.splice(i, 1);
+    _renderEtapasContrato();
+  }
+
+  function _confirmarContrato(propostaId) {
+    const prop = DB.get('propostas', propostaId);
+    if (!prop) return;
+
+    // Coletar dados financeiros
+    const valorFechado = Number(document.getElementById('cValorFechado').value);
+    if (!valorFechado) { Toast.error('Informe o valor fechado'); _ctab('fin'); return; }
+    const condicao = document.getElementById('cCondicao').value;
+    const contratoInicio = document.getElementById('cContratoInicio').value;
+    const contratoFim    = document.getElementById('cContratoFim').value;
+    const contratoObs    = document.getElementById('cContratoObs').value;
+
+    // Coletar dados do projeto
+    const projTitulo = document.getElementById('cProjTitulo').value.trim();
+    if (!projTitulo) { Toast.error('Informe o título do projeto'); _ctab('proj'); return; }
+    const projCodigo  = document.getElementById('cProjCodigo').value;
+    const projResp    = document.getElementById('cProjResp').value;
+    const projInicio  = document.getElementById('cProjInicio').value;
+    const projPrazo   = document.getElementById('cProjPrazo').value;
+
+    // Sincronizar etapas com o DOM (nomes podem ter sido editados sem blur)
+    document.querySelectorAll('.ec-nome').forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      if (_etapasContrato[idx]) _etapasContrato[idx].nome = el.value;
+    });
+
+    const etapasValidas = _etapasContrato.filter(e => e.nome.trim());
+
+    // ---- 1. Criar Projeto ----
+    const etapasProjeto = etapasValidas.map(e => ({
+      nome: e.nome.trim(),
+      inicio: e.inicio,
+      fim: e.fim,
+      pct: 0,
+      status: 'pendente',
+      responsavel: e.responsavel,
+      vincPagamento: e.vincPagamento,
+      valorPagamento: e.valor || 0,
+    }));
+
+    const projeto = DB.create('projetos', {
+      titulo: projTitulo,
+      codigo: projCodigo,
+      clienteId: prop.clienteId,
+      responsavel: projResp,
+      status: 'em_andamento',
+      valor: valorFechado,
+      dataInicio: projInicio || contratoInicio,
+      prazo: projPrazo || contratoFim,
+      propostaId: propostaId,
+      etapas: etapasProjeto,
+      financeiro: { recebimentos: [], custos: [], parceiros: [] },
+    });
+
+    // ---- 2. Lançar recebimentos no financeiro do projeto ----
+    const fin = { recebimentos: [], custos: [], parceiros: [] };
+
+    if (condicao === 'avista') {
+      const data = document.getElementById('cAvistaData').value;
+      const forma = document.getElementById('cAvistaForma').value;
+      const rec = { id: _uid(), descricao: 'Pagamento único', valor: valorFechado,
+                    vencimento: data, formaPagamento: forma, status: 'pendente',
+                    lancadoFinanceiro: false, recebiveisId: null };
+      // Auto-lança em recebiveis geral
+      const rv = DB.create('recebiveis', {
+        descricao: `${projTitulo} — Pagamento único`,
+        clienteId: prop.clienteId, valor: valorFechado, vencimento: data,
+        status: 'pendente', formaPagamento: forma, projetoId: projeto.id,
+        propostaId, origem: 'contrato',
+      });
+      rec.recebiveisId = rv.id;
+      rec.lancadoFinanceiro = true;
+      fin.recebimentos.push(rec);
+
+    } else if (condicao === 'parcelas') {
+      const n     = parseInt(document.getElementById('cNParcelas').value) || 3;
+      const data1 = document.getElementById('cParc1Data').value;
+      const intv  = parseInt(document.getElementById('cParcIntervalo').value) || 30;
+      const forma = document.getElementById('cParcForma').value;
+      const parcVal = valorFechado / n;
+
+      for (let i = 0; i < n; i++) {
+        const d = new Date((data1 || Utils.todayStr()) + 'T00:00:00');
+        d.setDate(d.getDate() + i * intv);
+        const venc = d.toISOString().split('T')[0];
+        const descParcela = `Parcela ${i+1}/${n}`;
+        const rec = { id: _uid(), descricao: descParcela, valor: parcVal,
+                      vencimento: venc, formaPagamento: forma, status: 'pendente',
+                      lancadoFinanceiro: false, recebiveisId: null };
+        const rv = DB.create('recebiveis', {
+          descricao: `${projTitulo} — ${descParcela}`,
+          clienteId: prop.clienteId, valor: parcVal, vencimento: venc,
+          status: 'pendente', formaPagamento: forma, projetoId: projeto.id,
+          propostaId, origem: 'contrato',
+        });
+        rec.recebiveisId = rv.id;
+        rec.lancadoFinanceiro = true;
+        fin.recebimentos.push(rec);
+      }
+
+    } else if (condicao === 'medicoes') {
+      // Vinculado a etapas — cria recebível para cada etapa com vincPagamento = true
+      etapasValidas.filter(e => e.vincPagamento && e.valor > 0).forEach((e, i) => {
+        const descRec = `Medição — ${e.nome.trim()}`;
+        const rec = { id: _uid(), descricao: descRec, valor: e.valor,
+                      vencimento: e.fim, formaPagamento: 'A definir', status: 'pendente',
+                      lancadoFinanceiro: false, recebiveisId: null, etapaNome: e.nome };
+        const rv = DB.create('recebiveis', {
+          descricao: `${projTitulo} — ${descRec}`,
+          clienteId: prop.clienteId, valor: e.valor, vencimento: e.fim,
+          status: 'pendente', projetoId: projeto.id, propostaId, origem: 'contrato',
+        });
+        rec.recebiveisId = rv.id;
+        rec.lancadoFinanceiro = true;
+        fin.recebimentos.push(rec);
+      });
+    }
+
+    // Salva financeiro no projeto
+    DB.update('projetos', projeto.id, { financeiro: fin });
+
+    // ---- 3. Criar atividades para etapas marcadas ----
+    const cfg = DB.getConfig();
+    let atividadesCriadas = 0;
+    etapasValidas.filter(e => e.criarAtividade).forEach(e => {
+      DB.create('atividades', {
+        titulo: `[${projCodigo || projTitulo}] ${e.nome.trim()}`,
+        tipo: 'tarefa',
+        status: 'pendente',
+        data: e.fim || projPrazo,
+        dataInicio: e.inicio || projInicio,
+        responsavel: e.responsavel || projResp,
+        clienteId: prop.clienteId,
+        projetoId: projeto.id,
+        descricao: `Etapa do projeto ${projTitulo} — ${e.nome.trim()}`,
+        origem: 'contrato',
+      });
+      atividadesCriadas++;
+    });
+
+    // ---- 4. Criar contrato ----
+    DB.create('contratos', {
+      numero: prop.numero || '',
+      objeto: projTitulo,
+      clienteId: prop.clienteId,
+      responsavel: projResp,
+      valor: valorFechado,
+      dataInicio: contratoInicio,
+      dataFim: contratoFim,
+      status: 'ativo',
+      projetoId: projeto.id,
+      propostaId,
+      descricao: prop.descricao || '',
+      observacoes: contratoObs,
+    });
+
+    // ---- 5. Atualizar proposta ----
+    DB.update('propostas', propostaId, {
+      status: 'aprovada',
+      valorFechado,
+      projetoId: projeto.id,
+    });
+
+    Modal.close();
+
+    // Resumo do que foi criado
+    const recCount = fin.recebimentos.length;
+    Toast.success(
+      `🎉 Contrato fechado! Projeto criado, ` +
+      `${recCount} recebível(is) lançado(s) e ` +
+      `${atividadesCriadas} atividade(s) criada(s) na agenda.`,
+      7000
+    );
+
+    render();
+
+    // Navega para o projeto criado
+    setTimeout(() => {
+      if (typeof App !== 'undefined') App.navigate('projetos');
+    }, 400);
+  }
+
+  function _uid() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+  }
+
   function addNew() { openForm(); }
 
-  return { render, openForm, saveProposta, deleteProposta, view, setFilter, changeStatus, criarRecebivel, addNew, addItemRow, removeItemRow, _setItemField };
+  return {
+    render, openForm, saveProposta, deleteProposta, view, setFilter, changeStatus,
+    criarRecebivel, addNew, addItemRow, removeItemRow, _setItemField,
+    abrirFluxoContratacao, _ctab, _toggleCondicao, _previewParcelas,
+    _addEtapaContrato, _renderEtapasContrato, _setEtapaCampo, _removeEtapaContrato,
+  };
 })();

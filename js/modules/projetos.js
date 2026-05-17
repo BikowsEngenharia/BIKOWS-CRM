@@ -390,15 +390,22 @@ const Projetos = (() => {
     container.appendChild(div.firstElementChild);
   }
 
-  function collectEtapas() {
+  function collectEtapas(projetoId) {
+    // Carrega etapas originais para preservar campos extras (vincPagamento, recebiveisId, etc.)
+    const original = projetoId ? (DB.get('projetos', projetoId)?.etapas || []) : [];
     const rows = document.querySelectorAll('.etapa-row');
-    return [...rows].map(row => ({
-      nome: row.querySelector('.etapa-nome')?.value || '',
-      inicio: row.querySelector('.etapa-inicio')?.value || '',
-      fim: row.querySelector('.etapa-fim')?.value || '',
-      pct: Number(row.querySelector('.etapa-pct')?.value) || 0,
-      status: row.querySelector('.etapa-status')?.value || 'pendente',
-    })).filter(e => e.nome.trim());
+    return [...rows].map((row, i) => {
+      const nome = row.querySelector('.etapa-nome')?.value || '';
+      const orig = original.find(e => e.nome === nome) || original[i] || {};
+      return {
+        ...orig, // preserva vincPagamento, valorPagamento, etapaNome, etc.
+        nome,
+        inicio: row.querySelector('.etapa-inicio')?.value || '',
+        fim: row.querySelector('.etapa-fim')?.value || '',
+        pct: Number(row.querySelector('.etapa-pct')?.value) || 0,
+        status: row.querySelector('.etapa-status')?.value || 'pendente',
+      };
+    }).filter(e => e.nome.trim());
   }
 
   function saveProjeto(id) {
@@ -418,22 +425,39 @@ const Projetos = (() => {
       custosDirectos: Number(document.getElementById('fpCustosDiretos').value) || 0,
       nfEmitida: document.getElementById('fpNf').checked,
       pagamentoRecebido: document.getElementById('fpPgto').checked,
-      etapas: collectEtapas(),
+      etapas: collectEtapas(id),
       observacoes: document.getElementById('fpObs').value,
     };
     if (id) {
       const anterior = DB.get('projetos', id);
       const statusAnterior = anterior?.status;
+      const etapasAntes = anterior?.etapas || [];
       DB.update('projetos', id, data);
       Toast.success('Projeto atualizado');
+
       // Hook: ao entrar em andamento, sugere configurar recebimentos
       if (statusAnterior !== 'em_andamento' && data.status === 'em_andamento') {
         if (typeof ProjetoFinanceiro !== 'undefined') {
           ProjetoFinanceiro.sugerirConfiguracaoPagamentos(id);
         }
       }
+
+      // Hook: etapa concluída com pagamento vinculado → solicita confirmação
+      const novasConcluidas = (data.etapas || []).filter(e => {
+        const antes = etapasAntes.find(a => a.nome === e.nome);
+        return e.status === 'concluida' && antes?.status !== 'concluida' && e.vincPagamento;
+      });
+      if (novasConcluidas.length > 0) {
+        _checarPagamentosEtapa(id, novasConcluidas);
+      }
+
+      // Hook: projeto inteiro concluído → checa todos os recebíveis pendentes
+      if (statusAnterior !== 'concluido' && data.status === 'concluido') {
+        _checarTodosPagamentos(id);
+      }
+
     } else {
-      const criado = DB.create('projetos', data);
+      DB.create('projetos', data);
       Toast.success('Projeto criado');
     }
     Modal.close();
@@ -447,6 +471,104 @@ const Projetos = (() => {
       Toast.success('Projeto removido');
       render();
     });
+  }
+
+  /* ====================================================
+     HOOKS DE PAGAMENTO POR ETAPA / CONCLUSÃO
+     ==================================================== */
+  function _checarPagamentosEtapa(projetoId, etapasConcluidas) {
+    const p = DB.get('projetos', projetoId);
+    if (!p) return;
+    const fin = p.financeiro || {};
+    const recs = fin.recebimentos || [];
+
+    // Para cada etapa recém-concluída, busca o recebimento vinculado pelo nome
+    etapasConcluidas.forEach(etapa => {
+      const rec = recs.find(r =>
+        r.status !== 'recebido' &&
+        (r.etapaNome === etapa.nome || r.descricao?.includes(etapa.nome))
+      );
+      if (!rec) return;
+
+      setTimeout(() => {
+        Modal.open({
+          title: '💰 Etapa Concluída — Confirmar Recebimento',
+          size: 'modal-sm',
+          body: `
+            <div style="background:#f0fdf4;border-radius:var(--radius);padding:12px;margin-bottom:14px">
+              <div class="font-bold">✅ Etapa concluída: ${Utils.escHtml(etapa.nome)}</div>
+              <div class="text-sm text-muted">Projeto: ${Utils.escHtml(p.titulo)}</div>
+            </div>
+            <p class="text-sm mb-3">
+              Esta etapa tem um recebimento vinculado de <strong>${Utils.formatCurrency(rec.valor)}</strong>.
+              O pagamento já foi recebido?
+            </p>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Data de Recebimento</label>
+                <input class="form-control" id="phkData" type="date" value="${Utils.todayStr()}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Forma de Pagamento</label>
+                <select class="form-control" id="phkForma">
+                  <option value="PIX">PIX</option>
+                  <option value="Transferência">Transferência</option>
+                  <option value="Boleto">Boleto</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                </select>
+              </div>
+            </div>
+          `,
+          saveLabel: '✅ Sim, confirmar recebimento',
+          cancelLabel: 'Ainda não recebi',
+          saveCb: () => {
+            if (typeof ProjetoFinanceiro !== 'undefined') {
+              // Simula o marcarRecebido sem abrir outro modal
+              rec.status = 'recebido';
+              rec.dataRecebimento = document.getElementById('phkData').value;
+              rec.formaPagamento  = document.getElementById('phkForma').value;
+              if (rec.recebiveisId) {
+                DB.update('recebiveis', rec.recebiveisId, {
+                  status: 'recebido',
+                  dataRecebimento: rec.dataRecebimento,
+                });
+              }
+              DB.create('lancamentos', {
+                descricao: `${p.titulo} — ${rec.descricao}`,
+                valor: rec.valor,
+                tipo: 'receita',
+                data: rec.dataRecebimento,
+                categoria: 'Serviços de Engenharia',
+                formaPagamento: rec.formaPagamento,
+                projetoId,
+                origem: 'projeto_financeiro',
+              });
+              rec.lancadoFinanceiro = true;
+              DB.update('projetos', projetoId, { financeiro: fin });
+              Modal.close();
+              Toast.success('Recebimento confirmado e lançado no financeiro!');
+            }
+          },
+        });
+      }, 500);
+    });
+  }
+
+  function _checarTodosPagamentos(projetoId) {
+    const p = DB.get('projetos', projetoId);
+    if (!p) return;
+    const recs = (p.financeiro?.recebimentos || []).filter(r => r.status !== 'recebido');
+    if (recs.length === 0) return;
+
+    setTimeout(() => {
+      Toast.warning(
+        `📋 Projeto <strong>${Utils.escHtml(p.titulo)}</strong> concluído com ` +
+        `<strong>${recs.length}</strong> recebimento(s) pendente(s). ` +
+        `<a href="#" onclick="ProjetoFinanceiro.open('${projetoId}');return false;" style="color:var(--primary);font-weight:600">` +
+        `Acesse o Financeiro do Projeto →</a>`,
+        10000
+      );
+    }, 600);
   }
 
   function addNew() { openForm(); }

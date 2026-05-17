@@ -80,6 +80,32 @@ const Pipeline = (() => {
     _toggleCampanhaSection(sel.value);
   }
 
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
+
   let _filter = {
     search: '', status: '', segmento: '',
     responsavel: '', origemLead: '',
@@ -176,17 +202,22 @@ const Pipeline = (() => {
     const leads = DB.getAll('leads');
     const config = DB.getConfig();
 
-    const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
-    const ganhos = leads.filter(l => l.status === 'fechado_ganho');
+    const leadsFiltrados = _filtrarPorPeriodo(leads, 'dataEntrada');
+    const ativos = leadsFiltrados.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const ganhos = leadsFiltrados.filter(l => l.status === 'fechado_ganho');
     const totalPipeline = Utils.sum(ativos, 'valorEstimado');
-    const receitaPond = _receitaPonderada(leads);
-    const taxa = leads.length ? ((ganhos.length / leads.length)*100).toFixed(0) : 0;
+    const receitaPond = _receitaPonderada(leadsFiltrados);
+    const taxa = leadsFiltrados.length ? ((ganhos.length / leadsFiltrados.length)*100).toFixed(0) : 0;
     const frios = ativos.filter(l => _isLeadFrio(l)).length;
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
 
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
         <h2 class="sec-title">Pipeline CRM</h2>
         <div class="sec-actions">
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Pipeline.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
+          </div>
           <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Ver somente licitações">🏛 Licitações</button>
           <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
           <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
@@ -250,7 +281,7 @@ const Pipeline = (() => {
 
       <div class="pipeline-summary mb-4">
         <div class="pipeline-stage">
-          <div class="ps-label">Total em Pipeline</div>
+          <div class="ps-label">Total em Pipeline <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
           <div class="ps-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="ps-count">${ativos.length} oportunidades abertas</div>
         </div>
@@ -260,14 +291,14 @@ const Pipeline = (() => {
           <div class="ps-count">previsão realista ponderada</div>
         </div>
         <div class="pipeline-stage">
-          <div class="ps-label">Fechado / Ganho</div>
+          <div class="ps-label">Fechado / Ganho <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
           <div class="ps-value">${Utils.formatCurrency(Utils.sum(ganhos,'valorFechado'))}</div>
           <div class="ps-count">${ganhos.length} negócios</div>
         </div>
         <div class="pipeline-stage">
-          <div class="ps-label">Taxa de Conversão</div>
+          <div class="ps-label">Taxa de Conversão <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
           <div class="ps-value">${taxa}%</div>
-          <div class="ps-count">${leads.filter(l=>l.status==='fechado_perdido').length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
+          <div class="ps-count">${leadsFiltrados.filter(l=>l.status==='fechado_perdido').length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
         </div>
       </div>
 
@@ -279,6 +310,7 @@ const Pipeline = (() => {
         </div>
       </div>
     `;
+    // Note: kanban board shows all leads regardless of period (period only affects KPI summary)
 
     initDragDrop();
     // Verificar leads frios ao abrir o pipeline
@@ -1177,7 +1209,7 @@ const Pipeline = (() => {
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
     relatorioOrigem, filtrarLicitacoes,
-    setFilter, clearFilters,
+    setFilter, clearFilters, setPeriodo,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
   };
 })();

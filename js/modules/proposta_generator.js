@@ -120,13 +120,19 @@ const PropostaGenerator = (() => {
   function buildForm(nextNum, today, proposta, cliente, clientOpts) {
     return `
     <!-- TAB NAVIGATION -->
-    <div class="tabs" style="margin-bottom:16px">
-      <button class="tab-btn active" onclick="pgTab(this,'pgBasico')">1. Dados Gerais</button>
-      <button class="tab-btn" onclick="pgTab(this,'pgCliente')">2. Cliente</button>
-      <button class="tab-btn" onclick="pgTab(this,'pgEscopo')">3. Escopo</button>
-      <button class="tab-btn" onclick="pgTab(this,'pgCronograma')">4. Cronograma</button>
-      <button class="tab-btn" onclick="pgTab(this,'pgValor')">5. Valor</button>
-      <button class="tab-btn" onclick="pgTab(this,'pgOpcoes')">6. Opções</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <div class="tabs" style="flex:1;margin-bottom:0">
+        <button class="tab-btn active" onclick="pgTab(this,'pgBasico')">1. Dados Gerais</button>
+        <button class="tab-btn" onclick="pgTab(this,'pgCliente')">2. Cliente</button>
+        <button class="tab-btn" onclick="pgTab(this,'pgEscopo')">3. Escopo</button>
+        <button class="tab-btn" onclick="pgTab(this,'pgCronograma')">4. Cronograma</button>
+        <button class="tab-btn" onclick="pgTab(this,'pgValor')">5. Valor</button>
+        <button class="tab-btn" onclick="pgTab(this,'pgOpcoes')">6. Opções</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button type="button" class="btn btn-primary btn-sm" onclick="PropostaGenerator.generatePDF()">📄 Gerar PDF</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="PropostaGenerator.downloadHTML()">💾 Baixar HTML</button>
+      </div>
     </div>
 
     <!-- TAB 1: DADOS GERAIS -->
@@ -619,9 +625,65 @@ enerlab</textarea>
     return String(n);
   }
 
+  // ---- Coletar dados, salvar no localStorage e abrir janela de impressão ----
+  function generatePDF() {
+    const data = collectData();
+    if (!data.numero) { Toast.error('Informe o número da proposta'); return; }
+    if (!data.cliente?.nome) { Toast.error('Informe o nome do cliente (aba Cliente)'); return; }
+    if (!data.valor) { Toast.error('Informe o valor da proposta (aba Valor)'); return; }
+    if (!data.valorPorExtenso) data.valorPorExtenso = valorPorExtenso(data.valor);
+
+    localStorage.setItem('crm_proposta_gerada', JSON.stringify(data));
+
+    const printWin = window.open('proposta_viewer.html', '_blank');
+    if (!printWin) {
+      Toast.error('Pop-up bloqueado. Permita pop-ups e tente novamente.');
+    } else {
+      Toast.success('Abrindo visualizador para impressão/PDF...');
+    }
+  }
+
+  // ---- Baixar HTML completo do viewer como arquivo local ----
+  async function downloadHTML() {
+    const data = collectData();
+    if (!data.numero) { Toast.error('Informe o número da proposta'); return; }
+    if (!data.cliente?.nome) { Toast.error('Informe o nome do cliente (aba Cliente)'); return; }
+    if (!data.valorPorExtenso) data.valorPorExtenso = valorPorExtenso(data.valor);
+
+    try {
+      const res = await fetch('proposta_viewer.html');
+      if (!res.ok) throw new Error('Não foi possível carregar o viewer');
+      let viewerHtml = await res.text();
+
+      // Injeta os dados diretamente no HTML para funcionar offline (sem localStorage)
+      const dataScript = `<script>
+        (function() {
+          const _d = ${JSON.stringify(data)};
+          const _orig = localStorage.getItem.bind(localStorage);
+          localStorage.setItem('crm_proposta_gerada', JSON.stringify(_d));
+        })();
+      <\/script>`;
+      viewerHtml = viewerHtml.replace('</head>', dataScript + '\n</head>');
+
+      const clienteSlug = (data.cliente?.nome || 'cliente').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
+      const numSlug = (data.numero || 'proposta').replace(/[^a-zA-Z0-9\-]/g, '_');
+      const fileName = `Proposta_${numSlug}_${clienteSlug}.html`;
+
+      const blob = new Blob([viewerHtml], { type: 'text/html;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      Toast.success(`HTML baixado: ${fileName}`);
+    } catch (err) {
+      Toast.error('Erro ao gerar HTML: ' + err.message);
+    }
+  }
+
   return {
     open, generate, preencherCliente,
     addEscopoSection, addEscopoItem, addCronogramaRow, addIncluiItem,
-    atualizarExtenso,
+    atualizarExtenso, generatePDF, downloadHTML,
   };
 })();

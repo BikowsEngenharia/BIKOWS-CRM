@@ -3,6 +3,32 @@
    ========================================== */
 const Projetos = (() => {
 
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
+
   let _filter = { status: '', responsavel: '' };
 
   function _calcRentabilidade(p) {
@@ -18,36 +44,46 @@ const Projetos = (() => {
   function render() {
     const projetos = DB.getAll('projetos');
     const config = DB.getConfig();
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const projetosFiltrados = _filtrarPorPeriodo(projetos, 'dataInicio');
+
     let list = projetos;
     if (_filter.status) list = list.filter(p => p.status === _filter.status);
     if (_filter.responsavel) list = list.filter(p => p.responsavel === _filter.responsavel);
 
+    // Em andamento sempre mostra todos (estado atual)
     const emAnd = projetos.filter(p => p.status === 'em_andamento').length;
     const atrasados = projetos.filter(p => p.status === 'em_andamento' && Utils.isOverdue(p.prazo)).length;
-    const concluidos = projetos.filter(p => p.status === 'concluido').length;
-    const totalValor = Utils.sum(projetos, 'valor');
+    // Iniciados e concluídos no período
+    const iniciadosPeriodo = projetosFiltrados.length;
+    const concluidosPeriodo = projetosFiltrados.filter(p => p.status === 'concluido').length;
+    const totalValor = Utils.sum(projetosFiltrados, 'valor');
 
-    // Rentabilidade consolidada
+    // Rentabilidade consolidada (todos os projetos)
     const totalCustos = projetos.reduce((s, p) => {
       const r = _calcRentabilidade(p);
       return s + r.custoTotal;
     }, 0);
-    const margemGeral = totalValor > 0 ? Math.round(((totalValor - totalCustos) / totalValor) * 100) : 0;
+    const totalValorGeral = Utils.sum(projetos, 'valor');
+    const margemGeral = totalValorGeral > 0 ? Math.round(((totalValorGeral - totalCustos) / totalValorGeral) * 100) : 0;
 
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
         <h2 class="sec-title">Projetos em Execução</h2>
         <div class="sec-actions">
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Projetos.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
+          </div>
           <button class="btn btn-secondary" onclick="Projetos.verRentabilidade()">📊 Rentabilidade</button>
           <button class="btn btn-primary" onclick="Projetos.openForm()">+ Novo Projeto</button>
         </div>
       </div>
 
       <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
-        <div class="kpi-card" style="--kpi-color:#3b82f6"><div class="kpi-label">Em Andamento</div><div class="kpi-value">${emAnd}</div><div class="kpi-icon">🔧</div></div>
+        <div class="kpi-card" style="--kpi-color:#3b82f6"><div class="kpi-label">Em Andamento</div><div class="kpi-value">${emAnd}</div><div class="kpi-sub">todos</div><div class="kpi-icon">🔧</div></div>
         <div class="kpi-card" style="--kpi-color:#ef4444"><div class="kpi-label">Atrasados</div><div class="kpi-value">${atrasados}</div><div class="kpi-icon">⚠</div></div>
-        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Concluídos</div><div class="kpi-value">${concluidos}</div><div class="kpi-icon">✅</div></div>
-        <div class="kpi-card" style="--kpi-color:#8b5cf6"><div class="kpi-label">Valor Total</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalValor)}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Iniciados <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${iniciadosPeriodo}</div><div class="kpi-icon">🚀</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Concluídos <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${concluidosPeriodo}</div><div class="kpi-icon">✅</div></div>
         <div class="kpi-card" style="--kpi-color:${margemGeral >= 40 ? '#10b981' : margemGeral >= 20 ? '#f59e0b' : '#ef4444'}">
           <div class="kpi-label">Margem Média</div>
           <div class="kpi-value">${margemGeral}%</div>
@@ -755,5 +791,5 @@ const Projetos = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade, addChecklistItem, toggleChecklistItem, _nextOS };
+  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade, addChecklistItem, toggleChecklistItem, _nextOS, setPeriodo };
 })();

@@ -3,6 +3,32 @@
    ========================================== */
 const Propostas = (() => {
 
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
+
   let _filter = { status: '' };
   let _formItems = []; // itens da proposta em edição
 
@@ -92,9 +118,12 @@ const Propostas = (() => {
   }
 
   function render() {
-    const propostas = DB.getAll('propostas');
+    const propostasAll = DB.getAll('propostas');
     const config = DB.getConfig();
-    let list = propostas;
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const propostas = _filtrarPorPeriodo(propostasAll, 'createdAt');
+
+    let list = propostasAll;
     if (_filter.status) list = list.filter(p => p.status === _filter.status);
 
     const totalEnviadas = propostas.filter(p => ['enviada','negociacao'].includes(p.status)).length;
@@ -107,15 +136,18 @@ const Propostas = (() => {
       <div class="sec-header">
         <h2 class="sec-title">Propostas</h2>
         <div class="sec-actions">
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Propostas.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
+          </div>
           <button class="btn btn-primary" onclick="Propostas.openForm()">+ Nova Proposta</button>
         </div>
       </div>
 
       <div class="kpi-grid">
-        <div class="kpi-card" style="--kpi-color:#f97316"><div class="kpi-label">Em Aberto</div><div class="kpi-value">${totalEnviadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorEmAberto)}</div><div class="kpi-icon">📤</div></div>
-        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Aprovadas</div><div class="kpi-value">${totalAprovadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorAprovado)}</div><div class="kpi-icon">✅</div></div>
-        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Taxa de Aprovação</div><div class="kpi-value">${taxa}%</div><div class="kpi-sub">${propostas.length} propostas total</div><div class="kpi-icon">📊</div></div>
-        <div class="kpi-card" style="--kpi-color:#8b5cf6"><div class="kpi-label">Total das Propostas</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(Utils.sum(propostas,'valor'))}</div><div class="kpi-icon">💼</div></div>
+        <div class="kpi-card" style="--kpi-color:#f97316"><div class="kpi-label">Em Aberto <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${totalEnviadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorEmAberto)}</div><div class="kpi-icon">📤</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Aprovadas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${totalAprovadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorAprovado)}</div><div class="kpi-icon">✅</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Taxa de Aprovação <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${taxa}%</div><div class="kpi-sub">${propostas.length} no período</div><div class="kpi-icon">📊</div></div>
+        <div class="kpi-card" style="--kpi-color:#8b5cf6"><div class="kpi-label">Total das Propostas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(Utils.sum(propostas,'valor'))}</div><div class="kpi-icon">💼</div></div>
       </div>
 
       <div class="card">
@@ -980,5 +1012,6 @@ const Propostas = (() => {
     abrirFluxoContratacao, _ctab, _toggleCondicao, _previewParcelas,
     _addEtapaContrato, _renderEtapasContrato, _setEtapaCampo, _removeEtapaContrato,
     nextNumeroProposta: _nextNumeroProposta, // exposto para uso no pipeline
+    setPeriodo,
   };
 })();

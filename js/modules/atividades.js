@@ -3,12 +3,41 @@
    ========================================== */
 const Atividades = (() => {
 
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
+
   let _filter = { status: '', tipo: '', responsavel: '' };
   let _selected = new Set();
 
   function render() {
     const atividades = DB.getAll('atividades');
     const config = DB.getConfig();
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const atividadesFiltradas = _filtrarPorPeriodo(atividades, 'data');
+
     let list = [...atividades].sort((a, b) => {
       if (!a.data) return 1; if (!b.data) return -1;
       return a.data.localeCompare(b.data);
@@ -17,24 +46,27 @@ const Atividades = (() => {
     if (_filter.tipo) list = list.filter(a => a.tipo === _filter.tipo);
     if (_filter.responsavel) list = list.filter(a => a.responsavel === _filter.responsavel);
 
-    const pendentes = atividades.filter(a => a.status === 'pendente').length;
-    const atrasadas = atividades.filter(a => a.status === 'pendente' && Utils.isOverdue(a.data)).length;
-    const hoje = atividades.filter(a => a.status === 'pendente' && Utils.isToday(a.data)).length;
-    const concluidas = atividades.filter(a => a.status === 'concluida').length;
+    const pendentes = atividadesFiltradas.filter(a => a.status === 'pendente').length;
+    const atrasadas = atividadesFiltradas.filter(a => a.status === 'pendente' && Utils.isOverdue(a.data)).length;
+    const hoje = atividadesFiltradas.filter(a => a.status === 'pendente' && Utils.isToday(a.data)).length;
+    const concluidas = atividadesFiltradas.filter(a => a.status === 'concluida').length;
 
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
         <h2 class="sec-title">Atividades</h2>
         <div class="sec-actions">
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Atividades.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
+          </div>
           <button class="btn btn-primary" onclick="Atividades.openForm()">+ Nova Atividade</button>
         </div>
       </div>
 
       <div class="stats-row mb-4">
-        <div class="stat-box"><div class="stat-val">${pendentes}</div><div class="stat-lbl">Pendentes</div></div>
+        <div class="stat-box"><div class="stat-val">${pendentes}</div><div class="stat-lbl">Pendentes <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div></div>
         <div class="stat-box" style="border-left:3px solid var(--danger)"><div class="stat-val text-danger">${atrasadas}</div><div class="stat-lbl">Atrasadas</div></div>
         <div class="stat-box" style="border-left:3px solid var(--warning)"><div class="stat-val">${hoje}</div><div class="stat-lbl">Para Hoje</div></div>
-        <div class="stat-box"><div class="stat-val text-success">${concluidas}</div><div class="stat-lbl">Concluídas</div></div>
+        <div class="stat-box"><div class="stat-val text-success">${concluidas}</div><div class="stat-lbl">Concluídas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div></div>
       </div>
 
       ${_selected.size > 0 ? `
@@ -265,5 +297,5 @@ const Atividades = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir };
+  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir, setPeriodo };
 })();

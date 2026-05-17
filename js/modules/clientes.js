@@ -3,6 +3,32 @@
    ========================================== */
 const Clientes = (() => {
 
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
+
   let _filter = { search: '', segmento: '', porte: '', ativo: '' };
 
   function render() {
@@ -10,6 +36,8 @@ const Clientes = (() => {
     const clientes = DB.getAll('clientes');
     const leads = DB.getAll('leads');
     const projetos = DB.getAll('projetos');
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const novosPeriodo = _filtrarPorPeriodo(clientes, 'createdAt').length;
 
     let list = clientes;
     if (_filter.search) {
@@ -24,6 +52,9 @@ const Clientes = (() => {
       <div class="sec-header">
         <h2 class="sec-title">Clientes</h2>
         <div class="sec-actions">
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Clientes.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
+          </div>
           <label class="btn btn-secondary" style="cursor:pointer" title="Importar CSV com colunas: nome, cnpj, segmento, porte, cidade, estado, email, telefone">
             📥 Importar CSV
             <input type="file" accept=".csv,.txt" style="display:none" onchange="Clientes.importCSV(event)">
@@ -36,6 +67,7 @@ const Clientes = (() => {
       <div class="stats-row mb-4">
         <div class="stat-box"><div class="stat-val">${clientes.length}</div><div class="stat-lbl">Total</div></div>
         <div class="stat-box"><div class="stat-val">${clientes.filter(c=>c.ativo!==false).length}</div><div class="stat-lbl">Ativos</div></div>
+        <div class="stat-box" style="border-left:3px solid var(--primary)"><div class="stat-val" style="color:var(--primary)">${novosPeriodo}</div><div class="stat-lbl">Novos (${periodoLabels[_periodo]})</div></div>
         <div class="stat-box"><div class="stat-val">${[...new Set(clientes.map(c=>c.segmento).filter(Boolean))].length}</div><div class="stat-lbl">Segmentos</div></div>
         <div class="stat-box"><div class="stat-val">${[...new Set(clientes.map(c=>c.estado).filter(Boolean))].length}</div><div class="stat-lbl">Estados</div></div>
       </div>
@@ -317,7 +349,12 @@ const Clientes = (() => {
           </div>
           <div class="form-group">
             <label class="form-label">CNPJ / CPF</label>
-            <input class="form-control" id="fCnpj" value="${Utils.escHtml(c?.cnpj||'')}" placeholder="XX.XXX.XXX/XXXX-XX" maxlength="18" oninput="Utils.autoFormatCNPJ(this)">
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+              <div style="flex:1">
+                <input class="form-control" id="fCnpj" value="${Utils.escHtml(c?.cnpj||'')}" placeholder="XX.XXX.XXX/XXXX-XX" maxlength="18" oninput="Utils.autoFormatCNPJ(this)">
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnBuscarCnpj" onclick="Clientes.buscarCNPJ()" style="white-space:nowrap;flex-shrink:0">🔍 Buscar CNPJ</button>
+            </div>
           </div>
         </div>
         <div class="form-row">
@@ -493,7 +530,102 @@ const Clientes = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate };
+  async function buscarCNPJ() {
+    const input = document.getElementById('fCnpj');
+    const btn   = document.getElementById('btnBuscarCnpj');
+    if (!input || !btn) return;
+
+    const raw  = input.value.replace(/\D/g, '');
+    if (raw.length !== 14) { Toast.error('CNPJ deve ter 14 dígitos'); return; }
+
+    const original = btn.textContent;
+    btn.textContent = 'Buscando...';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${raw}`);
+      if (!res.ok) throw new Error(res.status === 404 ? 'CNPJ não encontrado' : `Erro ${res.status} na consulta`);
+      const d = await res.json();
+
+      // Nome / Razão Social
+      const fNome = document.getElementById('fNome');
+      if (fNome && d.razao_social) fNome.value = d.razao_social;
+
+      // Nome Fantasia
+      const fNomeFantasia = document.getElementById('fNomeFantasia');
+      if (fNomeFantasia && d.nome_fantasia) fNomeFantasia.value = d.nome_fantasia;
+
+      // Segmento — tenta mapear CNAE para os segmentos disponíveis
+      const fSegmento = document.getElementById('fSegmento');
+      if (fSegmento && d.cnae_fiscal_descricao) {
+        const cnae = d.cnae_fiscal_descricao.toLowerCase();
+        const opts = [...fSegmento.options].map(o => ({ val: o.value, lbl: o.value.toLowerCase() }));
+        const mapa = [
+          { kws: ['aliment','bebid','agric','pecuár'], seg: 'Alimentos' },
+          { kws: ['metal','ferrament','caldeiraria','estrutura metál','soldagem','usinag'], seg: 'Metalurgia' },
+          { kws: ['automação','automação industrial','eletr','instrumentação'], seg: 'Automação' },
+          { kws: ['construção','obra','engenharia civil','arquitet'], seg: 'Construção Civil' },
+          { kws: ['quím','petroqu','petrol','gás'], seg: 'Química' },
+          { kws: ['papel','celulos'], seg: 'Papel e Celulose' },
+          { kws: ['plástic','borracha'], seg: 'Plásticos e Borracha' },
+          { kws: ['têxtil','confecção','vestuário'], seg: 'Têxtil' },
+          { kws: ['logístic','transport','armazenagem'], seg: 'Logística' },
+          { kws: ['saúde','hospital','farmac','médic'], seg: 'Saúde' },
+          { kws: ['tecnologia','software','inform'], seg: 'Tecnologia' },
+          { kws: ['serviços','assessoria','consultoria'], seg: 'Serviços' },
+        ];
+        let found = '';
+        for (const { kws, seg } of mapa) {
+          if (kws.some(k => cnae.includes(k))) { found = seg; break; }
+        }
+        if (found) {
+          const opt = opts.find(o => o.lbl === found.toLowerCase());
+          if (opt) fSegmento.value = opt.val;
+        }
+      }
+
+      // Endereço
+      const fEndereco = document.getElementById('fEndereco');
+      if (fEndereco) {
+        const partes = [
+          d.logradouro,
+          d.numero ? d.numero : null,
+          d.bairro ? '- ' + d.bairro : null,
+          (d.municipio && d.uf) ? d.municipio + '/' + d.uf : (d.municipio || null),
+          d.cep ? 'CEP ' + d.cep : null,
+        ].filter(Boolean);
+        if (partes.length) fEndereco.value = partes.join(', ');
+      }
+
+      // Cidade e Estado (campos separados)
+      const fCidade = document.getElementById('fCidade');
+      if (fCidade && d.municipio) fCidade.value = d.municipio;
+      const fEstado = document.getElementById('fEstado');
+      if (fEstado && d.uf) fEstado.value = d.uf;
+
+      // Telefone
+      const fTelefone = document.getElementById('fTelefone');
+      if (fTelefone && d.ddd_telefone_1) {
+        const t = d.ddd_telefone_1.replace(/\D/g,'');
+        if (t.length === 10) fTelefone.value = `(${t.slice(0,2)}) ${t.slice(2,6)}-${t.slice(6)}`;
+        else if (t.length === 11) fTelefone.value = `(${t.slice(0,2)}) ${t.slice(2,7)}-${t.slice(7)}`;
+        else fTelefone.value = d.ddd_telefone_1;
+      }
+
+      // E-mail
+      const fEmail = document.getElementById('fEmail');
+      if (fEmail && d.email) fEmail.value = d.email;
+
+      Toast.success(`Dados preenchidos: ${d.razao_social}`);
+    } catch (err) {
+      Toast.error('Erro ao buscar CNPJ: ' + (err.message || 'Tente novamente'));
+    } finally {
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  }
+
+  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo };
 })();
 
 // Tab switcher helper

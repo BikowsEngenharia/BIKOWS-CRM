@@ -23,6 +23,31 @@ const Marketing = (() => {
   let _filtroIdeiaPilar = '';
   let _filtroIdeiaPrior = '';
   let _kpiMes = new Date().toISOString().slice(0,7);
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
 
   /* ====================================================
      RENDER PRINCIPAL
@@ -35,6 +60,11 @@ const Marketing = (() => {
         <div>
           <h2 class="sec-title">Marketing & ConteÃºdo</h2>
           <p style="font-size:12px;color:var(--text-muted);margin-top:2px">CalendÃ¡rio editorial, campanhas, KPIs e estratÃ©gia de conteÃºdo</p>
+        </div>
+        <div class="sec-actions">
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Marketing.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${{mes:'Mês',trimestre:'Trimestre',semestre:'Semestre',ano:'Ano',tudo:'Tudo'}[p]}</button>`).join('')}
+          </div>
         </div>
       </div>
 
@@ -1071,7 +1101,7 @@ const Marketing = (() => {
     openPostForm, duplicatePost, deletePost,
     openCampanhaForm, viewCampanha, deleteCampanha,
     openIdeiaForm, usarIdeia, deleteIdeia,
-    editKpi,
+    editKpi, setPeriodo,
   };
 })();
 

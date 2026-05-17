@@ -11,6 +11,32 @@ const Contratos = (() => {
     rascunho:  { label: 'Rascunho',  color: '#8b5cf6' },
   };
 
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
+
   let _filter = { status: '', clienteId: '' };
 
   function _nextNumeroContrato() {
@@ -42,19 +68,25 @@ const Contratos = (() => {
   function render() {
     const contratos = DB.getAll('contratos');
     const clientes = DB.getAll('clientes');
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const contratosFiltrados = _filtrarPorPeriodo(contratos, 'dataInicio');
+
     let list = contratos;
     if (_filter.status) list = list.filter(c => _autoStatus(c) === _filter.status);
     if (_filter.clienteId) list = list.filter(c => c.clienteId === _filter.clienteId);
 
-    const ativos    = contratos.filter(c => _autoStatus(c) === 'ativo').length;
-    const renovando = contratos.filter(c => _autoStatus(c) === 'renovando').length;
-    const vencidos  = contratos.filter(c => _autoStatus(c) === 'vencido').length;
-    const valorTotal = contratos.filter(c => ['ativo','renovando'].includes(_autoStatus(c))).reduce((s,c)=>s+(c.valor||0),0);
+    const ativos    = contratosFiltrados.filter(c => _autoStatus(c) === 'ativo').length;
+    const renovando = contratosFiltrados.filter(c => _autoStatus(c) === 'renovando').length;
+    const vencidos  = contratosFiltrados.filter(c => _autoStatus(c) === 'vencido').length;
+    const valorTotal = contratosFiltrados.filter(c => ['ativo','renovando'].includes(_autoStatus(c))).reduce((s,c)=>s+(c.valor||0),0);
 
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
         <h2 class="sec-title">Contratos</h2>
         <div class="sec-actions">
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Contratos.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
+          </div>
           <button class="btn btn-primary" onclick="Contratos.openForm()">+ Novo Contrato</button>
         </div>
       </div>
@@ -360,5 +392,5 @@ const Contratos = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew };
+  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo };
 })();

@@ -472,7 +472,7 @@ const ProjetoFinanceiro = (() => {
 
     const p = _get(projetoId);
     const fin = _fin(p);
-    const novoId = DB.genId ? DB.genId() : Date.now().toString(36) + Math.random().toString(36).substr(2,4);
+    const novoId = Date.now().toString(36) + Math.random().toString(36).substr(2,4);
     const lancar = document.getElementById('pfRecLancar').checked;
 
     const rec = {
@@ -483,12 +483,14 @@ const ProjetoFinanceiro = (() => {
       formaPagamento: document.getElementById('pfRecForma').value,
       status: 'pendente',
       lancadoFinanceiro: false,
+      recebiveisId: null, // será preenchido ao lançar
     };
 
     fin.recebimentos = [...(fin.recebimentos || []), rec];
-    _save(projetoId, fin);
 
-    if (lancar) _lancarRecebimentoGeral(p, rec);
+    if (lancar) _lancarRecebimentoGeral(p, rec); // seta rec.recebiveisId + rec.lancadoFinanceiro
+
+    _save(projetoId, fin); // salva uma vez após o lançamento
 
     Modal.close();
     Toast.success('Parcela adicionada!');
@@ -537,6 +539,16 @@ const ProjetoFinanceiro = (() => {
         rec.dataRecebimento = dataRecebimento;
         rec.formaPagamento = forma;
 
+        // Fecha o registro no financeiro geral (Contas a Receber) se existir
+        if (rec.recebiveisId) {
+          DB.update('recebiveis', rec.recebiveisId, {
+            status: 'recebido',
+            dataRecebimento,
+            formaPagamento: forma,
+          });
+        }
+
+        // Registra entrada no caixa geral
         if (lancarCaixa) {
           DB.create('lancamentos', {
             descricao: `${p.titulo} — ${rec.descricao}`,
@@ -565,8 +577,8 @@ const ProjetoFinanceiro = (() => {
     const rec = (fin.recebimentos || []).find(r => r.id === recId);
     if (!rec) return;
 
-    // Lança em recebiveis (contas a receber)
-    DB.create('recebiveis', {
+    // Lança em recebiveis (contas a receber) e guarda o ID para fechar depois
+    const recebivel = DB.create('recebiveis', {
       descricao: `${p.titulo} — ${rec.descricao}`,
       clienteId: p.clienteId,
       valor: rec.valor,
@@ -576,6 +588,7 @@ const ProjetoFinanceiro = (() => {
       projetoId,
       origem: 'projeto_financeiro',
     });
+    rec.recebiveisId = recebivel.id; // link para fechar ao receber
     rec.lancadoFinanceiro = true;
     _save(projetoId, fin);
     Toast.success('Parcela lançada no financeiro geral!');
@@ -961,7 +974,8 @@ const ProjetoFinanceiro = (() => {
      UTILITÁRIOS
      ==================================================== */
   function _lancarRecebimentoGeral(p, rec) {
-    DB.create('recebiveis', {
+    // Cria em Contas a Receber e guarda o ID para fechar ao confirmar recebimento
+    const recebivel = DB.create('recebiveis', {
       descricao: `${p.titulo} — ${rec.descricao}`,
       clienteId: p.clienteId,
       valor: rec.valor,
@@ -971,6 +985,7 @@ const ProjetoFinanceiro = (() => {
       projetoId: p.id,
       origem: 'projeto_financeiro',
     });
+    rec.recebiveisId = recebivel.id; // link para fechar ao confirmar recebimento
     rec.lancadoFinanceiro = true;
   }
 

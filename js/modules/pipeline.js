@@ -192,6 +192,16 @@ const Pipeline = (() => {
     const dateClass = dias != null && dias < 0 ? 'text-danger' : 'text-muted';
     const frio = _isLeadFrio(lead);
     const diasSemAtualizar = _diasSemAtualizacao(lead);
+    const proposta = _getPropostaLead(lead.id);
+    const propBadge = proposta
+      ? `<div style="margin:3px 0;display:flex;align-items:center;gap:4px">
+           <span style="font-size:10px;background:${Utils.PROP_STATUS[proposta.status]?.badge==='badge-green'?'#dcfce7':'#eff6ff'};color:${proposta.status==='aprovada'?'#16a34a':'#1d4ed8'};padding:1px 6px;border-radius:99px;font-weight:600">
+             📄 ${Utils.escHtml(proposta.numero||'Proposta')} · ${Utils.PROP_STATUS[proposta.status]?.label||proposta.status}
+           </span>
+         </div>`
+      : (['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status)
+          ? `<div style="font-size:10px;color:var(--text-muted);margin:3px 0">📄 Sem proposta vinculada</div>`
+          : '');
 
     return `<div class="kanban-card ${frio ? 'lead-frio' : ''}" draggable="true" data-id="${lead.id}"
       style="--card-color:${color}"
@@ -202,6 +212,7 @@ const Pipeline = (() => {
       </div>
       <div class="kc-empresa">🏢 ${Utils.escHtml(empresa)}</div>
       <div class="kc-valor">${Utils.formatCurrency(lead.valorEstimado)}</div>
+      ${propBadge}
       ${frio ? `<div style="font-size:10px;color:#f59e0b;margin-bottom:4px">⚠ ${diasSemAtualizar}d sem atualização</div>` : ''}
       <div class="kc-footer">
         <span class="text-xs ${dateClass}">
@@ -212,6 +223,12 @@ const Pipeline = (() => {
       </div>
       <div class="kc-actions">
         <button class="btn btn-xs btn-secondary" onclick="Pipeline.viewLead('${lead.id}')">Ver</button>
+        ${proposta
+          ? `<button class="btn btn-xs btn-secondary" onclick="Modal.close();Propostas.view('${proposta.id}')" title="Ver proposta">📄</button>`
+          : (['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status)
+              ? `<button class="btn btn-xs btn-secondary" onclick="Pipeline.criarPropostaLead('${lead.id}')" title="Criar proposta">📄+</button>`
+              : '')}
+        ${lead.status === 'fechado_ganho' ? `<button class="btn btn-xs btn-primary" onclick="Pipeline.abrirContratoLead('${lead.id}')" title="Fechar contrato">🤝</button>` : ''}
         ${lead.contato ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escHtml(lead.contato)}')" title="WhatsApp">💬</button>` : ''}
         ${frio ? `<button class="btn btn-xs btn-warning" onclick="Pipeline.criarFollowupAutomatico('${lead.id}')" title="Criar follow-up">🔔</button>` : ''}
         <button class="btn btn-xs btn-secondary" onclick="Pipeline.openForm('${lead.id}')">✏</button>
@@ -287,10 +304,20 @@ const Pipeline = (() => {
     e.preventDefault();
     e.currentTarget.classList.remove('drag-over');
     if (!dragId) return;
-    DB.update('leads', dragId, { status: newStatus });
+    const leadId = dragId;
+    DB.update('leads', leadId, { status: newStatus });
     Toast.success('Lead movido para ' + Utils.LEAD_STATUS[newStatus]?.label);
     render();
     App.updateNotifBadge();
+
+    // Hook: ao mover para Fechado/Ganho → inicia fluxo de contratação
+    if (newStatus === 'fechado_ganho') {
+      setTimeout(() => _promptContratacao(leadId), 350);
+    }
+    // Hook: ao entrar em Proposta em Elaboração → sugere criar proposta
+    if (newStatus === 'proposta_elaboracao') {
+      setTimeout(() => _sugerirCriarProposta(leadId), 350);
+    }
   }
 
   function viewLead(id) {
@@ -332,9 +359,36 @@ const Pipeline = (() => {
         </div>
         ${lead.observacoes ? `<div class="detail-field"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(lead.observacoes)}</div></div>` : ''}
         ${lead.motivoPerda ? `<div class="detail-field mt-2"><div class="detail-label">Motivo de Perda</div><div class="detail-value text-danger">${Utils.escHtml(lead.motivoPerda)}</div></div>` : ''}
+        <!-- PROPOSTA VINCULADA -->
+        ${(() => {
+          const prop = _getPropostaLead(lead.id);
+          if (prop) {
+            return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin:12px 0;border-left:3px solid var(--primary)">
+              <div class="text-xs text-muted mb-1">📄 Proposta Vinculada</div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-bold text-sm">${Utils.escHtml(prop.numero||'—')} · ${Utils.escHtml(prop.titulo)}</div>
+                  <div class="text-xs text-muted">${Utils.formatCurrency(prop.valor)} · ${Utils.PROP_STATUS[prop.status]?.label||prop.status}</div>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-xs btn-secondary" onclick="Modal.close();Propostas.view('${prop.id}')">📄 Ver</button>
+                  <button class="btn btn-xs btn-secondary" onclick="Modal.close();Propostas.openForm('${prop.id}')">✏ Editar</button>
+                  ${prop.status !== 'aprovada' ? `<button class="btn btn-xs btn-primary" onclick="Modal.close();Propostas.changeStatus('${prop.id}','aprovada')">🤝 Fechar</button>` : ''}
+                </div>
+              </div>
+            </div>`;
+          } else if (['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status)) {
+            return `<div style="background:#fef9c3;border-radius:var(--radius);padding:10px 14px;margin:12px 0;font-size:13px;color:#854d0e">
+              📄 Nenhuma proposta vinculada a este lead.
+              <button class="btn btn-xs btn-secondary" style="margin-left:8px" onclick="Modal.close();Pipeline.criarPropostaLead('${lead.id}')">+ Criar Proposta</button>
+            </div>`;
+          }
+          return '';
+        })()}
+
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
-          ${lead.status === 'fechado_ganho' ? `<button class="btn btn-success btn-sm" onclick="Modal.close();Pipeline.criarProjeto('${id}')">📋 Criar Projeto</button>` : ''}
-          ${['proposta_enviada','negociacao','fechado_ganho'].includes(lead.status) ? `<button class="btn btn-secondary btn-sm" onclick="Modal.close();Pipeline.criarRecebivel('${id}')">💰 Criar Recebível</button>` : ''}
+          ${lead.status === 'fechado_ganho' ? `<button class="btn btn-success btn-sm" onclick="Modal.close();Pipeline.abrirContratoLead('${id}')">🤝 Fechar Contrato</button>` : ''}
+          ${['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status) && !_getPropostaLead(lead.id) ? `<button class="btn btn-secondary btn-sm" onclick="Modal.close();Pipeline.criarPropostaLead('${id}')">📄 Criar Proposta</button>` : ''}
           ${frio ? `<button class="btn btn-warning btn-sm" onclick="Pipeline.criarFollowupAutomatico('${lead.id}');Modal.close()">🔔 Criar Follow-up</button>` : ''}
           ${lead.contato ? `<button class="btn btn-sm" style="background:#25D366;border-color:#25D366;color:#fff" onclick="Utils.openWhatsApp('${Utils.escHtml(lead.contato)}','Olá ${Utils.escHtml(lead.decisor||'')}! Sou da Bikows Engenharia. Gostaria de falar sobre ${Utils.escHtml(lead.titulo)}.')">💬 WhatsApp</button>` : ''}
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Pipeline.openForm('${id}')">✏ Editar</button>
@@ -342,6 +396,137 @@ const Pipeline = (() => {
         </div>
       `,
     });
+  }
+
+  /* ====================================================
+     INTEGRAÇÃO PROPOSTA ↔ PIPELINE
+     ==================================================== */
+
+  // Encontra proposta vinculada ao lead (por leadId na proposta ou propostaId no lead)
+  function _getPropostaLead(leadId) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return null;
+    return DB.getAll('propostas').find(p =>
+      p.leadId === leadId || (lead.propostaId && p.id === lead.propostaId)
+    ) || null;
+  }
+
+  // Cria proposta a partir do lead e vincula os dois
+  function criarPropostaLead(leadId) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    const nextNum = 'BIK-' + new Date().getFullYear() + '-CTR-' + String(DB.getAll('propostas').length + 1).padStart(3,'0');
+    const proposta = DB.create('propostas', {
+      numero: nextNum,
+      titulo: lead.titulo,
+      clienteId: lead.clienteId,
+      responsavel: lead.responsavel,
+      valor: lead.valorEstimado || 0,
+      status: 'elaboracao',
+      leadId,
+      itens: [],
+      versoes: [],
+    });
+    // Vincula no lead
+    DB.update('leads', leadId, { propostaId: proposta.id, propostaNum: proposta.numero });
+    Toast.success(`Proposta ${proposta.numero} criada e vinculada ao lead!`);
+    render();
+    // Abre o form da proposta para preencher detalhes
+    setTimeout(() => Propostas.openForm(proposta.id), 300);
+  }
+
+  // Abre o fluxo completo de fechamento de contrato para um lead
+  function abrirContratoLead(leadId) {
+    const proposta = _getPropostaLead(leadId);
+    if (proposta) {
+      // Já tem proposta → usa o fluxo de fechamento dela
+      Propostas.abrirFluxoContratacao(proposta.id);
+    } else {
+      // Sem proposta → cria uma rascunho e já abre o fechamento
+      const lead = DB.get('leads', leadId);
+      if (!lead) return;
+      Modal.open({
+        title: '🤝 Fechar Contrato',
+        size: 'modal-sm',
+        body: `
+          <p class="text-sm mb-3">Este lead não tem proposta vinculada.</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-primary" onclick="Modal.close();Pipeline.criarPropostaLead('${leadId}')">
+              📄 Criar proposta primeiro e depois fechar
+            </button>
+            <button class="btn btn-secondary" onclick="Modal.close();Pipeline._fecharSemProposta('${leadId}')">
+              ⚡ Fechar contrato diretamente (sem proposta)
+            </button>
+          </div>
+        `,
+        saveLabel: null,
+        cancelLabel: 'Cancelar',
+      });
+    }
+  }
+
+  // Fecha contrato direto (sem proposta prévia) — cria uma rascunho internamente
+  function _fecharSemProposta(leadId) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    const nextNum = 'BIK-' + new Date().getFullYear() + '-CTR-' + String(DB.getAll('propostas').length + 1).padStart(3,'0');
+    const proposta = DB.create('propostas', {
+      numero: nextNum,
+      titulo: lead.titulo,
+      clienteId: lead.clienteId,
+      responsavel: lead.responsavel,
+      valor: lead.valorFechado || lead.valorEstimado || 0,
+      status: 'elaboracao',
+      leadId,
+      itens: [],
+      versoes: [],
+    });
+    DB.update('leads', leadId, { propostaId: proposta.id, propostaNum: proposta.numero });
+    Propostas.abrirFluxoContratacao(proposta.id);
+  }
+
+  // Prompt ao arrastar lead para "Fechado/Ganho"
+  function _promptContratacao(leadId) {
+    const lead = DB.get('leads', leadId);
+    const proposta = _getPropostaLead(leadId);
+    const propInfo = proposta
+      ? `Proposta vinculada: <strong>${Utils.escHtml(proposta.numero)} · ${Utils.formatCurrency(proposta.valor)}</strong>`
+      : 'Nenhuma proposta vinculada ainda.';
+
+    Modal.open({
+      title: '🎉 Negócio Ganho! Iniciar Contratação?',
+      size: 'modal-sm',
+      body: `
+        <div style="text-align:center;padding:10px 0 16px">
+          <div style="font-size:40px;margin-bottom:8px">🎉</div>
+          <div class="font-bold" style="font-size:16px">${Utils.escHtml(lead?.titulo||'')}</div>
+          <div class="text-sm text-muted mt-1">${propInfo}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-primary" onclick="Modal.close();Pipeline.abrirContratoLead('${leadId}')">
+            🤝 Abrir fluxo de contratação
+          </button>
+          <button class="btn btn-secondary" onclick="Modal.close()">
+            Fazer depois
+          </button>
+        </div>
+      `,
+      saveLabel: null,
+      cancelLabel: null,
+    });
+  }
+
+  // Sugere criar proposta ao entrar em "Proposta em Elaboração"
+  function _sugerirCriarProposta(leadId) {
+    const proposta = _getPropostaLead(leadId);
+    if (proposta) return; // já tem proposta
+    const lead = DB.get('leads', leadId);
+    Toast.info(
+      `📄 Lead "<strong>${Utils.escHtml(lead?.titulo||'')}</strong>" entrou em elaboração de proposta. ` +
+      `<a href="#" onclick="Pipeline.criarPropostaLead('${leadId}');return false;" style="color:var(--primary);font-weight:600">` +
+      `Criar proposta agora →</a>`,
+      8000
+    );
   }
 
   function criarProjeto(leadId) {
@@ -514,8 +699,16 @@ const Pipeline = (() => {
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Proposta Nº</label>
-            <input class="form-control" id="fPropostaNum" value="${Utils.escHtml(lead?.propostaNum||'')}" placeholder="BIK-2026-CTR-XXX">
+            <label class="form-label">Proposta Vinculada</label>
+            ${(() => {
+              const props = DB.getAll('propostas').filter(p => !p.clienteId || p.clienteId === (lead?.clienteId||''));
+              const opts = props.map(p => `<option value="${p.id}" ${(lead?.propostaId===p.id)?'selected':''}>${Utils.escHtml(p.numero||'—')} · ${Utils.escHtml(p.titulo)} (${Utils.PROP_STATUS[p.status]?.label||p.status})</option>`).join('');
+              return `<select class="form-control" id="fPropostaId">
+                <option value="">— Nenhuma / Criar depois</option>
+                ${opts}
+              </select>
+              <input type="hidden" id="fPropostaNum" value="${Utils.escHtml(lead?.propostaNum||'')}">`;
+            })()}
           </div>
           <div class="form-group">
             <label class="form-label">Motivo de Perda</label>
@@ -557,6 +750,7 @@ const Pipeline = (() => {
       proximaAcao: document.getElementById('fProximaAcao').value,
       dataProximaAcao: document.getElementById('fDataAcao').value,
       propostaNum: document.getElementById('fPropostaNum').value,
+      propostaId: document.getElementById('fPropostaId')?.value || lead?.propostaId || null,
       motivoPerda: document.getElementById('fMotivo').value,
       contato: document.getElementById('fContato').value,
       servicoInteresse: servicos,
@@ -587,5 +781,10 @@ const Pipeline = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveLead, deleteLead, viewLead, addNew, dragStart, dragEnd, dragOver, dragLeave, drop, criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios };
+  return {
+    render, openForm, saveLead, deleteLead, viewLead, addNew,
+    dragStart, dragEnd, dragOver, dragLeave, drop,
+    criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
+    criarPropostaLead, abrirContratoLead, _fecharSemProposta,
+  };
 })();

@@ -403,15 +403,35 @@ const Notifications = (() => {
     }
   }
 
-  /* ---- Digest por e-mail (via Supabase Edge Function) ---- */
+  /* ---- Digest por e-mail (via Edge Function crm-notifications) ---- */
   async function _sendEmailDigest(items, prefs) {
     if (!prefs.emailDest) return;
     try {
-      await _supabase.functions.invoke('send-notif-email', {
-        body: { to: prefs.emailDest, items },
+      // Dispara o digest urgente — a edge function re-consulta o banco e envia
+      await _supabase.functions.invoke('crm-notifications', {
+        body: { tipo: 'urgent' },
       });
     } catch (e) {
       console.warn('[Notif] Email falhou:', e);
+    }
+  }
+
+  /* ---- Enviar e-mail de teste (chamada manual da Config) ---- */
+  async function sendTestEmail() {
+    try {
+      const { data, error } = await _supabase.functions.invoke('crm-notifications', {
+        body: { tipo: 'daily' },
+      });
+      if (error) throw error;
+      if (data?.ok === false && data?.reason === 'sem_alertas') {
+        Toast.success('✅ E-mail de teste enviado! (sem alertas hoje, chegará vazio)');
+      } else if (data?.ok) {
+        Toast.success('✅ E-mail enviado com sucesso para ' + (data.to || 'destinatário'));
+      } else {
+        Toast.error('❌ Erro ao enviar: ' + (data?.resend?.message || 'verifique a API key'));
+      }
+    } catch (e) {
+      Toast.error('❌ Erro: ' + e.message);
     }
   }
 
@@ -424,5 +444,6 @@ const Notifications = (() => {
     getPrefs,
     savePrefs,
     checkAll: _checkAll,
+    sendTestEmail,
   };
 })();

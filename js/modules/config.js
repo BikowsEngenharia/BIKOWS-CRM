@@ -234,6 +234,12 @@ const Config = (() => {
               <button class="btn btn-primary" onclick="Config.saveNotificacoes()">💾 Salvar configurações</button>
               <button class="btn btn-ghost" onclick="Notifications.requestPermission()">🖥 Ativar push no navegador</button>
               <button class="btn btn-ghost" onclick="Notifications.checkAll()">🔄 Verificar lembretes agora</button>
+              <button class="btn btn-secondary" onclick="Notifications.sendTestEmail()" title="Dispara o e-mail diário agora para testar">📧 Testar e-mail</button>
+            </div>
+            <div style="margin-top:14px;padding:12px 16px;background:var(--surface-2);border-radius:var(--radius);border:1px solid var(--border);font-size:12px;color:var(--text-muted)">
+              📅 <strong>Agendamentos automáticos:</strong>
+              Resumo diário <strong>08h</strong> (seg–dom) · Relatório semanal <strong>segunda às 08h</strong> · Alertas urgentes <strong>07h</strong> (seg–sex, somente se houver itens críticos).<br>
+              ⚙️ Requer a <strong>RESEND_API_KEY</strong> configurada nos segredos do Supabase para funcionar.
             </div>
           </div>
         </div>

@@ -5,8 +5,20 @@ const Auth = (() => {
 
   /* ---- Inicialização ---- */
   function init() {
+    // Safety timeout: se em 12s ainda não houver resposta do Supabase, mostra opção de recarregar
+    const loadingTimeout = setTimeout(() => {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay && overlay.style.display !== 'none') {
+        const textEl = document.getElementById('loadingText');
+        if (textEl) {
+          textEl.innerHTML = 'Tempo de carregamento excedido.<br><button onclick="location.reload()" style="margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px">🔄 Recarregar</button>';
+        }
+      }
+    }, 12000);
+
     // Listener de estado de auth — dispara imediatamente com sessão atual
     _supabase.auth.onAuthStateChange((event, session) => {
+      clearTimeout(loadingTimeout);
       if (session) {
         _bootApp();
       } else {
@@ -78,17 +90,39 @@ const Auth = (() => {
     _showLoading('Carregando dados…');
 
     try {
-      await DB.loadAll();
+      // Timeout de 20s para o loadAll — se demorar mais, continua com dados locais
+      const loadTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('loadAll timeout')), 20000)
+      );
+      await Promise.race([DB.loadAll(), loadTimeout]);
+    } catch (e) {
+      console.warn('[Auth] loadAll falhou ou demorou demais — usando dados locais:', e.message);
+      // Continua mesmo assim com dados do cache/localStorage
+    }
+
+    try {
       await DB.initSampleData();
       DB.subscribeRealtime();
     } catch (e) {
-      console.error('[Auth] Erro ao carregar dados:', e);
+      console.warn('[Auth] Erro em initSampleData/subscribeRealtime:', e);
     }
 
     _hideLoading();
 
-    if (typeof App !== 'undefined') App.init();
-    if (typeof Notifications !== 'undefined') Notifications.init();
+    try {
+      if (typeof App !== 'undefined') App.init();
+    } catch (e) {
+      console.error('[Auth] Erro ao iniciar App:', e);
+      // Último recurso: mostrar conteúdo mesmo assim
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) overlay.style.display = 'none';
+      const appLayout = document.getElementById('appLayout');
+      if (appLayout) appLayout.style.display = '';
+    }
+
+    if (typeof Notifications !== 'undefined') {
+      try { Notifications.init(); } catch (e) { /* silencioso */ }
+    }
   }
 
   /* ---- UI helpers ---- */

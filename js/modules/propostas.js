@@ -6,6 +6,33 @@ const Propostas = (() => {
   let _filter = { status: '' };
   let _formItems = []; // itens da proposta em edição
 
+  /* ------------------------------------------------
+     Gerador de número de proposta — PROP-YYYY-NNNNN
+     Busca o maior sequencial existente e incrementa,
+     nunca depende do .length (quebra com exclusões)
+  ------------------------------------------------ */
+  function _nextNumeroProposta() {
+    const ano = new Date().getFullYear();
+    const prefix = `PROP-${ano}-`;
+    const todas = DB.getAll('propostas');
+    let max = 0;
+    todas.forEach(p => {
+      if (p.numero && p.numero.startsWith(prefix)) {
+        const seq = parseInt(p.numero.replace(prefix, ''), 10);
+        if (!isNaN(seq) && seq > max) max = seq;
+      }
+    });
+    // Também considera números no formato legado BIK-YYYY-CTR-NNN
+    const prefixLegado = `BIK-${ano}-CTR-`;
+    todas.forEach(p => {
+      if (p.numero && p.numero.startsWith(prefixLegado)) {
+        const seq = parseInt(p.numero.replace(prefixLegado, ''), 10);
+        if (!isNaN(seq) && seq > max) max = seq;
+      }
+    });
+    return `${prefix}${String(max + 1).padStart(5, '0')}`;
+  }
+
   function _emptyItem() {
     return { desc: '', qtd: 1, un: 'Serv.', unit: 0, disc: 0, total: 0 };
   }
@@ -108,7 +135,12 @@ const Propostas = (() => {
                 const expirado = dias != null && dias < 0 && !['aprovada','recusada'].includes(p.status);
                 const validadeLabel = dias == null ? '—' : dias < 0 ? `Expirada ${Math.abs(dias)}d` : dias === 0 ? 'Expira hoje' : `${dias}d restantes`;
                 return `<tr>
-                  <td class="text-xs font-bold text-muted">${Utils.escHtml(p.numero||'—')}</td>
+                  <td>
+                    <div style="font-weight:700;font-size:12px;color:var(--primary);white-space:nowrap">${Utils.escHtml(p.numero||'—')}</div>
+                    <button class="btn btn-xs" style="margin-top:3px;padding:1px 6px;font-size:10px;color:var(--text-muted);border:1px solid var(--border);background:transparent"
+                      onclick="navigator.clipboard.writeText('${Utils.escHtml(p.numero||'')}').then(()=>Toast.info('Número copiado!'))"
+                      title="Copiar número">📋</button>
+                  </td>
                   <td><div class="font-bold" style="max-width:200px">${Utils.escHtml(p.titulo)}</div>${p.descricao ? `<div class="text-xs text-muted">${Utils.escHtml(Utils.truncate(p.descricao,50))}</div>` : ''}</td>
                   <td class="text-sm">${Utils.escHtml(Utils.getClientName(p.clienteId))}</td>
                   <td class="font-bold text-primary">${Utils.formatCurrency(p.valor)}</td>
@@ -148,16 +180,18 @@ const Propostas = (() => {
       title: `Proposta ${p.numero || ''}`,
       size: 'modal-lg',
       body: `
-        <div style="background:var(--bg);padding:16px;border-radius:var(--radius);margin-bottom:20px">
-          <div class="flex items-center justify-between mb-2">
-            <div>
-              <div class="text-xs text-muted">Proposta Nº</div>
-              <div class="font-bold text-lg">${Utils.escHtml(p.numero||'—')}</div>
+        <div style="background:linear-gradient(135deg,var(--primary),#1e40af);color:#fff;padding:16px 20px;border-radius:var(--radius);margin-bottom:20px">
+          <div class="flex items-center justify-between mb-1">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:22px;font-weight:800;letter-spacing:.02em">${Utils.escHtml(p.numero||'—')}</span>
+              <button onclick="navigator.clipboard.writeText('${Utils.escHtml(p.numero||'')}').then(()=>Toast.info('Número copiado!'))"
+                style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px"
+                title="Copiar número">📋 Copiar</button>
             </div>
             <div>${Utils.propBadge(p.status)}</div>
           </div>
-          <div class="font-bold" style="font-size:18px;color:var(--text)">${Utils.escHtml(p.titulo)}</div>
-          ${p.descricao ? `<div class="text-sm text-muted mt-1">${Utils.escHtml(p.descricao)}</div>` : ''}
+          <div style="font-size:17px;font-weight:600;opacity:.95;margin-top:4px">${Utils.escHtml(p.titulo)}</div>
+          ${p.descricao ? `<div style="font-size:13px;opacity:.75;margin-top:3px">${Utils.escHtml(p.descricao)}</div>` : ''}
         </div>
 
         <div class="detail-grid mb-4">
@@ -252,20 +286,24 @@ const Propostas = (() => {
     const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${p?.responsavel===r?'selected':''}>${r}</option>`).join('');
     const statusOpts = Object.entries(Utils.PROP_STATUS).map(([k,v]) => `<option value="${k}" ${(p?.status||'elaboracao')===k?'selected':''}>${v.label}</option>`).join('');
 
-    const nextNum = 'BIK-' + new Date().getFullYear() + '-CTR-' + String(DB.getAll('propostas').length + 1).padStart(3, '0');
+    const nextNum = id ? (p?.numero || _nextNumeroProposta()) : _nextNumeroProposta();
 
     Modal.open({
       title: id ? 'Editar Proposta' : 'Nova Proposta',
       size: 'modal-lg',
       body: `
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Número da Proposta</label>
-            <input class="form-control" id="fpNum" value="${Utils.escHtml(p?.numero||nextNum)}">
+        <!-- Número em destaque -->
+        <div style="background:var(--primary);color:#fff;border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+          <div style="flex:1">
+            <div style="font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.05em">Número da Proposta</div>
+            <input id="fpNum" value="${Utils.escHtml(nextNum)}"
+              style="background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.4);color:#fff;font-size:20px;font-weight:700;width:100%;outline:none;padding:2px 0"
+              placeholder="PROP-2026-00001"
+              title="Editável se necessário">
           </div>
-          <div class="form-group">
-            <label class="form-label">Status</label>
-            <select class="form-control" id="fpStatus">${statusOpts}</select>
+          <div style="text-align:right">
+            <div style="font-size:11px;opacity:.75">Status</div>
+            <select class="form-control" id="fpStatus" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;padding:4px 8px;border-radius:6px">${statusOpts}</select>
           </div>
         </div>
         <div class="form-group">

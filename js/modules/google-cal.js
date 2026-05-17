@@ -17,9 +17,10 @@ const GCAL_DISCOVERY = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3
 const GoogleCal = (() => {
 
   // ── Estado interno ──────────────────────────────────────────────────────────
-  let _connected   = false;
-  let _lastSync    = null; // timestamp (ms)
-  let _tokenClient = null; // google.accounts.oauth2 token client
+  let _connected    = false;
+  let _lastSync     = null;   // timestamp (ms)
+  let _tokenClient  = null;   // google.accounts.oauth2 token client (GIS)
+  let _accessToken  = null;   // token OAuth atual
 
   // ── Mapeamento de colorId por tipo de atividade ─────────────────────────────
   const COLOR_MAP = {
@@ -65,6 +66,10 @@ const GoogleCal = (() => {
     return typeof gapi !== 'undefined' && gapi.client && gapi.client.calendar;
   }
 
+  function _gisReady() {
+    return typeof google !== 'undefined' && google.accounts && google.accounts.oauth2;
+  }
+
   function _getClientName(clienteId) {
     if (!clienteId) return '';
     const c = DB.get('clientes', clienteId);
@@ -89,50 +94,58 @@ const GoogleCal = (() => {
    * Deve ser chamado uma única vez no carregamento da página,
    * somente se GCAL_CLIENT_ID estiver preenchido.
    */
+  /**
+   * init() — Carrega gapi.client e inicializa o token client GIS.
+   * Usa a nova Google Identity Services API (substitui auth2 deprecated).
+   */
   function init() {
-    if (!_isConfigured()) return; // sem configuração, silencioso
+    if (!_isConfigured()) return;
 
-    if (typeof gapi === 'undefined') {
-      // Injetar o script do gapi se ainda não estiver na página
-      const s = document.createElement('script');
-      s.src = 'https://apis.google.com/js/api.js';
-      s.onload = () => _loadGapiClient();
-      s.onerror = () => console.warn('[GoogleCal] Falha ao carregar gapi.');
-      document.head.appendChild(s);
-    } else {
-      _loadGapiClient();
-    }
-  }
-
-  function _loadGapiClient() {
-    gapi.load('client:auth2', {
-      callback: async () => {
+    // Carregar gapi se necessário
+    _ensureGapi(() => {
+      gapi.load('client', async () => {
         try {
           await gapi.client.init({
-            apiKey:          GCAL_API_KEY || undefined,
-            clientId:        GCAL_CLIENT_ID,
-            discoveryDocs:   [GCAL_DISCOVERY],
-            scope:           GCAL_SCOPES,
+            apiKey:        GCAL_API_KEY || undefined,
+            discoveryDocs: [GCAL_DISCOVERY],
           });
-
-          // Verificar se já existe uma sessão autenticada
-          const auth = gapi.auth2.getAuthInstance();
-          if (auth && auth.isSignedIn.get()) {
-            _connected = true;
-            _refreshAllStatuses();
-          }
-
-          // Escutar mudanças de login
-          auth.isSignedIn.listen((signedIn) => {
-            _connected = signedIn;
-            _refreshAllStatuses();
-          });
-
+          _initTokenClient();
         } catch (err) {
           console.warn('[GoogleCal] Erro ao inicializar gapi.client:', err);
         }
+      });
+    });
+  }
+
+  function _ensureGapi(cb) {
+    if (typeof gapi !== 'undefined') { cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://apis.google.com/js/api.js';
+    s.onload  = cb;
+    s.onerror = () => console.warn('[GoogleCal] Falha ao carregar gapi.');
+    document.head.appendChild(s);
+  }
+
+  function _initTokenClient() {
+    if (!_gisReady()) {
+      // GIS ainda não carregou — tentar novamente em 1s
+      setTimeout(_initTokenClient, 1000);
+      return;
+    }
+    _tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope:     GCAL_SCOPES,
+      callback:  (tokenResponse) => {
+        if (tokenResponse.error) {
+          console.warn('[GoogleCal] Erro no token:', tokenResponse.error);
+          return;
+        }
+        _accessToken = tokenResponse.access_token;
+        _connected   = true;
+        gapi.client.setToken({ access_token: _accessToken });
+        _refreshAllStatuses();
+        Toast.success('Google Calendar conectado!');
       },
-      onerror: () => console.warn('[GoogleCal] Erro ao carregar client:auth2'),
     });
   }
 
@@ -147,49 +160,36 @@ const GoogleCal = (() => {
    * connect() — Inicia o fluxo OAuth. Mostra modal de instruções se
    * o CLIENT_ID não estiver configurado.
    */
-  async function connect() {
+  function connect() {
     if (!_isConfigured()) {
       _showNotConfiguredModal();
       return;
     }
 
-    if (!_gapiReady()) {
-      Toast.warning('Aguarde… a biblioteca do Google ainda está carregando.');
+    if (!_tokenClient) {
+      // Token client ainda não pronto — inicializar e tentar novamente
+      Toast.warning('Carregando bibliotecas do Google… tente novamente em alguns segundos.');
+      init();
       return;
     }
 
-    try {
-      const auth = gapi.auth2.getAuthInstance();
-      await auth.signIn({ scope: GCAL_SCOPES });
-      _connected = true;
-      Toast.success('Google Calendar conectado com sucesso!');
-      _refreshAllStatuses();
-    } catch (err) {
-      if (err.error !== 'popup_closed_by_user') {
-        Toast.error('Erro ao conectar: ' + (err.error || err.message || JSON.stringify(err)));
-      }
-    }
+    // Solicitar token — abre popup do Google
+    _tokenClient.requestAccessToken({ prompt: 'consent' });
   }
 
-  /**
-   * disconnect() — Revoga o token OAuth e atualiza a UI.
-   */
-  async function disconnect() {
-    if (!_gapiReady()) {
-      _connected = false;
-      _refreshAllStatuses();
-      return;
+  function disconnect() {
+    if (_accessToken && _gisReady()) {
+      google.accounts.oauth2.revoke(_accessToken, () => {
+        console.log('[GoogleCal] Token revogado.');
+      });
     }
-
-    try {
-      const auth = gapi.auth2.getAuthInstance();
-      await auth.signOut();
-      _connected = false;
-      Toast.success('Google Calendar desconectado.');
-      _refreshAllStatuses();
-    } catch (err) {
-      Toast.error('Erro ao desconectar: ' + (err.message || JSON.stringify(err)));
+    _accessToken = null;
+    _connected   = false;
+    if (typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken(null);
     }
+    _refreshAllStatuses();
+    Toast.success('Google Calendar desconectado.');
   }
 
   /**

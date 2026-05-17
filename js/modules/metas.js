@@ -2,8 +2,9 @@
    Metas & KPIs — Dashboard de Resultados
    ========================================== */
 const Metas = (() => {
-  let _ano = new Date().getFullYear();
-  let _tab = 'painel'; // painel | trimestres | servicos | anual
+  let _ano  = new Date().getFullYear();
+  let _tab  = 'painel'; // painel | trimestres | servicos | anual
+  let _qDash = Math.floor(new Date().getMonth() / 3); // trimestre exibido no painel
 
   const TRIMESTRES = ['Q1 (Jan–Mar)', 'Q2 (Abr–Jun)', 'Q3 (Jul–Set)', 'Q4 (Out–Dez)'];
   const TRIMESTRE_MESES = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]];
@@ -112,10 +113,11 @@ const Metas = (() => {
      PAINEL — Dashboard principal
      ==================================================== */
   function _renderPainel() {
-    const qi    = _trimestreAtual();
+    const qi    = _qDash;
     const meta  = _getMeta(_ano, qi);
     const real  = _realizados(_ano, qi);
     const isHoje = new Date().getFullYear() === _ano;
+    const qAtual = _trimestreAtual();
 
     // Totais anuais
     const totMeta = { receita:0, novosClientes:0, novosLeads:0, propostas:0, projetosConcluidos:0, licitacoesGanhas:0 };
@@ -146,10 +148,27 @@ const Metas = (() => {
     const maxBar = Math.max(...qData.map(d => Math.max(d.realVal, d.metaVal)), 1);
 
     return `
-      <!-- BANNER TRIMESTRE ATUAL -->
+      <!-- SELETOR DE TRIMESTRE -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        ${Q_LABELS.map((lbl,q) => {
+          const isSelected = q === qi;
+          const isAtual    = q === qAtual && isHoje;
+          return `<button
+            onclick="Metas.setQDash(${q})"
+            style="padding:6px 16px;border-radius:20px;border:2px solid ${isSelected?'var(--primary,#2563eb)':'var(--border)'};
+                   background:${isSelected?'var(--primary,#2563eb)':'var(--surface)'};
+                   color:${isSelected?'#fff':'var(--text)'};font-size:13px;font-weight:700;cursor:pointer;
+                   transition:all .15s;position:relative;">
+            ${lbl}${isAtual?'<span style="position:absolute;top:-4px;right:-4px;width:8px;height:8px;background:#22c55e;border-radius:50%;border:2px solid var(--surface)"></span>':''}
+          </button>`;
+        }).join('')}
+        <span style="font-size:12px;color:var(--text-muted);align-self:center;margin-left:4px;">● = trimestre atual</span>
+      </div>
+
+      <!-- BANNER TRIMESTRE SELECIONADO -->
       <div style="background:linear-gradient(135deg,#0a1628 0%,#1e3a5f 100%);border-radius:14px;padding:22px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
         <div>
-          <div style="color:#7a9bbf;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">${isHoje?'Trimestre Atual':'Ano '+_ano} · ${TRIMESTRES[qi]}</div>
+          <div style="color:#7a9bbf;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">${isHoje && qi===qAtual?'Trimestre Atual':'Ano '+_ano} · ${TRIMESTRES[qi]}</div>
           <div style="color:#fff;font-size:28px;font-weight:800;line-height:1;">${Utils.formatCurrency(real.receita)}</div>
           <div style="color:#7a9bbf;font-size:13px;margin-top:4px;">de ${Utils.formatCurrency(meta.receita)} · <span style="color:${pctReceita>=100?'#4ade80':pctReceita>=70?'#fbbf24':'#f87171'};font-weight:700;">${pctReceita}% da meta</span></div>
         </div>
@@ -550,9 +569,10 @@ const Metas = (() => {
     _renderTab();
   }
 
-  function setTab(tab) { _tab = tab; _renderTab(); }
-  function setAno(ano) { _ano = ano; render(); }
-  function addNew()    { editMeta(_ano, _trimestreAtual()); }
+  function setTab(tab)   { _tab = tab; _renderTab(); }
+  function setAno(ano)   { _ano = ano; render(); }
+  function setQDash(q)   { _qDash = q; if (_tab === 'painel') _renderTab(); }
+  function addNew()      { editMeta(_ano, _trimestreAtual()); }
 
-  return { render, setTab, setAno, addNew, editMeta, saveMeta, editServicos, saveServicos };
+  return { render, setTab, setAno, setQDash, addNew, editMeta, saveMeta, editServicos, saveServicos };
 })();

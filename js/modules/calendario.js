@@ -434,6 +434,10 @@ const Calendario = (() => {
       </div>
 
       ${kpisHtml}
+
+      <!-- Google Calendar Integration -->
+      <div id="gcalStatusContainer" style="margin-bottom:16px"></div>
+
       ${legendHtml}
 
       <!-- Navigation bar -->
@@ -457,6 +461,13 @@ const Calendario = (() => {
         </div>
       </div>
     `;
+
+    // Renderizar bloco Google Calendar após o DOM estar pronto
+    setTimeout(() => {
+      if (typeof GoogleCal !== 'undefined') {
+        GoogleCal.renderStatus(document.getElementById('gcalStatusContainer'));
+      }
+    }, 0);
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────────

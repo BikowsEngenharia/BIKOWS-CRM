@@ -125,25 +125,25 @@ const Licitacoes = (() => {
       </div>
 
       <div class="kpi-grid" style="--kpi-cols:5">
-        <div class="kpi-card" style="--kpi-color:#3b82f6">
+        <div class="kpi-card" style="--kpi-color:#3b82f6;cursor:pointer" title="Clique para filtrar em andamento" onclick="Licitacoes.setFilter('status','');Licitacoes.setTab('lista')">
           <div class="kpi-label">Em Andamento</div>
           <div class="kpi-value">${emAndamento.length}</div>
           <div class="kpi-sub">${Utils.formatCurrency(valorDisputa)} em disputa</div>
           <div class="kpi-icon">🏛</div>
         </div>
-        <div class="kpi-card" style="--kpi-color:#f97316">
+        <div class="kpi-card" style="--kpi-color:#f97316;cursor:pointer" title="Clique para ver abertura em ≤7 dias" onclick="Licitacoes.setFilter('status','proposta_enviada');Licitacoes.setTab('lista')">
           <div class="kpi-label">Abertura em ≤7 dias</div>
           <div class="kpi-value">${urgentes}</div>
           <div class="kpi-sub">${urgentes > 0 ? '⚠ Atenção necessária' : 'Sem urgências'}</div>
           <div class="kpi-icon">⏰</div>
         </div>
-        <div class="kpi-card" style="--kpi-color:#10b981">
+        <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" title="Clique para ver ganhas" onclick="Licitacoes.setFilter('status','ganhou');Licitacoes.setTab('lista')">
           <div class="kpi-label">Ganhas</div>
           <div class="kpi-value">${ganhou.length}</div>
           <div class="kpi-sub">${Utils.formatCurrency(valorGanho)}</div>
           <div class="kpi-icon">✅</div>
         </div>
-        <div class="kpi-card" style="--kpi-color:#ef4444">
+        <div class="kpi-card" style="--kpi-color:#ef4444;cursor:pointer" title="Clique para ver perdidas" onclick="Licitacoes.setFilter('status','perdeu');Licitacoes.setTab('lista')">
           <div class="kpi-label">Perdidas</div>
           <div class="kpi-value">${perdeu.length}</div>
           <div class="kpi-sub">${lics.length} total no período</div>
@@ -379,8 +379,12 @@ const Licitacoes = (() => {
             const total = cards.reduce((s,l) => s + (l.valorEstimado||0), 0);
             return `
               <div style="width:200px;flex-shrink:0">
-                <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid ${s.color};margin-bottom:8px">
-                  <div style="font-size:12px;font-weight:700;color:${s.color}">${s.label}</div>
+                <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid ${s.color};margin-bottom:8px;cursor:pointer;transition:box-shadow .15s"
+                     title="Clique para filtrar por ${s.label}"
+                     onclick="Licitacoes.setFilter('status','${sk}');Licitacoes.setTab('lista')"
+                     onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'"
+                     onmouseout="this.style.boxShadow='none'">
+                  <div style="font-size:12px;font-weight:700;color:${s.color}">${s.label} 🔍</div>
                   <div style="font-size:11px;color:var(--text-muted)">${cards.length} · ${Utils.formatCurrency(total)}</div>
                 </div>
                 ${cards.map(l => renderKanbanCard(l)).join('')}
@@ -389,15 +393,23 @@ const Licitacoes = (() => {
 
           <!-- Resultados -->
           <div style="width:200px;flex-shrink:0">
-            <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #10b981;margin-bottom:8px">
-              <div style="font-size:12px;font-weight:700;color:#10b981">✅ Ganhas</div>
+            <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #10b981;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s"
+                 title="Clique para ver todas as ganhas"
+                 onclick="Licitacoes.setFilter('status','ganhou');Licitacoes.setTab('lista')"
+                 onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'"
+                 onmouseout="this.style.boxShadow='none'">
+              <div style="font-size:12px;font-weight:700;color:#10b981">✅ Ganhas 🔍</div>
               <div style="font-size:11px;color:var(--text-muted)">${lics.filter(l=>l.status==='ganhou').length}</div>
             </div>
             ${lics.filter(l=>l.status==='ganhou').map(l => renderKanbanCard(l)).join('')}
           </div>
           <div style="width:200px;flex-shrink:0">
-            <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #ef4444;margin-bottom:8px">
-              <div style="font-size:12px;font-weight:700;color:#ef4444">❌ Perdidas / Canceladas</div>
+            <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #ef4444;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s"
+                 title="Clique para ver perdidas/canceladas"
+                 onclick="Licitacoes.setFilter('status','perdeu');Licitacoes.setTab('lista')"
+                 onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'"
+                 onmouseout="this.style.boxShadow='none'">
+              <div style="font-size:12px;font-weight:700;color:#ef4444">❌ Perdidas / Canceladas 🔍</div>
               <div style="font-size:11px;color:var(--text-muted)">${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).length}</div>
             </div>
             ${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).map(l => renderKanbanCard(l)).join('')}

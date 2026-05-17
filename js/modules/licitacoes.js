@@ -164,6 +164,113 @@ const Licitacoes = (() => {
       document.getElementById('btnTabKanban')?.classList.toggle('btn-primary', _tab === 'kanban');
       document.getElementById('btnTabKanban')?.classList.toggle('btn-secondary', _tab !== 'kanban');
     }, 0);
+
+    // Auto-lançar no pipeline (10 dias antes da abertura)
+    setTimeout(() => _autoLancarNoPipeline(), 200);
+  }
+
+  /* ── Auto-lançamento no pipeline ──────────────────────────────────────── */
+
+  const _DIAS_ANTECEDENCIA = 10;
+  const _TERMINAL = ['ganhou', 'perdeu', 'deserta', 'cancelada'];
+
+  function _autoLancarNoPipeline() {
+    const lics = DB.getAll('licitacoes');
+    let lancadas = 0;
+
+    lics.forEach(l => {
+      // Ignorar terminais e as que já têm lead vinculado
+      if (_TERMINAL.includes(l.status)) return;
+      if (l.leadId) return; // já está no pipeline
+
+      const dias = Utils.daysUntil(l.dataAbertura);
+      if (dias == null) return;                    // sem data de abertura
+      if (dias > _DIAS_ANTECEDENCIA) return;       // ainda não é hora
+      if (dias < -30) return;                      // abertura muito no passado, ignora
+
+      // Chegou a hora — criar lead no pipeline
+      _criarLeadNoPipeline(l);
+      lancadas++;
+    });
+
+    if (lancadas > 0) {
+      Toast.info(
+        `🏛 ${lancadas} licitação(ões) lançada(s) automaticamente no pipeline ` +
+        `(abertura em ≤${_DIAS_ANTECEDENCIA} dias).`,
+        6000
+      );
+      // Re-render silencioso para mostrar badge
+      const licsAtt = DB.getAll('licitacoes');
+      let list = [...licsAtt].sort((a, b) => (a.dataAbertura||'').localeCompare(b.dataAbertura||''));
+      if (_filter.status) list = list.filter(l => l.status === _filter.status);
+      if (_filter.modalidade) list = list.filter(l => l.modalidade === _filter.modalidade);
+      const el = document.getElementById('licTabContent');
+      if (el && _tab === 'lista') {
+        el.innerHTML = renderLista(list, licsAtt, DB.getConfig());
+      }
+    }
+  }
+
+  function _criarLeadNoPipeline(lic) {
+    // Calcular próxima ação: 3 dias antes da abertura (ou amanhã se < 3 dias)
+    let dataAcao = lic.dataAbertura;
+    if (dataAcao) {
+      const d = new Date(dataAcao);
+      d.setDate(d.getDate() - 3);
+      const hoje = new Date(); hoje.setHours(0,0,0,0);
+      if (d < hoje) d.setDate(hoje.getDate() + 1);
+      dataAcao = d.toISOString().split('T')[0];
+    }
+
+    const lead = DB.create('leads', {
+      titulo: `${lic.numero} — ${Utils.truncate(lic.objeto || '', 70)}`,
+      origemLead: 'Licitação Pública',
+      status: 'proposta_elaboracao', // já está em elaboração de proposta
+      clienteId: null,
+      segmento: 'Governo / Órgão Público',
+      valorEstimado: lic.valorEstimado || 0,
+      responsavel: lic.responsavel || '',
+      proximaAcao: 'Preparar proposta técnica e comercial para licitação',
+      dataProximaAcao: dataAcao || '',
+      licitacaoId: lic.id,
+      licitacao: {
+        edital:      lic.numero,
+        orgao:       lic.orgao,
+        modalidade:  lic.modalidade,
+        uasg:        lic.uasg || '',
+        dataEntrega: lic.dataAbertura,
+        valorOrgao:  lic.valorEstimado || 0,
+        lance:       lic.valorProposta || 0,
+        link:        lic.linkEdital || lic.linkPortal || '',
+        resultado:   'Em disputa',
+      },
+      observacoes: `Auto-lançado pelo módulo de Licitações ${_DIAS_ANTECEDENCIA} dias antes da abertura.`,
+    });
+
+    // Gravar leadId de volta na licitação para rastreamento
+    DB.update('licitacoes', lic.id, {
+      leadId: lead.id,
+      dataLancamentoPipeline: Utils.todayStr(),
+    });
+  }
+
+  /* Lançamento manual (botão na tabela ou no view) */
+  function lancarNoPipeline(id) {
+    const l = DB.get('licitacoes', id);
+    if (!l) return;
+    if (l.leadId) {
+      // Já lançado — navega para o lead
+      Toast.info('Esta licitação já está no pipeline. Abrindo...');
+      setTimeout(() => { App.navigate('pipeline'); }, 500);
+      return;
+    }
+    if (_TERMINAL.includes(l.status)) {
+      Toast.warning('Licitações finalizadas não são lançadas no pipeline.'); return;
+    }
+    _criarLeadNoPipeline(l);
+    Toast.success(`🏛 Licitação "${l.numero}" lançada no pipeline!`);
+    Modal.close();
+    render();
   }
 
   /* ── Lista ────────────────────────────────────────────────────────────── */
@@ -191,29 +298,49 @@ const Licitacoes = (() => {
             <thead><tr>
               <th>Processo</th><th>Objeto</th><th>Órgão</th><th>Modalidade</th>
               <th>Abertura</th><th>Val. Estimado</th><th>Val. Proposta</th>
-              <th>Status</th><th>Resp.</th><th>Ações</th>
+              <th>Status</th><th>Pipeline</th><th>Ações</th>
             </tr></thead>
             <tbody>
               ${list.map(l => {
                 const dias = Utils.daysUntil(l.dataAbertura);
-                const aberturaAlert = dias != null && dias >= 0 && dias <= 7 && !['ganhou','perdeu','deserta','cancelada'].includes(l.status)
-                  ? `<span class="badge badge-red" style="font-size:9px">⚠ ${dias}d</span>` : '';
+                const terminal = _TERMINAL.includes(l.status);
+
+                // Coluna Pipeline
+                let pipelineCell;
+                if (l.leadId) {
+                  pipelineCell = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#0f766e;background:#f0fdfa;padding:2px 8px;border-radius:99px;border:1px solid #0f766e33">✅ No pipeline</span>
+                    <div class="text-xs text-muted" style="margin-top:2px">${Utils.formatDate(l.dataLancamentoPipeline)}</div>`;
+                } else if (terminal) {
+                  pipelineCell = `<span class="text-xs text-muted">—</span>`;
+                } else if (dias != null && dias <= _DIAS_ANTECEDENCIA) {
+                  pipelineCell = `<span style="font-size:11px;color:#f97316;font-weight:600">⏳ Lançando...</span>`;
+                } else {
+                  const faltam = dias != null ? `em ${dias}d` : 'data indefinida';
+                  pipelineCell = `<span class="text-xs text-muted">Automático ${faltam}</span>
+                    <br><button class="btn btn-xs btn-secondary" style="margin-top:3px" onclick="Licitacoes.lancarNoPipeline('${l.id}')" title="Lançar agora manualmente">↗ Agora</button>`;
+                }
+
+                // Alerta de abertura próxima
+                const aberturaColor = dias == null ? '' : dias < 0 ? '#ef4444' : dias <= 3 ? '#f97316' : dias <= 10 ? '#f59e0b' : '';
+                const aberturaLabel = dias == null ? '—' : dias < 0 ? `Encerrado ${Math.abs(dias)}d` : dias === 0 ? '⚠ HOJE' : `${dias}d restantes`;
+
                 const lic_status = STATUS[l.status] || { label: l.status, badge: 'badge-gray' };
                 return `<tr>
                   <td>
-                    <div class="font-bold text-sm">${Utils.escHtml(l.numero || '—')}</div>
+                    <div class="font-bold text-sm" style="color:var(--primary)">${Utils.escHtml(l.numero || '—')}</div>
                     <div class="text-xs text-muted">${Utils.escHtml(l.portal || '')}</div>
                   </td>
-                  <td><div style="max-width:220px;font-size:13px">${Utils.escHtml(Utils.truncate(l.objeto || '', 80))}</div></td>
-                  <td class="text-sm">${Utils.escHtml(l.orgao || '—')}<br><span class="text-xs text-muted">${Utils.escHtml(l.uasg ? 'UASG: ' + l.uasg : '')}</span></td>
+                  <td><div style="max-width:200px;font-size:13px">${Utils.escHtml(Utils.truncate(l.objeto || '', 70))}</div></td>
+                  <td class="text-sm">${Utils.escHtml(l.orgao || '—')}<br><span class="text-xs text-muted">${Utils.escHtml(l.uasg ? 'UASG '+l.uasg : '')}</span></td>
                   <td class="text-xs">${Utils.escHtml(l.modalidade || '—')}</td>
                   <td class="text-sm">
-                    ${Utils.formatDate(l.dataAbertura)} ${aberturaAlert}
+                    <div>${Utils.formatDate(l.dataAbertura)}</div>
+                    ${aberturaColor ? `<div style="font-size:11px;font-weight:700;color:${aberturaColor}">${aberturaLabel}</div>` : `<div class="text-xs text-muted">${aberturaLabel}</div>`}
                   </td>
                   <td class="font-bold text-sm">${l.valorEstimado ? Utils.formatCurrency(l.valorEstimado) : '—'}</td>
                   <td class="text-sm ${l.valorProposta && l.valorEstimado && l.valorProposta < l.valorEstimado ? 'text-success' : ''}">${l.valorProposta ? Utils.formatCurrency(l.valorProposta) : '—'}</td>
                   <td><span class="badge ${lic_status.badge}" style="font-size:11px">${lic_status.label}</span></td>
-                  <td class="text-xs">${Utils.escHtml(l.responsavel || '—')}</td>
+                  <td>${pipelineCell}</td>
                   <td>
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Licitacoes.view('${l.id}')">Ver</button>
@@ -414,6 +541,31 @@ const Licitacoes = (() => {
           </div>
           <button class="btn btn-primary btn-sm" onclick="Licitacoes.saveNotas('${id}')">💾 Salvar Notas</button>
         </div>
+
+        <!-- Pipeline status no view -->
+        ${(() => {
+          if (l.leadId) {
+            return `<div style="background:#f0fdfa;border:1px solid #0f766e44;border-radius:var(--radius);padding:12px;margin-top:12px;display:flex;align-items:center;gap:12px">
+              <span style="font-size:22px">🏛</span>
+              <div style="flex:1">
+                <div class="font-bold text-sm" style="color:#0f766e">No pipeline desde ${Utils.formatDate(l.dataLancamentoPipeline)}</div>
+                <div class="text-xs text-muted">Acompanhe o andamento na tela Pipeline → filtro "Licitação Pública"</div>
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="Modal.close();App.navigate('pipeline')">Ir ao Pipeline →</button>
+            </div>`;
+          }
+          if (_TERMINAL.includes(l.status)) return '';
+          const diasAbertura = Utils.daysUntil(l.dataAbertura);
+          const faltam = diasAbertura != null ? `${diasAbertura} dias` : 'data indefinida';
+          return `<div style="background:#fffbeb;border:1px solid #f59e0b44;border-radius:var(--radius);padding:12px;margin-top:12px;display:flex;align-items:center;gap:12px">
+            <span style="font-size:22px">⏳</span>
+            <div style="flex:1">
+              <div class="font-bold text-sm">Lançamento automático no pipeline</div>
+              <div class="text-xs text-muted">Faltam <strong>${faltam}</strong> para a abertura · será lançada automaticamente ${diasAbertura != null && diasAbertura <= _DIAS_ANTECEDENCIA ? '<strong style="color:#f97316">agora (≤10 dias)</strong>' : `quando restar ${_DIAS_ANTECEDENCIA} dias`}</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="Licitacoes.lancarNoPipeline('${id}')">↗ Lançar agora</button>
+          </div>`;
+        })()}
 
         <!-- Footer actions -->
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap;border-top:1px solid var(--border);padding-top:16px">
@@ -761,5 +913,6 @@ const Licitacoes = (() => {
   return {
     render, openForm, saveLic, deleteLic, view, setFilter, setTab,
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
+    lancarNoPipeline,
   };
 })();

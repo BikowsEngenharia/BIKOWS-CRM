@@ -60,6 +60,13 @@ const Pipeline = (() => {
     sec.style.display = val === 'Licitação Pública' ? 'block' : 'none';
   }
 
+  /* Toggle da seção de campanha Google Ads no formulário */
+  function _toggleCampanhaSection(val) {
+    const sec = document.getElementById('campanhaTrafegoSection');
+    if (!sec) return;
+    sec.style.display = val === 'Tráfego Pago' ? 'block' : 'none';
+  }
+
   function _origemIcon(o) { return _ORIGENS_MAP[o]?.icon || ''; }
   function _origemBadge(o) {
     if (!o || !_ORIGENS_MAP[o]) return '';
@@ -70,6 +77,7 @@ const Pipeline = (() => {
     const el = document.getElementById('fOrigemPreview');
     if (el) el.innerHTML = _origemBadge(sel.value);
     _toggleLicitacaoSection(sel.value);
+    _toggleCampanhaSection(sel.value);
   }
 
   let _filter = {
@@ -918,6 +926,21 @@ const Pipeline = (() => {
           <textarea class="form-control" id="fObs" rows="3">${Utils.escHtml(lead?.observacoes||'')}</textarea>
         </div>
 
+        <!-- SEÇÃO CAMPANHA GOOGLE ADS (exibida só quando origem = Tráfego Pago) -->
+        <div id="campanhaTrafegoSection" style="display:${lead?.origemLead==='Tráfego Pago'?'block':'none'};background:var(--teal-light);border:1px solid #99f6e4;border-radius:var(--radius);padding:14px;margin-top:8px">
+          <div class="form-label" style="color:#0d9488;margin-bottom:8px">🎯 GOOGLE ADS — Campanha</div>
+          <div class="form-group">
+            <label class="form-label">Campanha vinculada</label>
+            <select class="form-control" id="fCampanhaId">
+              <option value="">— Selecionar campanha —</option>
+              ${DB.getAll('trafego_campanhas').filter(c => c.status !== 'encerrada').map(c =>
+                `<option value="${c.id}" ${lead?.campanhaId===c.id?'selected':''}>${Utils.escHtml(c.nome)} · ${c.plataforma || 'Google Ads'}</option>`
+              ).join('')}
+            </select>
+            <span class="form-hint">Vincule este lead a uma campanha para acompanhar o ROI</span>
+          </div>
+        </div>
+
         <!-- SEÇÃO LICITAÇÃO (exibida só quando origem = Licitação Pública) -->
         <div id="licitacaoSection" style="display:${lead?.origemLead==='Licitação Pública'?'block':'none'}">
           <div style="background:#f0fdfa;border:1px solid #0f766e44;border-radius:var(--radius);padding:14px;margin-top:4px">
@@ -986,6 +1009,7 @@ const Pipeline = (() => {
     const existingLead = id ? DB.get('leads', id) : null;
 
     const servicos = [...document.getElementById('fServicos').selectedOptions].map(o => o.value);
+    const campanhaId = document.getElementById('fCampanhaId')?.value || null;
     const data = {
       titulo,
       status: document.getElementById('fStatus').value,
@@ -995,6 +1019,7 @@ const Pipeline = (() => {
       valorFechado: Number(document.getElementById('fValorFechado').value) || 0,
       responsavel: document.getElementById('fResponsavel').value,
       origemLead: document.getElementById('fOrigem').value,
+      campanhaId: campanhaId,
       licitacao: document.getElementById('fOrigem').value === 'Licitação Pública' ? {
         edital:      document.getElementById('fLicEdital')?.value.trim() || '',
         modalidade:  document.getElementById('fLicModalidade')?.value || '',
@@ -1153,6 +1178,6 @@ const Pipeline = (() => {
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
     relatorioOrigem, filtrarLicitacoes,
     setFilter, clearFilters,
-    _previewOrigem, _toggleLicitacaoSection,
+    _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
   };
 })();

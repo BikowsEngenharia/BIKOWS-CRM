@@ -280,6 +280,8 @@ const Dashboard = (() => {
       <!-- Licitações Urgentes -->
       ${_renderLicitacoesUrgentes(licsAtivas)}
 
+      ${_renderTrafegoWidget()}
+
       <!-- Alertas Follow-up -->
       ${renderFollowupAlerts(ativos)}
 
@@ -337,6 +339,75 @@ const Dashboard = (() => {
     }
 
     _renderMetasKpi();
+  }
+
+  /* ================================================
+     WIDGET: TRÁFEGO PAGO (Google Ads)
+     ================================================ */
+  function _renderTrafegoWidget() {
+    try {
+      const mesAtual = new Date().toISOString().slice(0, 7);
+
+      // Leads de tráfego pago do mês
+      const leadsTrafico = DB.getAll('leads').filter(l => {
+        if (l.origemLead !== 'Tráfego Pago') return false;
+        const d = l.dataEntrada || (l.createdAt||'').split('T')[0];
+        return d && d.startsWith(mesAtual);
+      });
+
+      if (leadsTrafico.length === 0 && DB.getAll('trafego_campanhas').length === 0) return '';
+
+      // Investimento do mês
+      const campanhas = DB.getAll('trafego_campanhas');
+      const investido = campanhas.filter(c => {
+        const ini = (c.dataInicio||'').slice(0,7);
+        const fim = (c.dataFim||'').slice(0,7) || '9999-12';
+        return ini <= mesAtual && fim >= mesAtual;
+      }).reduce((s,c) => s + (c.investidoReal || c.orcamentoMensal || 0), 0);
+
+      const cpl = leadsTrafico.length > 0 && investido > 0 ? investido / leadsTrafico.length : null;
+      const ganhos = leadsTrafico.filter(l => l.status === 'fechado_ganho');
+      const receita = Utils.sum(ganhos, 'valorFechado');
+      const roi = investido > 0 && receita > 0 ? ((receita - investido) / investido * 100).toFixed(0) : null;
+
+      // Meta do mês
+      const meta = DB.getAll('trafego_metas').find(m => m.mes === mesAtual);
+      const metaCPL = meta?.metaCPL || null;
+      const cplOk = cpl && metaCPL ? cpl <= metaCPL : true;
+
+      const mesLabel = new Date(mesAtual + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+      return `
+        <div class="card mb-4" style="border-left:4px solid #ef4444">
+          <div class="card-header">
+            <div class="card-title" style="color:#ef4444">🎯 Google Ads — ${mesLabel}</div>
+            <button class="btn btn-xs btn-secondary" onclick="App.navigate('trafego')">Ver detalhes →</button>
+          </div>
+          <div class="card-body" style="padding:14px 18px">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+              <div style="text-align:center">
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Investido</div>
+                <div style="font-size:20px;font-weight:800;color:var(--text)">${investido > 0 ? Utils.formatCurrency(investido) : '—'}</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Leads</div>
+                <div style="font-size:20px;font-weight:800;color:#3b82f6">${leadsTrafico.length}</div>
+                ${meta?.metaLeads ? `<div style="font-size:10px;color:var(--text-muted)">meta: ${meta.metaLeads}</div>` : ''}
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">CPL</div>
+                <div style="font-size:20px;font-weight:800;color:${cplOk ? '#10b981' : '#ef4444'}">${cpl ? Utils.formatCurrency(cpl) : '—'}</div>
+                ${metaCPL ? `<div style="font-size:10px;color:var(--text-muted)">meta: ${Utils.formatCurrency(metaCPL)}</div>` : ''}
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">ROI</div>
+                <div style="font-size:20px;font-weight:800;color:${roi > 0 ? '#10b981' : roi < 0 ? '#ef4444' : 'var(--text)'}">${roi !== null ? roi + '%' : '—'}</div>
+                ${receita > 0 ? `<div style="font-size:10px;color:var(--text-muted)">${Utils.formatCurrency(receita)} receita</div>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>`;
+    } catch(e) { return ''; }
   }
 
   /* ================================================

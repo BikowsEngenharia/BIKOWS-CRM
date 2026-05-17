@@ -67,6 +67,33 @@ const App = (() => {
     navigate('dashboard');
     updateNotifBadge();
 
+    // Restaurar estado collapsed da sidebar (desktop)
+    const savedCollapsed = localStorage.getItem('crm_sidebar_collapsed') === '1';
+    if (savedCollapsed && window.innerWidth > 900) {
+      _sidebarCollapsed = true;
+      document.getElementById('sidebar')?.classList.add('collapsed');
+    }
+
+    // Fechar sidebar ao navegar (mobile)
+    document.querySelectorAll('.nav-link[data-page]').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth <= 900) {
+          document.getElementById('sidebar')?.classList.remove('mobile-open');
+          document.getElementById('sidebarOverlay')?.classList.remove('active');
+        }
+      });
+    });
+
+    // Fechar sidebar overlay ao redimensionar para desktop
+    window.addEventListener('resize', () => {
+      const sidebar = document.getElementById('sidebar');
+      if (!sidebar) return;
+      if (window.innerWidth > 900) {
+        sidebar.classList.remove('mobile-open');
+        document.getElementById('sidebarOverlay')?.classList.remove('active');
+      }
+    });
+
     // Keyboard navigation for global search
     const searchInput = document.getElementById('globalSearch');
     if (searchInput) {
@@ -161,11 +188,27 @@ const App = (() => {
 
   function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    if (window.innerWidth <= 900) {
-      sidebar.classList.toggle('mobile-open');
+    const isMobile = window.innerWidth <= 900;
+
+    if (isMobile) {
+      const isOpen = sidebar.classList.contains('mobile-open');
+      sidebar.classList.toggle('mobile-open', !isOpen);
+      // Overlay
+      let overlay = document.getElementById('sidebarOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'sidebarOverlay';
+        overlay.className = 'sidebar-overlay';
+        overlay.onclick = () => toggleSidebar();
+        document.body.appendChild(overlay);
+      }
+      overlay.classList.toggle('active', !isOpen);
     } else {
       _sidebarCollapsed = !_sidebarCollapsed;
       sidebar.classList.toggle('collapsed', _sidebarCollapsed);
+      localStorage.setItem('crm_sidebar_collapsed', _sidebarCollapsed ? '1' : '0');
+      const btn = document.getElementById('sidebarCollapseBtn');
+      if (btn) btn.style.transform = _sidebarCollapsed ? 'rotate(180deg)' : '';
     }
   }
 

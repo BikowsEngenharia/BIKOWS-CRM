@@ -88,6 +88,7 @@ const Notifications = (() => {
     items.push(..._checkContasPagar(prefs));
     items.push(..._checkARTPendente(prefs));
     items.push(..._checkMarketing(prefs));
+    items.push(..._checkCPLTrafico(prefs));
 
     if (items.length === 0) return;
 
@@ -256,6 +257,47 @@ const Notifications = (() => {
           body: (p.canal || '') + ' · ' + Utils.truncate(p.titulo || '', 50),
         };
       });
+  }
+
+  /* ---- CPL de Tráfego Pago acima da meta ---- */
+  function _checkCPLTrafico(prefs) {
+    try {
+      const mesAtual = new Date().toISOString().slice(0, 7);
+
+      // Buscar meta do mês
+      const metas = DB.getAll('trafego_metas');
+      const meta = metas.find(m => m.mes === mesAtual);
+      if (!meta?.metaCPL) return []; // sem meta definida, sem alerta
+
+      // Calcular CPL atual
+      const leads = DB.getAll('leads').filter(l => {
+        if (l.origemLead !== 'Tráfego Pago') return false;
+        const d = l.dataEntrada || (l.createdAt || '').split('T')[0];
+        return d && d.startsWith(mesAtual);
+      });
+      if (leads.length === 0) return [];
+
+      const campanhas = DB.getAll('trafego_campanhas');
+      const investido = campanhas.filter(c => {
+        const ini = (c.dataInicio || '').slice(0, 7);
+        const fim = (c.dataFim || '').slice(0, 7) || '9999-12';
+        return ini <= mesAtual && fim >= mesAtual;
+      }).reduce((s, c) => s + (c.investidoReal || c.orcamentoMensal || 0), 0);
+
+      if (investido === 0) return [];
+
+      const cplAtual = investido / leads.length;
+      const metaCPL = meta.metaCPL;
+
+      if (cplAtual <= metaCPL) return []; // dentro da meta
+
+      const pct = Math.round((cplAtual / metaCPL - 1) * 100);
+      return [{
+        tag: 'cpl_' + mesAtual,
+        title: '⚠ CPL acima da meta — Google Ads',
+        body: `CPL atual: ${Utils.formatCurrency(cplAtual)} · Meta: ${Utils.formatCurrency(metaCPL)} · ${pct}% acima`,
+      }];
+    } catch (e) { return []; }
   }
 
   /* ---- Notificação no navegador ---- */

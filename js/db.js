@@ -33,10 +33,30 @@ const DB = (() => {
   /* ====================================================
      ESCRITA NO SUPABASE (async, silenciosa)
      ==================================================== */
+  /* ---- Backup local (resiliência offline / multi-device) ---- */
+  function _saveLocalBackup(table) {
+    try {
+      const data = _cache[table];
+      if (data && data.length > 0) {
+        localStorage.setItem('crm_cache_' + table, JSON.stringify(data));
+      }
+    } catch (e) { /* silencioso — quota excedida etc */ }
+  }
+
+  function _loadLocalBackup(table) {
+    try {
+      const raw = localStorage.getItem('crm_cache_' + table);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+    } catch (e) { return null; }
+  }
+
   async function _sbUpsert(table, record) {
     try {
       const { error } = await _supabase.from(table).upsert({ id: record.id, data: record });
       if (error) console.warn('[DB] upsert:', table, error.message);
+      else _saveLocalBackup(table); // atualiza backup após escrita bem-sucedida
     } catch (e) {
       console.warn('[DB] upsert exception:', e);
     }
@@ -121,6 +141,7 @@ const DB = (() => {
     const toDelete = _cache[entity].find(r => r.id === id);
     _auditLog('delete', entity, toDelete);
     _cache[entity] = _cache[entity].filter(r => r.id !== id);
+    _saveLocalBackup(entity);
     _sbDelete(entity, id);
   }
 
@@ -136,15 +157,41 @@ const DB = (() => {
      ==================================================== */
   async function loadAll() {
     const fetches = ENTITIES.map(async (entity) => {
-      const { data: rows, error } = await _supabase
-        .from(entity)
-        .select('data')
-        .order('created_at', { ascending: true });
-      if (error) {
-        console.warn('[DB] load error:', entity, error.message);
-        return;
+      try {
+        const { data: rows, error } = await _supabase
+          .from(entity)
+          .select('data')
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.warn('[DB] load error:', entity, error.message);
+          // Fallback: usa backup local se disponível
+          const backup = _loadLocalBackup(entity);
+          if (backup) {
+            _cache[entity] = backup;
+            console.info('[DB] usando backup local para:', entity, '(' + backup.length + ' registros)');
+          }
+          return;
+        }
+
+        const fromSupabase = (rows || []).map(r => r.data).filter(Boolean);
+        if (fromSupabase.length > 0) {
+          _cache[entity] = fromSupabase;
+          _saveLocalBackup(entity); // mantém backup sincronizado
+        } else {
+          // Supabase retornou vazio — pode ser nova instalação OU problema de conexão
+          // Só usa fallback se o cache local tiver dados e for uma tabela core
+          const backup = _loadLocalBackup(entity);
+          if (backup) {
+            _cache[entity] = backup;
+            console.info('[DB] Supabase vazio, restaurando local:', entity);
+          }
+        }
+      } catch (e) {
+        console.warn('[DB] load exception:', entity, e);
+        const backup = _loadLocalBackup(entity);
+        if (backup) _cache[entity] = backup;
       }
-      _cache[entity] = (rows || []).map(r => r.data).filter(Boolean);
     });
 
     const configFetch = async () => {

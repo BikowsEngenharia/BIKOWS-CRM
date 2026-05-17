@@ -18,6 +18,7 @@ const Relatorios = (() => {
         <button class="tab-btn ${_tab==='financeiro'?'active':''}" onclick="Relatorios.setTab('financeiro')">💰 Financeiro</button>
         <button class="tab-btn ${_tab==='operacional'?'active':''}" onclick="Relatorios.setTab('operacional')">🔧 Operacional</button>
         <button class="tab-btn ${_tab==='clientes'?'active':''}" onclick="Relatorios.setTab('clientes')">🏢 Clientes</button>
+        <button class="tab-btn ${_tab==='licitacoes'?'active':''}" onclick="Relatorios.setTab('licitacoes')">🏛 Licitações</button>
       </div>
       <div id="relContent">${renderTab()}</div>
     `;
@@ -35,6 +36,7 @@ const Relatorios = (() => {
     if (_tab === 'financeiro') return renderFinanceiro();
     if (_tab === 'operacional') return renderOperacional();
     if (_tab === 'clientes') return renderClientesTab();
+    if (_tab === 'licitacoes') return renderLicitacoesTab();
     return '';
   }
 
@@ -245,6 +247,28 @@ const Relatorios = (() => {
           </table>
         </div>
       </div>` : ''}
+
+      <div class="card mb-4">
+        <div class="card-header"><div class="card-title">📜 Status das ARTs por Projeto</div></div>
+        <div class="card-body">
+          <table class="tbl">
+            <thead><tr><th>OS</th><th>Projeto</th><th>Cliente</th><th>ART Nº</th><th>Status ART</th><th>Engenheiro</th></tr></thead>
+            <tbody>
+              ${projetos.filter(p => p.status === 'em_andamento').map(p => {
+                const artOk = p.art?.numero && p.art?.status === 'registrada';
+                return `<tr>
+                  <td class="text-xs font-bold" style="color:var(--primary)">${Utils.escHtml(p.ordemServico||'—')}</td>
+                  <td class="font-bold text-sm">${Utils.escHtml(p.titulo)}</td>
+                  <td class="text-sm">${Utils.escHtml(Utils.getClientName(p.clienteId))}</td>
+                  <td class="text-sm">${p.art?.numero ? Utils.escHtml(p.art.numero) : '<span style="color:#ef4444">Sem ART</span>'}</td>
+                  <td>${p.art?.status ? `<span class="badge ${artOk?'badge-green':'badge-yellow'}">${p.art.status}</span>` : '<span class="badge badge-red">pendente</span>'}</td>
+                  <td class="text-sm">${Utils.escHtml(p.art?.engResponsavel||'—')}</td>
+                </tr>`;
+              }).join('') || '<tr><td colspan="6" class="text-muted text-center">Nenhum projeto em andamento</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
     `;
   }
 
@@ -376,6 +400,117 @@ const Relatorios = (() => {
         size: 160,
       });
     }
+  }
+
+  function renderLicitacoesTab() {
+    const lics = DB.getAll('licitacoes');
+    const ganhou = lics.filter(l => l.status === 'ganhou');
+    const perdeu = lics.filter(l => l.status === 'perdeu');
+    const emAndamento = lics.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
+    const taxa = lics.length > 0 ? ((ganhou.length / lics.length)*100).toFixed(1) : 0;
+    const valorGanho = ganhou.reduce((s,l) => s + (l.valorAdjudicado||l.valorProposta||0), 0);
+    const valorDisputa = emAndamento.reduce((s,l) => s + (l.valorEstimado||0), 0);
+    const valorPerdido = perdeu.reduce((s,l) => s + (l.valorEstimado||0), 0);
+
+    // Agrupar por modalidade
+    const byModalidade = {};
+    lics.forEach(l => {
+      const m = l.modalidade || 'Não informada';
+      if (!byModalidade[m]) byModalidade[m] = { total:0, ganhou:0, perdeu:0, valor:0 };
+      byModalidade[m].total++;
+      if (l.status === 'ganhou') { byModalidade[m].ganhou++; byModalidade[m].valor += l.valorAdjudicado||l.valorProposta||0; }
+      if (l.status === 'perdeu') byModalidade[m].perdeu++;
+    });
+
+    // Agrupar por status
+    const byStatus = {};
+    lics.forEach(l => { byStatus[l.status] = (byStatus[l.status]||0) + 1; });
+
+    // Por mês (últimos 12 meses)
+    const meses = {};
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(); d.setMonth(d.getMonth() - i);
+      meses[d.toISOString().substring(0,7)] = { label: Utils.monthLabel(-i), ganhou: 0, perdeu: 0, valor: 0 };
+    }
+    lics.forEach(l => {
+      const m = l.dataAbertura?.substring(0,7);
+      if (m && meses[m]) {
+        if (l.status === 'ganhou') { meses[m].ganhou++; meses[m].valor += l.valorAdjudicado||l.valorProposta||0; }
+        if (l.status === 'perdeu') meses[m].perdeu++;
+      }
+    });
+
+    return `
+      <div class="kpi-grid mb-4">
+        <div class="kpi-card" style="--kpi-color:#0f766e"><div class="kpi-label">Em Disputa</div><div class="kpi-value">${emAndamento.length}</div><div class="kpi-sub">${Utils.formatCurrency(valorDisputa)}</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Ganhas</div><div class="kpi-value">${ganhou.length}</div><div class="kpi-sub">${Utils.formatCurrency(valorGanho)} adjudicado</div></div>
+        <div class="kpi-card" style="--kpi-color:#ef4444"><div class="kpi-label">Perdidas</div><div class="kpi-value">${perdeu.length}</div><div class="kpi-sub">${Utils.formatCurrency(valorPerdido)} perdido</div></div>
+        <div class="kpi-card" style="--kpi-color:#7c3aed"><div class="kpi-label">Taxa de Vitória</div><div class="kpi-value">${taxa}%</div><div class="kpi-sub">${lics.length} disputadas total</div></div>
+      </div>
+
+      <div class="grid-2 mb-4">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Por Modalidade</div></div>
+          <div class="card-body">
+            <table class="tbl">
+              <thead><tr><th>Modalidade</th><th>Total</th><th>Ganhas</th><th>Perdidas</th><th>Taxa</th><th>Valor Ganho</th></tr></thead>
+              <tbody>
+                ${Object.entries(byModalidade).sort((a,b)=>b[1].total-a[1].total).map(([mod, d]) => {
+                  const tx = d.total > 0 ? Math.round(d.ganhou/d.total*100) : 0;
+                  const cor = tx >= 40 ? '#10b981' : tx >= 20 ? '#f59e0b' : '#ef4444';
+                  return `<tr>
+                    <td class="font-bold text-sm">${Utils.escHtml(mod)}</td>
+                    <td style="text-align:center">${d.total}</td>
+                    <td style="text-align:center;color:#10b981;font-weight:700">${d.ganhou}</td>
+                    <td style="text-align:center;color:#ef4444">${d.perdeu}</td>
+                    <td style="text-align:center;font-weight:700;color:${cor}">${tx}%</td>
+                    <td class="text-primary font-bold">${d.valor > 0 ? Utils.formatCurrency(d.valor) : '—'}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Por Status</div></div>
+          <div class="card-body">
+            ${Object.entries(byStatus).map(([st, n]) => {
+              const pct = Math.round(n/lics.length*100);
+              const colors = { ganhou:'#10b981', perdeu:'#ef4444', deserta:'#94a3b8', cancelada:'#94a3b8', em_analise:'#3b82f6', identificada:'#64748b', habilitacao:'#7c3aed', proposta_preparando:'#d97706', proposta_enviada:'#ea580c', sessao_realizada:'#0891b2', recurso:'#ca8a04' };
+              const cor = colors[st] || '#64748b';
+              return `<div style="margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                  <span class="text-sm">${st}</span>
+                  <span class="text-sm font-bold">${n} (${pct}%)</span>
+                </div>
+                <div style="height:8px;background:var(--border);border-radius:99px">
+                  <div style="width:${pct}%;height:100%;background:${cor};border-radius:99px"></div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header"><div class="card-title">Histórico por Mês (últimos 12 meses)</div></div>
+        <div class="card-body">
+          <table class="tbl">
+            <thead><tr><th>Mês</th><th>Ganhas</th><th>Perdidas</th><th>Valor Adjudicado</th></tr></thead>
+            <tbody>
+              ${Object.entries(meses).reverse().filter(([,d]) => d.ganhou+d.perdeu > 0).map(([,d]) => `<tr>
+                <td class="text-sm">${d.label}</td>
+                <td style="text-align:center;color:#10b981;font-weight:700">${d.ganhou}</td>
+                <td style="text-align:center;color:#ef4444">${d.perdeu}</td>
+                <td class="font-bold text-primary">${d.valor > 0 ? Utils.formatCurrency(d.valor) : '—'}</td>
+              </tr>`).join('') || '<tr><td colspan="4" class="text-muted text-center">Nenhuma licitação encerrada nos últimos 12 meses</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      ${lics.length === 0 ? '<div class="empty-state"><div class="empty-icon">🏛</div><div class="empty-title">Nenhuma licitação cadastrada</div><button class="btn btn-primary mt-4" onclick="App.navigate(\'licitacoes\')">Ir para Licitações</button></div>' : ''}
+    `;
   }
 
   return { render, setTab };

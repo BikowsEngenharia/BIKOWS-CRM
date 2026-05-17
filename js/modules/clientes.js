@@ -426,17 +426,21 @@ const Clientes = (() => {
           const cols = line.split(';').map(c => c.trim().replace(/^["']|["']$/g,''));
           const nome = cols[idx('nome')] || '';
           if (!nome) { skipped++; return; }
+          const npsRaw = cols[idx('nps')] || cols[idx('nps / satisfação geral')] || '';
           DB.create('clientes', {
             nome,
-            cnpj:      cols[idx('cnpj')] || '',
-            segmento:  cols[idx('segmento')] || '',
-            porte:     cols[idx('porte')] || 'Médio',
-            cidade:    cols[idx('cidade')] || '',
-            estado:    cols[idx('estado')] || '',
-            email:     cols[idx('email')] || '',
-            telefone:  cols[idx('telefone')] || '',
-            site:      cols[idx('site')] || '',
-            observacoes: cols[idx('observacoes')] || '',
+            cnpj:           cols[idx('cnpj')] || '',
+            segmento:       cols[idx('segmento')] || '',
+            porte:          cols[idx('porte')] || 'Médio',
+            cidade:         cols[idx('cidade')] || '',
+            estado:         cols[idx('estado')] || '',
+            email:          cols[idx('email')] || '',
+            telefone:       cols[idx('telefone')] || '',
+            site:           cols[idx('site')] || '',
+            observacoes:    cols[idx('observacoes')] || '',
+            codigoCliente:  cols[idx('codigo cliente')] || cols[idx('codigocliente')] || '',
+            engResponsavel: cols[idx('eng responsavel')] || cols[idx('engresponsavel')] || cols[idx('eng_responsavel')] || '',
+            nps:            npsRaw ? (Number(npsRaw) || null) : null,
             ativo: true,
           });
           created++;
@@ -451,8 +455,8 @@ const Clientes = (() => {
   }
 
   function downloadCSVTemplate() {
-    const header = 'nome;cnpj;segmento;porte;cidade;estado;email;telefone;site;observacoes';
-    const example = 'Empresa Exemplo Ltda;12.345.678/0001-90;Alimentos;Médio;Londrina;PR;contato@empresa.com;(43) 99999-1234;www.empresa.com;Observação opcional';
+    const header = 'nome;cnpj;segmento;porte;cidade;estado;email;telefone;site;observacoes;codigo cliente;eng responsavel;nps';
+    const example = 'Empresa Exemplo Ltda;12.345.678/0001-90;Alimentos;Médio;Londrina;PR;contato@empresa.com;(43) 99999-1234;www.empresa.com;Observação opcional;CLI-0001;João da Silva;5';
     const blob = new Blob([header + '\n' + example], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

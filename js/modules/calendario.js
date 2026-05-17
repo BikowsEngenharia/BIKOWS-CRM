@@ -122,6 +122,21 @@ const Calendario = (() => {
       });
     });
 
+    // ── Licitações — data de abertura ─────────────────────────────────────
+    DB.getAll('licitacoes')
+      .filter(l => l.dataAbertura && !['ganhou','perdeu','deserta','cancelada'].includes(l.status))
+      .forEach(l => {
+        addEvent(l.dataAbertura, {
+          type: 'licitacao',
+          label: `🏛 ${Utils.escHtml(l.numero || 'Licitação')}`,
+          color: '#fff',
+          bg: '#0f766e',
+          entityId: l.id,
+          entityType: 'licitacoes',
+          raw: l,
+        });
+      });
+
     return map;
   }
 
@@ -190,11 +205,12 @@ const Calendario = (() => {
         ? Utils.escHtml(Utils.getClientName ? Utils.getClientName(ev.raw.clienteId) : ev.raw.clienteId)
         : '';
       const typeLabels = {
-        atividade: 'Atividade',
-        followup:  'Follow-up',
-        proposta:  'Venc. Proposta',
-        parcela:   'Parcela',
-        projeto:   'Prazo Projeto',
+        atividade:  'Atividade',
+        followup:   'Follow-up',
+        proposta:   'Venc. Proposta',
+        parcela:    'Parcela',
+        projeto:    'Prazo Projeto',
+        licitacao:  'Sessão Licitação',
       };
       const typeBadge = typeLabels[ev.type] || ev.type;
 
@@ -209,6 +225,8 @@ const Calendario = (() => {
         actionBtn = `<button class="btn btn-sm btn-secondary" onclick="App.navigate('financeiro');Modal.close()">→ Financeiro</button>`;
       } else if (ev.type === 'projeto') {
         actionBtn = `<button class="btn btn-sm btn-secondary" onclick="App.navigate('projetos');Modal.close()">→ Projetos</button>`;
+      } else if (ev.type === 'licitacao') {
+        actionBtn = `<button class="btn btn-sm btn-secondary" onclick="App.navigate('licitacoes');Modal.close()">→ Licitações</button>`;
       }
 
       return `
@@ -353,6 +371,7 @@ const Calendario = (() => {
       { bg: '#d97706', label: 'Parcela ≤3 dias' },
       { bg: '#f59e0b', label: 'Parcela a vencer' },
       { bg: '#059669', label: 'Prazo Projeto' },
+      { bg: '#0f766e', label: 'Sessão Licitação' },
     ];
     const chips = items.map(it =>
       `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:12px;color:var(--text)">

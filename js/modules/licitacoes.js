@@ -609,6 +609,22 @@ const Licitacoes = (() => {
   function changeStatus(id, status) {
     DB.update('licitacoes', id, { status });
     Toast.success('Status atualizado: ' + STATUS[status]?.label);
+
+    // Sincroniza lead vinculado no pipeline
+    const licAtualizada = DB.get('licitacoes', id);
+    if (licAtualizada?.leadId) {
+      const leadStatus = status === 'ganhou' ? 'fechado_ganho' : status === 'perdeu' ? 'fechado_perdido' : null;
+      if (leadStatus) {
+        DB.update('leads', licAtualizada.leadId, {
+          status: leadStatus,
+          valorFechado: leadStatus === 'fechado_ganho' ? (licAtualizada.valorAdjudicado || licAtualizada.valorProposta || 0) : 0,
+          motivoPerda: leadStatus === 'fechado_perdido' ? (licAtualizada.motivoPerda || 'Licitação perdida') : undefined,
+          'licitacao.resultado': status === 'ganhou' ? 'Ganhou' : 'Perdeu',
+        });
+        Toast.info(`Pipeline atualizado: lead movido para "${leadStatus === 'fechado_ganho' ? 'Fechado/Ganho' : 'Fechado/Perdido'}".`);
+      }
+    }
+
     Modal.close();
     render();
   }
@@ -867,6 +883,20 @@ const Licitacoes = (() => {
       saveCb: () => {
         const titulo = document.getElementById('lpTitulo').value.trim();
         if (!titulo) { Toast.error('Título obrigatório'); return; }
+
+        // Gerar OS automático
+        const anoAtual = new Date().getFullYear();
+        const osPrefix = `OS-${anoAtual}-`;
+        const todosProj = DB.getAll('projetos');
+        let maxOs = 0;
+        todosProj.forEach(proj => {
+          if (proj.ordemServico?.startsWith(osPrefix)) {
+            const seq = parseInt(proj.ordemServico.replace(osPrefix, ''), 10);
+            if (!isNaN(seq) && seq > maxOs) maxOs = seq;
+          }
+        });
+        const osGerado = `${osPrefix}${String(maxOs + 1).padStart(5, '0')}`;
+
         DB.create('projetos', {
           titulo,
           codigo: document.getElementById('lpCodigo').value,
@@ -880,7 +910,9 @@ const Licitacoes = (() => {
           nfEmitida: false,
           pagamentoRecebido: false,
           etapas: [],
+          ordemServico: osGerado,
           licitacaoOrigemId: id,
+          leadId: l.leadId || null,
           observacoes: `Originado da licitação ${l.numero} — ${l.orgao}`,
         });
         Toast.success('Projeto criado com sucesso!');

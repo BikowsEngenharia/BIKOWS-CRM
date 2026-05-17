@@ -34,6 +34,29 @@ const Dashboard = (() => {
       });
     });
 
+    // Licitações
+    const licitacoes = DB.getAll('licitacoes');
+    const licsAtivas = licitacoes.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
+    const licsUrgentes = licsAtivas.filter(l => { const d = Utils.daysUntil(l.dataAbertura); return d != null && d >= 0 && d <= 7; }).length;
+    const valorLics = licsAtivas.reduce((s,l) => s + (l.valorEstimado||0), 0);
+
+    // ARTs pendentes
+    const artSemNumero = projetos.filter(p => p.status === 'em_andamento' && !p.art?.numero).length;
+
+    // Canal principal de leads
+    const origemCount = {};
+    leads.filter(l => l.origemLead).forEach(l => { origemCount[l.origemLead] = (origemCount[l.origemLead]||0) + 1; });
+    const origemEntries = Object.entries(origemCount).sort((a,b) => b[1]-a[1]);
+    const canalPrincipal = origemEntries[0]?.[0] || '—';
+    const canalPrincipalQtd = origemEntries[0]?.[1] || 0;
+    const canalPrincipalPct = leads.length > 0 ? Math.round(canalPrincipalQtd/leads.length*100) : 0;
+
+    // NPS médio dos projetos
+    const projsComNps = projetos.filter(p => p.npsCliente);
+    const npsMedia = projsComNps.length > 0 ? (projsComNps.reduce((s,p) => s + p.npsCliente, 0) / projsComNps.length).toFixed(1) : null;
+    const npsDisplay = npsMedia ? '⭐ ' + npsMedia : '—';
+    const npsCount = projsComNps.length;
+
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
         <h2 class="sec-title">Dashboard</h2>
@@ -70,6 +93,38 @@ const Dashboard = (() => {
           <div class="kpi-value">${taxaConversao}%</div>
           <div class="kpi-sub">${ganhos.length} ganhos / ${perdidos.length} perdidos</div>
           <div class="kpi-icon">📈</div>
+        </div>
+      </div>
+
+      <!-- KPIs SECUNDÁRIOS -->
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+        <!-- Licitações em andamento -->
+        <div class="kpi-card" style="--kpi-color:#0f766e">
+          <div class="kpi-label">Licitações em Disputa</div>
+          <div class="kpi-value">${licsAtivas.length}</div>
+          <div class="kpi-sub ${licsUrgentes > 0 ? 'text-danger' : ''}">${licsUrgentes > 0 ? `⚠ ${licsUrgentes} abrindo em ≤7 dias` : Utils.formatCurrency(valorLics) + ' em disputa'}</div>
+          <div class="kpi-icon">🏛</div>
+        </div>
+        <!-- ARTs pendentes -->
+        <div class="kpi-card" style="--kpi-color:${artSemNumero > 0 ? '#ef4444' : '#10b981'}">
+          <div class="kpi-label">ARTs Pendentes</div>
+          <div class="kpi-value">${artSemNumero}</div>
+          <div class="kpi-sub">${artSemNumero > 0 ? 'Projetos em andamento sem ART' : '✅ Todos os projetos com ART'}</div>
+          <div class="kpi-icon">📜</div>
+        </div>
+        <!-- Canal principal de leads -->
+        <div class="kpi-card" style="--kpi-color:#6366f1">
+          <div class="kpi-label">Principal Canal</div>
+          <div class="kpi-value" style="font-size:16px">${canalPrincipal}</div>
+          <div class="kpi-sub">${canalPrincipalQtd} leads · ${canalPrincipalPct}% do total</div>
+          <div class="kpi-icon">📡</div>
+        </div>
+        <!-- NPS médio -->
+        <div class="kpi-card" style="--kpi-color:#f59e0b">
+          <div class="kpi-label">NPS Médio (serviços)</div>
+          <div class="kpi-value">${npsDisplay}</div>
+          <div class="kpi-sub">${npsCount} avaliações recebidas</div>
+          <div class="kpi-icon">⭐</div>
         </div>
       </div>
 
@@ -139,6 +194,49 @@ const Dashboard = (() => {
         </div>
       </div>
 
+      <!-- ROW 3: Origem dos Leads -->
+      <div class="grid-2 mb-4">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Leads por Canal de Origem</div></div>
+          <div class="card-body"><div id="chartOrigem"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">ARTs — Status</div>
+          </div>
+          <div class="card-body">
+            ${(() => {
+              const artStatus = { 'Sem ART': artSemNumero };
+              projetos.forEach(p => {
+                if (p.art?.numero) {
+                  const s = p.art.status || 'pendente';
+                  artStatus[s] = (artStatus[s]||0) + 1;
+                }
+              });
+              const colors = { 'registrada':'#10b981','baixada':'#3b82f6','pendente':'#f59e0b','cancelada':'#94a3b8','Sem ART':'#ef4444' };
+              const total = Object.values(artStatus).reduce((s,n) => s+n, 0);
+              if (total === 0) return '<div class="empty-state"><div class="empty-sub">Nenhum projeto cadastrado</div></div>';
+              return Object.entries(artStatus).filter(([,n]) => n > 0).map(([k,n]) => {
+                const pct = Math.round(n/total*100);
+                const cor = colors[k]||'#94a3b8';
+                return `<div style="margin-bottom:10px">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                    <span class="text-sm">${k}</span>
+                    <span class="text-sm font-bold">${n} (${pct}%)</span>
+                  </div>
+                  <div style="height:8px;background:var(--border);border-radius:99px">
+                    <div style="width:${pct}%;height:100%;background:${cor};border-radius:99px"></div>
+                  </div>
+                </div>`;
+              }).join('');
+            })()}
+          </div>
+        </div>
+      </div>
+
+      <!-- Licitações Urgentes -->
+      ${_renderLicitacoesUrgentes(licsAtivas)}
+
       <!-- Alertas Follow-up -->
       ${renderFollowupAlerts(ativos)}
 
@@ -183,7 +281,53 @@ const Dashboard = (() => {
       size: 160,
     });
 
+    // Gráfico de origem dos leads
+    const origemData = Object.entries(origemCount).map(([k,v]) => ({ label: k, value: v }));
+    if (origemData.length > 0) {
+      Charts.donut({ containerId: 'chartOrigem', data: origemData, size: 160 });
+    } else {
+      const el = document.getElementById('chartOrigem');
+      if (el) el.innerHTML = '<div class="empty-state"><div class="empty-sub">Nenhum lead com origem cadastrada</div></div>';
+    }
+
     _renderMetasKpi();
+  }
+
+  /* ================================================
+     WIDGET: LICITAÇÕES COM ABERTURA PRÓXIMA
+     ================================================ */
+  function _renderLicitacoesUrgentes(licsAtivas) {
+    const urgentes = licsAtivas
+      .filter(l => { const d = Utils.daysUntil(l.dataAbertura); return d != null && d <= 10; })
+      .sort((a,b) => (a.dataAbertura||'').localeCompare(b.dataAbertura||''));
+    if (urgentes.length === 0) return '';
+    return `
+      <div class="card mb-4" style="border-left:4px solid #0f766e">
+        <div class="card-header">
+          <div class="card-title" style="color:#0f766e">🏛 Licitações com Abertura Próxima</div>
+          <button class="btn btn-xs btn-secondary" onclick="App.navigate('licitacoes')">Ver todas →</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table class="tbl">
+            <thead><tr><th>Processo</th><th>Órgão</th><th>Modalidade</th><th>Abertura</th><th>Valor Est.</th><th>Status</th></tr></thead>
+            <tbody>
+              ${urgentes.map(l => {
+                const dias = Utils.daysUntil(l.dataAbertura);
+                const cor = dias < 0 ? '#ef4444' : dias <= 3 ? '#f97316' : dias <= 7 ? '#f59e0b' : '#0f766e';
+                const label = dias < 0 ? `Encerrado ${Math.abs(dias)}d` : dias === 0 ? '⚠ HOJE' : `${dias}d restantes`;
+                return `<tr>
+                  <td class="font-bold text-sm" style="color:var(--primary)">${Utils.escHtml(l.numero||'—')}</td>
+                  <td class="text-sm">${Utils.escHtml(l.orgao||'—')}</td>
+                  <td class="text-xs">${Utils.escHtml(l.modalidade||'—')}</td>
+                  <td><div class="font-bold" style="font-size:12px;color:${cor}">${Utils.formatDate(l.dataAbertura)}</div><div style="font-size:11px;color:${cor}">${label}</div></td>
+                  <td class="text-sm">${l.valorEstimado ? Utils.formatCurrency(l.valorEstimado) : '—'}</td>
+                  <td class="text-xs">${l.status||'—'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
   }
 
   /* ================================================

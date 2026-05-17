@@ -86,6 +86,7 @@ const Notifications = (() => {
     items.push(..._checkParcelas(prefs));
     items.push(..._checkLicitacoes(prefs));
     items.push(..._checkContasPagar(prefs));
+    items.push(..._checkARTPendente(prefs));
     items.push(..._checkMarketing(prefs));
 
     if (items.length === 0) return;
@@ -224,6 +225,17 @@ const Notifications = (() => {
           body: c.fornecedor + ' · ' + Utils.formatCurrency(c.valor),
         };
       });
+  }
+
+  /* ---- Projetos sem ART (em andamento) ---- */
+  function _checkARTPendente(prefs) {
+    return DB.getAll('projetos')
+      .filter(p => p.status === 'em_andamento' && (!p.art?.numero))
+      .map(p => ({
+        tag: 'art_' + p.id,
+        title: '📜 Projeto sem ART registrada',
+        body: (p.ordemServico ? p.ordemServico + ' — ' : '') + p.titulo + ' · ' + (Utils.getClientName(p.clienteId) || ''),
+      }));
   }
 
   /* ---- Marketing (posts agendados) ---- */

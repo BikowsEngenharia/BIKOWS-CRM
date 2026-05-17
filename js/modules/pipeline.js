@@ -1035,7 +1035,7 @@ const Pipeline = (() => {
       proximaAcao: document.getElementById('fProximaAcao').value,
       dataProximaAcao: document.getElementById('fDataAcao').value,
       propostaNum: document.getElementById('fPropostaNum').value,
-      propostaId: document.getElementById('fPropostaId')?.value || lead?.propostaId || null,
+      propostaId: document.getElementById('fPropostaId')?.value || existingLead?.propostaId || null,
       motivoPerda: document.getElementById('fMotivo').value,
       contato: document.getElementById('fContato').value,
       servicoInteresse: servicos,

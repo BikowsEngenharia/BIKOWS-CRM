@@ -459,8 +459,14 @@ const Config = (() => {
       Toast.success('Dados removidos. Recarregando...');
       setTimeout(() => window.location.reload(), 1500);
     });
-    document.getElementById('btnConfirm').style.background = '#dc2626';
-    document.getElementById('btnConfirm').textContent = 'SIM, LIMPAR TUDO';
+    // Aguarda o modal renderizar antes de alterar o botão
+    setTimeout(() => {
+      const btn = document.getElementById('btnConfirm');
+      if (btn) {
+        btn.style.background = '#dc2626';
+        btn.textContent = 'SIM, LIMPAR TUDO';
+      }
+    }, 50);
   }
 
   function saveNotificacoes() {

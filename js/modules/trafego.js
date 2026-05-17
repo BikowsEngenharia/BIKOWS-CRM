@@ -522,12 +522,12 @@ const Trafego = (() => {
       </div>
     `;
 
-    const footer = `
-      <button class="btn btn-ghost" onclick="Modal.close()">Cancelar</button>
-      <button class="btn btn-primary" onclick="Trafego.saveCampanha('${id || ''}')">Salvar Campanha</button>
-    `;
-
-    Modal.open({ title: id ? 'Editar Campanha' : 'Nova Campanha Google Ads', body, footer });
+    Modal.open({
+      title: id ? 'Editar Campanha' : 'Nova Campanha Google Ads',
+      body,
+      saveLabel: id ? 'Salvar Alterações' : 'Criar Campanha',
+      saveCb: () => Trafego.saveCampanha(id || ''),
+    });
   }
 
   function saveCampanha(id) {
@@ -698,7 +698,7 @@ const Trafego = (() => {
     if (typeof App !== 'undefined' && App.navigate) {
       App.navigate('pipeline');
       setTimeout(() => {
-        if (typeof Pipeline !== 'undefined' && Pipeline.openLead) Pipeline.openLead(id);
+        if (typeof Pipeline !== 'undefined' && Pipeline.viewLead) Pipeline.viewLead(id);
       }, 300);
     }
   }

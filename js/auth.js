@@ -5,7 +5,18 @@ const Auth = (() => {
 
   /* ---- Inicialização ---- */
   function init() {
-    // Safety timeout: se em 12s ainda não houver resposta do Supabase, mostra opção de recarregar
+    let _authFired = false;
+
+    // Fallback agressivo: se em 8s o onAuthStateChange não disparou, exibe login direto
+    const fallbackTimeout = setTimeout(() => {
+      if (!_authFired) {
+        console.warn('[Auth] onAuthStateChange não disparou em 8s — exibindo login');
+        _hideLoading();
+        _showLogin();
+      }
+    }, 8000);
+
+    // Safety timeout extra: se em 15s ainda houver loading overlay, mostra botão de recarregar
     const loadingTimeout = setTimeout(() => {
       const overlay = document.getElementById('loadingOverlay');
       if (overlay && overlay.style.display !== 'none') {
@@ -14,18 +25,28 @@ const Auth = (() => {
           textEl.innerHTML = 'Tempo de carregamento excedido.<br><button onclick="location.reload()" style="margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px">🔄 Recarregar</button>';
         }
       }
-    }, 12000);
+    }, 15000);
 
     // Listener de estado de auth — dispara imediatamente com sessão atual
-    _supabase.auth.onAuthStateChange((event, session) => {
+    try {
+      _supabase.auth.onAuthStateChange((event, session) => {
+        _authFired = true;
+        clearTimeout(fallbackTimeout);
+        clearTimeout(loadingTimeout);
+        if (session) {
+          _bootApp();
+        } else {
+          _hideLoading();
+          _showLogin();
+        }
+      });
+    } catch (e) {
+      console.error('[Auth] Erro ao registrar onAuthStateChange:', e);
+      clearTimeout(fallbackTimeout);
       clearTimeout(loadingTimeout);
-      if (session) {
-        _bootApp();
-      } else {
-        _hideLoading();
-        _showLogin();
-      }
-    });
+      _hideLoading();
+      _showLogin();
+    }
   }
 
   /* ---- Login ---- */

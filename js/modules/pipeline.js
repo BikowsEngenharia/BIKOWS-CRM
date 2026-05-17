@@ -412,10 +412,11 @@ const Pipeline = (() => {
   }
 
   // Cria proposta a partir do lead e vincula os dois
-  function criarPropostaLead(leadId) {
+  // silencioso=true → não abre o formulário (usado na auto-criação ao entrar na coluna)
+  function criarPropostaLead(leadId, silencioso = false) {
     const lead = DB.get('leads', leadId);
     if (!lead) return;
-    const nextNum = 'BIK-' + new Date().getFullYear() + '-CTR-' + String(DB.getAll('propostas').length + 1).padStart(3,'0');
+    const nextNum = Propostas.nextNumeroProposta(); // gerador centralizado com piso histórico
     const proposta = DB.create('propostas', {
       numero: nextNum,
       titulo: lead.titulo,
@@ -429,10 +430,12 @@ const Pipeline = (() => {
     });
     // Vincula no lead
     DB.update('leads', leadId, { propostaId: proposta.id, propostaNum: proposta.numero });
-    Toast.success(`Proposta ${proposta.numero} criada e vinculada ao lead!`);
     render();
-    // Abre o form da proposta para preencher detalhes
-    setTimeout(() => Propostas.openForm(proposta.id), 300);
+    if (!silencioso) {
+      Toast.success(`Proposta ${proposta.numero} criada e vinculada ao lead!`);
+      setTimeout(() => Propostas.openForm(proposta.id), 300);
+    }
+    return proposta;
   }
 
   // Abre o fluxo completo de fechamento de contrato para um lead
@@ -516,16 +519,28 @@ const Pipeline = (() => {
     });
   }
 
-  // Sugere criar proposta ao entrar em "Proposta em Elaboração"
+  // Ao entrar em "Proposta em Elaboração": cria stub automaticamente e notifica com o número
   function _sugerirCriarProposta(leadId) {
-    const proposta = _getPropostaLead(leadId);
-    if (proposta) return; // já tem proposta
+    const propostaExistente = _getPropostaLead(leadId);
+    if (propostaExistente) {
+      // Já tem proposta — apenas informa
+      Toast.info(
+        `📄 Proposta <strong>${Utils.escHtml(propostaExistente.numero||'')}</strong> já vinculada a este lead.`,
+        4000
+      );
+      return;
+    }
     const lead = DB.get('leads', leadId);
-    Toast.info(
-      `📄 Lead "<strong>${Utils.escHtml(lead?.titulo||'')}</strong>" entrou em elaboração de proposta. ` +
-      `<a href="#" onclick="Pipeline.criarPropostaLead('${leadId}');return false;" style="color:var(--primary);font-weight:600">` +
-      `Criar proposta agora →</a>`,
-      8000
+    // Cria stub silenciosamente (não abre form ainda)
+    const proposta = criarPropostaLead(leadId, true);
+    if (!proposta) return;
+    // Toast com o número reservado + link para abrir e preencher
+    Toast.success(
+      `📋 Número <strong>${Utils.escHtml(proposta.numero)}</strong> reservado para ` +
+      `"<strong>${Utils.escHtml(lead?.titulo||'')}</strong>". ` +
+      `<a href="#" onclick="Propostas.openForm('${proposta.id}');return false;" style="color:#fff;text-decoration:underline;font-weight:600">` +
+      `Preencher proposta →</a>`,
+      9000
     );
   }
 

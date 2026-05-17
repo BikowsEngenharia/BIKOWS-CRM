@@ -11,11 +11,14 @@ const Propostas = (() => {
      Busca o maior sequencial existente e incrementa,
      nunca depende do .length (quebra com exclusões)
   ------------------------------------------------ */
+  // Piso histórico — última proposta emitida antes do sistema
+  const _PISO_SEQUENCIA = 1100;
+
   function _nextNumeroProposta() {
     const ano = new Date().getFullYear();
     const prefix = `PROP-${ano}-`;
     const todas = DB.getAll('propostas');
-    let max = 0;
+    let max = _PISO_SEQUENCIA; // começa do piso, nunca abaixo
     todas.forEach(p => {
       if (p.numero && p.numero.startsWith(prefix)) {
         const seq = parseInt(p.numero.replace(prefix, ''), 10);
@@ -976,5 +979,6 @@ const Propostas = (() => {
     criarRecebivel, addNew, addItemRow, removeItemRow, _setItemField,
     abrirFluxoContratacao, _ctab, _toggleCondicao, _previewParcelas,
     _addEtapaContrato, _renderEtapasContrato, _setEtapaCampo, _removeEtapaContrato,
+    nextNumeroProposta: _nextNumeroProposta, // exposto para uso no pipeline
   };
 })();

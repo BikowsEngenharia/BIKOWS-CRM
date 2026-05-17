@@ -9,7 +9,7 @@
    5. Cole o Client ID abaixo
    ========================================== */
 
-const GCAL_CLIENT_ID = ''; // ← Cole aqui o seu OAuth 2.0 Client ID
+const GCAL_CLIENT_ID = '502992926661-oeffbek20h6r36g35k4c7vgi99tsvl61.apps.googleusercontent.com';
 const GCAL_API_KEY   = ''; // ← Opcional: chave de API (apenas leitura sem OAuth)
 const GCAL_SCOPES    = 'https://www.googleapis.com/auth/calendar.events';
 const GCAL_DISCOVERY = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';

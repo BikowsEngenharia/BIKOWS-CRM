@@ -17,6 +17,30 @@ const Pipeline = (() => {
   // Dias sem atualização para considerar lead frio
   const DIAS_FRIO = 7;
 
+  /* ---- Mapa de canais de origem ---- */
+  const _ORIGENS_MAP = {
+    'Tráfego Pago':    { icon: '🎯', color: '#ef4444', bg: '#fef2f2' },
+    'Indicação':       { icon: '🤝', color: '#10b981', bg: '#f0fdf4' },
+    'Recorrência':     { icon: '🔁', color: '#8b5cf6', bg: '#f5f3ff' },
+    'Prospecção Ativa':{ icon: '📞', color: '#3b82f6', bg: '#eff6ff' },
+    'Site / SEO':      { icon: '🌐', color: '#06b6d4', bg: '#ecfeff' },
+    'LinkedIn':        { icon: '💼', color: '#0a66c2', bg: '#eff6ff' },
+    'Evento / Feira':  { icon: '📅', color: '#f59e0b', bg: '#fffbeb' },
+    'Parceria':        { icon: '🔗', color: '#6366f1', bg: '#eef2ff' },
+    'Outro':           { icon: '❓', color: '#94a3b8', bg: '#f8fafc' },
+  };
+
+  function _origemIcon(o) { return _ORIGENS_MAP[o]?.icon || ''; }
+  function _origemBadge(o) {
+    if (!o || !_ORIGENS_MAP[o]) return '';
+    const m = _ORIGENS_MAP[o];
+    return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:${m.color};background:${m.bg};padding:2px 8px;border-radius:99px;border:1px solid ${m.color}33">${m.icon} ${o}</span>`;
+  }
+  function _previewOrigem(sel) {
+    const el = document.getElementById('fOrigemPreview');
+    if (el) el.innerHTML = _origemBadge(sel.value);
+  }
+
   let dragId = null;
 
   /* ---- Detecção de lead frio ---- */
@@ -106,7 +130,12 @@ const Pipeline = (() => {
             <option value="">Todos os responsáveis</option>
             ${config.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('')}
           </select>
+          <select class="filter-select" id="filterOrigem" onchange="Pipeline.render()">
+            <option value="">Todas as origens</option>
+            ${Object.keys(_ORIGENS_MAP).map(o => `<option value="${o}">${_origemIcon(o)} ${o}</option>`).join('')}
+          </select>
           <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
+          <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
           <button class="btn btn-primary" onclick="Pipeline.openForm()">+ Novo Lead</button>
         </div>
       </div>
@@ -159,8 +188,10 @@ const Pipeline = (() => {
 
   function renderColumn(stage, allLeads) {
     const filterResp = document.getElementById('filterResp')?.value || '';
+    const filterOrigem = document.getElementById('filterOrigem')?.value || '';
     let leads = allLeads.filter(l => l.status === stage.key);
     if (filterResp) leads = leads.filter(l => l.responsavel === filterResp);
+    if (filterOrigem) leads = leads.filter(l => l.origemLead === filterOrigem);
     const total = Utils.sum(leads, 'valorEstimado');
     const ponderado = leads.reduce((s,l) => s + (l.valorEstimado||0) * (stage.prob/100), 0);
 
@@ -210,7 +241,10 @@ const Pipeline = (() => {
       <div class="kc-name">
         ${frio ? `<span title="Lead frio: ${diasSemAtualizar}d sem atualização" style="cursor:help">🧊</span> ` : ''}${Utils.escHtml(lead.titulo)}
       </div>
-      <div class="kc-empresa">🏢 ${Utils.escHtml(empresa)}</div>
+      <div class="kc-empresa" style="display:flex;align-items:center;justify-content:space-between;gap:4px">
+        <span>🏢 ${Utils.escHtml(empresa)}</span>
+        ${lead.origemLead ? _origemBadge(lead.origemLead) : ''}
+      </div>
       <div class="kc-valor">${Utils.formatCurrency(lead.valorEstimado)}</div>
       ${propBadge}
       ${frio ? `<div style="font-size:10px;color:#f59e0b;margin-bottom:4px">⚠ ${diasSemAtualizar}d sem atualização</div>` : ''}
@@ -643,7 +677,11 @@ const Pipeline = (() => {
       const sel = (lead?.servicoInteresse || []).includes(s) ? 'selected' : '';
       return `<option value="${s}" ${sel}>${s}</option>`;
     }).join('');
-    const origens = ['Prospecção','Indicação','Site','LinkedIn','Evento','Retorno','Outro'];
+    const origens = [
+      '','Tráfego Pago','Indicação','Recorrência',
+      'Prospecção Ativa','Site / SEO','LinkedIn','Evento / Feira',
+      'Parceria','Outro'
+    ];
     const motivos = ['Preço','Concorrência','Sem orçamento','Sem urgência','Sem resposta','Outro'];
 
     Modal.open({
@@ -688,10 +726,11 @@ const Pipeline = (() => {
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Origem do Lead</label>
-            <select class="form-control" id="fOrigem">
-              ${origens.map(o => `<option value="${o}" ${lead?.origemLead===o?'selected':''}>${o}</option>`).join('')}
+            <label class="form-label">Origem do Lead 📡</label>
+            <select class="form-control" id="fOrigem" onchange="Pipeline._previewOrigem(this)">
+              ${origens.map(o => `<option value="${o}" ${lead?.origemLead===o?'selected':''}>${_origemIcon(o)} ${o||'— Selecionar —'}</option>`).join('')}
             </select>
+            <div id="fOrigemPreview" style="margin-top:4px;min-height:20px">${_origemBadge(lead?.origemLead||'')}</div>
           </div>
           <div class="form-group" style="flex:2">
             <label class="form-label">Decisor</label>
@@ -796,10 +835,108 @@ const Pipeline = (() => {
 
   function addNew() { openForm(); }
 
+  /* ---- Relatório de leads por canal de origem ---- */
+  function relatorioOrigem() {
+    const leads = DB.getAll('leads');
+    const canais = Object.keys(_ORIGENS_MAP);
+    // Inclui "Sem origem" para leads sem campo preenchido
+    const semOrigem = leads.filter(l => !l.origemLead || !_ORIGENS_MAP[l.origemLead]);
+
+    const rows = canais.map(canal => {
+      const grupo = leads.filter(l => l.origemLead === canal);
+      const ativos  = grupo.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+      const ganhos  = grupo.filter(l => l.status === 'fechado_ganho');
+      const perdidos = grupo.filter(l => l.status === 'fechado_perdido');
+      const valorPipeline = Utils.sum(ativos, 'valorEstimado');
+      const valorFechado  = Utils.sum(ganhos, 'valorFechado');
+      const taxa = grupo.length ? Math.round((ganhos.length / grupo.length) * 100) : 0;
+      const m = _ORIGENS_MAP[canal];
+      return { canal, m, total: grupo.length, ativos: ativos.length, ganhos: ganhos.length, perdidos: perdidos.length, valorPipeline, valorFechado, taxa };
+    }).filter(r => r.total > 0)
+      .sort((a, b) => b.total - a.total);
+
+    const totalGeral = leads.length;
+    const canalMaisLeads = rows[0]?.canal || '—';
+
+    Modal.open({
+      title: '📡 Leads por Canal de Origem',
+      size: 'modal-lg',
+      saveLabel: null,
+      body: `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+          <div style="background:var(--bg);padding:12px;border-radius:var(--radius);text-align:center">
+            <div class="text-xs text-muted">Total de leads</div>
+            <div class="font-bold" style="font-size:22px">${totalGeral}</div>
+          </div>
+          <div style="background:var(--bg);padding:12px;border-radius:var(--radius);text-align:center">
+            <div class="text-xs text-muted">Canais ativos</div>
+            <div class="font-bold" style="font-size:22px">${rows.length}</div>
+          </div>
+          <div style="background:var(--bg);padding:12px;border-radius:var(--radius);text-align:center">
+            <div class="text-xs text-muted">Canal com mais leads</div>
+            <div class="font-bold" style="font-size:16px">${_origemBadge(canalMaisLeads)}</div>
+          </div>
+        </div>
+
+        <!-- Barras visuais por canal -->
+        <div style="margin-bottom:20px">
+          ${rows.map(r => {
+            const pct = totalGeral > 0 ? Math.round((r.total / totalGeral) * 100) : 0;
+            return `
+            <div style="margin-bottom:14px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span>${_origemBadge(r.canal)}</span>
+                <span class="text-xs text-muted">${r.total} leads · ${pct}% do total</span>
+              </div>
+              <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:${r.m.color};border-radius:99px"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+
+        <!-- Tabela detalhada -->
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Canal</th>
+              <th style="text-align:center">Total</th>
+              <th style="text-align:center">Ativos</th>
+              <th style="text-align:center">Ganhos</th>
+              <th style="text-align:center">Taxa</th>
+              <th style="text-align:right">Pipeline</th>
+              <th style="text-align:right">Fechado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `<tr>
+              <td>${_origemBadge(r.canal)}</td>
+              <td style="text-align:center;font-weight:700">${r.total}</td>
+              <td style="text-align:center" class="text-muted">${r.ativos}</td>
+              <td style="text-align:center;color:#10b981;font-weight:700">${r.ganhos}</td>
+              <td style="text-align:center">
+                <span style="font-weight:700;color:${r.taxa>=40?'#10b981':r.taxa>=20?'#f59e0b':'#ef4444'}">${r.taxa}%</span>
+              </td>
+              <td style="text-align:right" class="font-bold text-primary">${Utils.formatCurrency(r.valorPipeline)}</td>
+              <td style="text-align:right;color:#10b981;font-weight:700">${Utils.formatCurrency(r.valorFechado)}</td>
+            </tr>`).join('')}
+            ${semOrigem.length ? `<tr style="opacity:.6">
+              <td><span style="font-size:11px;color:var(--text-muted)">❓ Sem origem</span></td>
+              <td style="text-align:center">${semOrigem.length}</td>
+              <td colspan="5" class="text-xs text-muted">Preencha o campo Origem nos leads</td>
+            </tr>` : ''}
+          </tbody>
+        </table>
+        ${semOrigem.length ? `<div class="text-xs text-muted mt-3">⚠ ${semOrigem.length} lead(s) sem canal de origem preenchido. Edite-os para melhorar a análise.</div>` : ''}
+      `,
+    });
+  }
+
   return {
     render, openForm, saveLead, deleteLead, viewLead, addNew,
     dragStart, dragEnd, dragOver, dragLeave, drop,
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
+    relatorioOrigem, _previewOrigem,
   };
 })();

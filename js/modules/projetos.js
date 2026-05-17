@@ -72,7 +72,7 @@ const Projetos = (() => {
         <div class="table-wrap">
           ${list.length === 0 ? emptyState() : `
           <table class="tbl">
-            <thead><tr><th>Código</th><th>Projeto</th><th>Cliente</th><th>Valor</th><th>Margem</th><th>Prazo</th><th>Progresso</th><th>Status</th><th>NF</th><th>Ações</th></tr></thead>
+            <thead><tr><th>OS</th><th>Código</th><th>Projeto</th><th>Cliente</th><th>Valor</th><th>Margem</th><th>Prazo</th><th>ART</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody>
               ${list.map(p => {
                 const etapas = p.etapas || [];
@@ -82,25 +82,28 @@ const Projetos = (() => {
                 const prazoLabel = dias == null ? '—' : dias < 0 ? `⚠ ${Math.abs(dias)}d atraso` : dias === 0 ? 'Hoje' : `${dias}d`;
                 const rent = _calcRentabilidade(p);
                 const margemColor = rent.margemPct >= 40 ? '#10b981' : rent.margemPct >= 20 ? '#f59e0b' : rent.custoTotal > 0 ? '#ef4444' : '#94a3b8';
+                const artStatus = p.art?.numero
+                  ? (p.art.status === 'registrada' ? `<span class="badge badge-green text-xs" title="${p.art.numero}">✅ ART</span>` : `<span class="badge badge-yellow text-xs">${p.art.numero}</span>`)
+                  : (p.status === 'em_andamento' ? `<span class="badge badge-red text-xs">⚠ Sem ART</span>` : `<span class="text-muted text-xs">—</span>`);
+                const checkPct = p.checklist?.length
+                  ? Math.round(p.checklist.filter(c=>c.concluido).length / p.checklist.length * 100)
+                  : null;
                 return `<tr>
-                  <td class="text-xs text-muted font-bold">${Utils.escHtml(p.codigo||'—')}</td>
-                  <td><div class="font-bold" style="max-width:160px">${Utils.escHtml(p.titulo)}</div></td>
+                  <td class="text-xs font-bold" style="color:var(--primary)">${Utils.escHtml(p.ordemServico||'—')}</td>
+                  <td class="text-xs text-muted">${Utils.escHtml(p.codigo||'—')}</td>
+                  <td><div class="font-bold" style="max-width:150px">${Utils.escHtml(p.titulo)}</div>
+                    ${checkPct !== null ? `<div style="display:flex;align-items:center;gap:4px;margin-top:2px"><div style="flex:1;height:3px;background:var(--border);border-radius:99px"><div style="width:${checkPct}%;height:100%;background:${checkPct===100?'#10b981':'#3b82f6'};border-radius:99px"></div></div><span class="text-xs" style="color:var(--text-muted)">${checkPct}%</span></div>` : ''}
+                  </td>
                   <td class="text-sm">${Utils.escHtml(Utils.getClientName(p.clienteId))}</td>
                   <td class="text-sm font-bold">${Utils.formatCurrency(p.valor)}</td>
                   <td class="text-sm font-bold" style="color:${margemColor}">${rent.custoTotal > 0 ? rent.margemPct + '%' : '—'}</td>
                   <td class="text-sm ${prazoClass}">${Utils.formatDate(p.prazo)} <span class="text-xs">${prazoLabel}</span></td>
-                  <td style="min-width:100px">
-                    <div class="flex items-center gap-2">
-                      <div class="progress" style="flex:1"><div class="progress-fill" style="width:${pct}%"></div></div>
-                      <span class="text-xs font-bold">${pct}%</span>
-                    </div>
-                  </td>
+                  <td>${artStatus}</td>
                   <td>${Utils.projBadge(p.status)}</td>
-                  <td>${p.nfEmitida ? '<span class="badge badge-green">Emitida</span>' : '<span class="badge badge-gray">Pendente</span>'}</td>
                   <td>
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}')">Ver</button>
-                      <button class="btn btn-xs btn-primary" onclick="ProjetoFinanceiro.open('${p.id}')" title="Controle Financeiro do Projeto">💰</button>
+                      <button class="btn btn-xs btn-primary" onclick="ProjetoFinanceiro.open('${p.id}')" title="Controle Financeiro">💰</button>
                       <button class="btn btn-xs btn-secondary" onclick="Projetos.openForm('${p.id}')">✏</button>
                       <button class="btn btn-xs btn-danger" onclick="Projetos.deleteProjeto('${p.id}')">🗑</button>
                     </div>
@@ -177,69 +180,120 @@ const Projetos = (() => {
     const rent = _calcRentabilidade(p);
     const margemColor = rent.margemPct >= 40 ? 'var(--success)' : rent.margemPct >= 20 ? 'var(--warning)' : rent.custoTotal > 0 ? 'var(--danger)' : 'var(--text-muted)';
 
+    // ART display
+    const art = p.art || {};
+    const artStatusLabel = { pendente:'⏳ Pendente', registrada:'✅ Registrada', baixada:'🏁 Baixada', cancelada:'❌ Cancelada' };
+    const artColor = art.numero ? (art.status === 'registrada' || art.status === 'baixada' ? '#10b981' : '#f59e0b') : (p.status === 'em_andamento' ? '#ef4444' : '#94a3b8');
+
+    // Checklist
+    const checklist = p.checklist || [];
+    const checkDone = checklist.filter(c => c.concluido).length;
+    const checkPct = checklist.length ? Math.round(checkDone / checklist.length * 100) : null;
+
+    // NPS stars
+    const npsStars = p.npsCliente ? '⭐'.repeat(p.npsCliente) + ` (${p.npsCliente}/5)` : '—';
+
     Modal.open({
       title: p.titulo,
       size: 'modal-lg',
       body: `
+        <!-- CABEÇALHO: OS + badges principais -->
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+          ${p.ordemServico ? `<span style="background:var(--primary);color:#fff;font-weight:700;font-size:13px;padding:4px 12px;border-radius:99px">${Utils.escHtml(p.ordemServico)}</span>` : ''}
+          ${p.codigo ? `<span style="background:var(--bg);color:var(--text-muted);font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--border)">${Utils.escHtml(p.codigo)}</span>` : ''}
+          ${Utils.projBadge(p.status)}
+          ${p.nfEmitida ? '<span class="badge badge-green text-xs">NF Emitida</span>' : '<span class="badge badge-gray text-xs">Sem NF</span>'}
+          ${p.npsCliente ? `<span title="NPS do Cliente" style="font-size:13px">${npsStars}</span>` : ''}
+        </div>
+
+        <!-- GRID INFO PRINCIPAL -->
         <div class="detail-grid mb-3">
-          <div class="detail-field"><div class="detail-label">Código</div><div class="detail-value">${Utils.escHtml(p.codigo||'—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${Utils.projBadge(p.status)}</div></div>
           <div class="detail-field"><div class="detail-label">Cliente</div><div class="detail-value">${Utils.escHtml(Utils.getClientName(p.clienteId))}</div></div>
           <div class="detail-field"><div class="detail-label">Responsável</div><div class="detail-value">${Utils.escHtml(p.responsavel||'—')}</div></div>
           <div class="detail-field"><div class="detail-label">Valor Contrato</div><div class="detail-value font-bold text-primary">${Utils.formatCurrency(p.valor)}</div></div>
-          <div class="detail-field"><div class="detail-label">Prazo</div><div class="detail-value">${Utils.formatDate(p.prazo)}</div></div>
           <div class="detail-field"><div class="detail-label">Início</div><div class="detail-value">${Utils.formatDate(p.dataInicio)}</div></div>
-          <div class="detail-field"><div class="detail-label">NF Emitida</div><div class="detail-value">${p.nfEmitida?'<span class="badge badge-green">Sim</span>':'<span class="badge badge-gray">Não</span>'}</div></div>
+          <div class="detail-field"><div class="detail-label">Prazo</div><div class="detail-value">${Utils.formatDate(p.prazo)}</div></div>
+          <div class="detail-field"><div class="detail-label">Pagamento</div><div class="detail-value">${p.pagamentoRecebido?'<span class="badge badge-green">Recebido</span>':'<span class="badge badge-gray">Pendente</span>'}</div></div>
+        </div>
+
+        <!-- ART -->
+        <div style="background:var(--bg);border-radius:var(--radius);padding:14px;margin-bottom:14px;border-left:4px solid ${artColor}">
+          <div class="font-bold text-sm mb-2" style="color:${artColor}">📜 ART — Anotação de Responsabilidade Técnica</div>
+          ${art.numero ? `
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+              <div><div class="text-xs text-muted">Número</div><div class="font-bold text-sm">${Utils.escHtml(art.numero)}</div></div>
+              <div><div class="text-xs text-muted">Status</div><div class="font-bold text-sm">${artStatusLabel[art.status]||art.status}</div></div>
+              <div><div class="text-xs text-muted">Engenheiro</div><div class="text-sm">${Utils.escHtml(art.engResponsavel||'—')}</div></div>
+              <div><div class="text-xs text-muted">Data de Registro</div><div class="text-sm">${Utils.formatDate(art.data)}</div></div>
+              <div><div class="text-xs text-muted">Valor da ART</div><div class="text-sm">${art.valor ? Utils.formatCurrency(art.valor) : '—'}</div></div>
+              <div><div class="text-xs text-muted">Link / Arquivo</div><div class="text-sm">${art.link ? `<a href="${Utils.escHtml(art.link)}" target="_blank" style="color:var(--primary)">🔗 Abrir</a>` : '—'}</div></div>
+            </div>
+          ` : `<div class="text-sm" style="color:${artColor}">${p.status === 'em_andamento' ? '⚠ Nenhuma ART registrada. Projeto em andamento sem ART!' : 'Nenhuma ART registrada.'}</div>`}
         </div>
 
         <!-- RENTABILIDADE -->
-        <div style="background:var(--bg);border-radius:var(--radius);padding:16px;margin-bottom:16px;border-left:4px solid ${margemColor}">
-          <div class="font-bold text-sm mb-3">📊 Rentabilidade do Projeto</div>
+        <div style="background:var(--bg);border-radius:var(--radius);padding:14px;margin-bottom:14px;border-left:4px solid ${margemColor}">
+          <div class="font-bold text-sm mb-2">📊 Rentabilidade</div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-            <div style="text-align:center">
-              <div class="text-xs text-muted">Receita</div>
-              <div class="font-bold" style="color:var(--primary)">${Utils.formatCurrency(rent.receita)}</div>
-            </div>
+            <div style="text-align:center"><div class="text-xs text-muted">Receita</div><div class="font-bold" style="color:var(--primary)">${Utils.formatCurrency(rent.receita)}</div></div>
             <div style="text-align:center">
               <div class="text-xs text-muted">Custo Horas</div>
               <div class="font-bold text-sm">${Utils.formatCurrency(rent.custoHoras)}</div>
               ${p.horasTrabalhadas ? `<div class="text-xs text-muted">${p.horasTrabalhadas}h × ${Utils.formatCurrency(p.valorHora||0)}</div>` : ''}
             </div>
-            <div style="text-align:center">
-              <div class="text-xs text-muted">Custos Diretos</div>
-              <div class="font-bold text-sm">${Utils.formatCurrency(rent.custosDirectos)}</div>
-            </div>
+            <div style="text-align:center"><div class="text-xs text-muted">Custos Diretos</div><div class="font-bold text-sm">${Utils.formatCurrency(rent.custosDirectos)}</div></div>
             <div style="text-align:center">
               <div class="text-xs text-muted">Margem</div>
               <div class="font-bold" style="color:${margemColor};font-size:20px">${rent.margemPct}%</div>
               <div class="text-xs" style="color:${margemColor}">${Utils.formatCurrency(rent.margem)}</div>
             </div>
           </div>
-          ${rent.custoTotal === 0 ? `<div class="text-xs text-muted mt-2">ℹ Registre horas e custos ao editar o projeto para ver a margem real.</div>` : ''}
+          ${rent.custoTotal === 0 ? `<div class="text-xs text-muted mt-2">ℹ Registre horas e custos para ver a margem real.</div>` : ''}
         </div>
 
+        <!-- PROGRESSO ETAPAS -->
         <div class="mb-3">
           <div class="flex items-center justify-between mb-2">
-            <div class="detail-label">Progresso Geral</div>
+            <div class="detail-label">Progresso Geral das Etapas</div>
             <span class="font-bold">${pct}%</span>
           </div>
-          <div class="progress" style="height:12px"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="progress" style="height:10px"><div class="progress-fill" style="width:${pct}%"></div></div>
         </div>
+        ${etapas.length ? `
         <div class="detail-label mb-2">Etapas</div>
         <div class="etapas-list">
           ${etapas.map((e, i) => {
             const statColors = { concluida: '#10b981', em_andamento: '#3b82f6', pendente: '#94a3b8' };
+            const vincBadge = e.vincPagamento ? `<span class="badge badge-yellow text-xs" title="Vinculado a pagamento">💳</span>` : '';
             return `<div class="etapa-item">
               <div class="etapa-num" style="background:${statColors[e.status]||'#94a3b8'}">${i+1}</div>
               <div class="etapa-info">
-                <div class="etapa-name">${Utils.escHtml(e.nome)}</div>
+                <div class="etapa-name">${Utils.escHtml(e.nome)} ${vincBadge}</div>
                 <div class="etapa-dates">${Utils.formatDate(e.inicio)} → ${Utils.formatDate(e.fim)}</div>
               </div>
               <div class="etapa-pct-bar"><div class="etapa-pct-fill" style="width:${e.pct||0}%;background:${statColors[e.status]||'#94a3b8'}"></div></div>
               <div class="etapa-pct">${e.pct||0}%</div>
             </div>`;
           }).join('')}
-        </div>
+        </div>` : ''}
+
+        <!-- CHECKLIST DE ENTREGA -->
+        ${checklist.length ? `
+        <div style="background:var(--bg);border-radius:var(--radius);padding:14px;margin-top:14px">
+          <div class="flex items-center justify-between mb-2">
+            <div class="font-bold text-sm">📦 Checklist de Entrega</div>
+            <span class="text-sm font-bold" style="color:${checkPct===100?'#10b981':'var(--primary)'}">${checkDone}/${checklist.length} (${checkPct}%)</span>
+          </div>
+          <div style="height:6px;background:var(--border);border-radius:99px;margin-bottom:10px">
+            <div style="width:${checkPct}%;height:100%;background:${checkPct===100?'#10b981':'#3b82f6'};border-radius:99px;transition:width .3s"></div>
+          </div>
+          ${checklist.map(item => `
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:16px">${item.concluido ? '✅' : '⬜'}</span>
+              <span class="text-sm" style="${item.concluido ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${Utils.escHtml(item.texto)}</span>
+            </div>`).join('')}
+        </div>` : ''}
+
         ${p.observacoes ? `<div class="mt-3 detail-field"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(p.observacoes)}</div></div>` : ''}
         <div class="mt-4 flex gap-2">
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
@@ -268,11 +322,16 @@ const Projetos = (() => {
       body: `
         <div class="form-row">
           <div class="form-group" style="flex:3">
-            <label class="form-label">Título do Projeto *</label>
+            <label class="form-label">Título do Projeto / OS *</label>
             <input class="form-control" id="fpTitulo" value="${Utils.escHtml(p?.titulo||'')}" placeholder="Ex: Adequação NR-12 Linha de Produção">
           </div>
           <div class="form-group">
-            <label class="form-label">Código</label>
+            <label class="form-label">Ordem de Serviço (OS)</label>
+            <input class="form-control" id="fpOrdemServico" value="${Utils.escHtml(p?.ordemServico||'')}" placeholder="OS-2026-00001">
+            <div class="text-xs text-muted mt-1">Número único de OS</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Código Interno</label>
             <input class="form-control" id="fpCodigo" value="${Utils.escHtml(p?.codigo||'')}" placeholder="BIK-2026-PRJ-001">
           </div>
         </div>
@@ -324,6 +383,59 @@ const Projetos = (() => {
           </div>
         </div>
 
+        <!-- ART -->
+        <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;border-left:3px solid ${p?.art?.numero ? '#10b981' : '#ef4444'}">
+          <div class="font-bold text-sm mb-2">📜 ART — Anotação de Responsabilidade Técnica</div>
+          <div class="form-row" style="margin:0">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Número da ART</label>
+              <input class="form-control" id="fpArtNumero" value="${Utils.escHtml(p?.art?.numero||'')}" placeholder="Ex: 2026000123456">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Data de Registro</label>
+              <input class="form-control" id="fpArtData" type="date" value="${p?.art?.data||''}">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Engenheiro Responsável</label>
+              <input class="form-control" id="fpArtEng" value="${Utils.escHtml(p?.art?.engResponsavel||'')}" placeholder="Nome do engenheiro">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Status da ART</label>
+              <select class="form-control" id="fpArtStatus">
+                ${[['pendente','⏳ Pendente'],['registrada','✅ Registrada'],['baixada','🏁 Baixada'],['cancelada','❌ Cancelada']]
+                  .map(([v,l]) => `<option value="${v}" ${(p?.art?.status||'pendente')===v?'selected':''}>${l}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="form-row" style="margin:8px 0 0">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Valor da ART (R$)</label>
+              <input class="form-control" id="fpArtValor" type="number" step="0.01" value="${p?.art?.valor||''}" placeholder="0,00">
+            </div>
+            <div class="form-group" style="flex:3;margin-bottom:0">
+              <label class="form-label">Link / Arquivo (URL ou caminho)</label>
+              <input class="form-control" id="fpArtLink" value="${Utils.escHtml(p?.art?.link||'')}" placeholder="https://... ou caminho do arquivo">
+            </div>
+          </div>
+        </div>
+
+        <!-- Checklist de Entrega -->
+        <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px">
+          <div class="flex items-center justify-between mb-2">
+            <div class="font-bold text-sm">📦 Checklist de Entrega</div>
+            <button type="button" class="btn btn-xs btn-secondary" onclick="Projetos.addChecklistItem()">+ Item</button>
+          </div>
+          <div id="fpChecklist">
+            ${(p?.checklist||[]).map((item,i) => `
+              <div class="checklist-item" style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">
+                <input type="checkbox" ${item.concluido?'checked':''} onchange="Projetos.toggleChecklistItem(${i},this.checked)" style="flex-shrink:0">
+                <input class="form-control" style="flex:1;padding:4px 8px;height:auto" value="${Utils.escHtml(item.texto)}" placeholder="Ex: Laudo técnico, Relatório fotográfico...">
+                <button type="button" class="btn btn-xs btn-danger" onclick="this.closest('.checklist-item').remove()">✕</button>
+              </div>`).join('')}
+            ${(p?.checklist||[]).length===0 ? `<div class="text-xs text-muted">Ex: Laudo, Relatório, Desenho técnico, Certificado, ART baixada...</div>` : ''}
+          </div>
+        </div>
+
         <div class="form-row mb-2">
           <div class="form-group">
             <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
@@ -336,6 +448,13 @@ const Projetos = (() => {
               <input type="checkbox" id="fpPgto" ${p?.pagamentoRecebido?'checked':''}>
               <span class="form-label" style="margin:0">Pagamento Recebido</span>
             </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">NPS do Cliente (pós-serviço)</label>
+            <select class="form-control" id="fpNpsCliente">
+              <option value="">Não avaliado</option>
+              ${[5,4,3,2,1].map(n => `<option value="${n}" ${p?.npsCliente==n?'selected':''}>${'⭐'.repeat(n)}</option>`).join('')}
+            </select>
           </div>
         </div>
         <div class="form-group">
@@ -411,8 +530,16 @@ const Projetos = (() => {
   function saveProjeto(id) {
     const titulo = document.getElementById('fpTitulo').value.trim();
     if (!titulo) { Toast.error('Título obrigatório'); return; }
+    // Coleta checklist do DOM
+    const checklistItems = [...document.querySelectorAll('#fpChecklist .checklist-item')].map(row => ({
+      texto: row.querySelector('input[type=text], input:not([type=checkbox])') ?
+        (row.querySelector('input:not([type=checkbox])')?.value || '') : '',
+      concluido: row.querySelector('input[type=checkbox]')?.checked || false,
+    })).filter(i => i.texto.trim());
+
     const data = {
       titulo,
+      ordemServico: document.getElementById('fpOrdemServico').value.trim(),
       codigo: document.getElementById('fpCodigo').value,
       clienteId: document.getElementById('fpCliente').value,
       responsavel: document.getElementById('fpResponsavel').value,
@@ -425,9 +552,24 @@ const Projetos = (() => {
       custosDirectos: Number(document.getElementById('fpCustosDiretos').value) || 0,
       nfEmitida: document.getElementById('fpNf').checked,
       pagamentoRecebido: document.getElementById('fpPgto').checked,
+      npsCliente: Number(document.getElementById('fpNpsCliente').value) || null,
+      art: {
+        numero:        document.getElementById('fpArtNumero').value.trim(),
+        data:          document.getElementById('fpArtData').value,
+        engResponsavel:document.getElementById('fpArtEng').value.trim(),
+        status:        document.getElementById('fpArtStatus').value,
+        valor:         Number(document.getElementById('fpArtValor').value) || 0,
+        link:          document.getElementById('fpArtLink').value.trim(),
+      },
+      checklist: checklistItems,
       etapas: collectEtapas(id),
       observacoes: document.getElementById('fpObs').value,
     };
+
+    // Alerta: projeto em andamento sem ART
+    if (data.status === 'em_andamento' && !data.art.numero) {
+      Toast.warning('⚠ Projeto em andamento sem ART registrada! Lembre-se de registrar a ART.', 6000);
+    }
     if (id) {
       const anterior = DB.get('projetos', id);
       const statusAnterior = anterior?.status;
@@ -571,7 +713,31 @@ const Projetos = (() => {
     }, 600);
   }
 
+  /* ---- Checklist helpers ---- */
+  function addChecklistItem() {
+    const container = document.getElementById('fpChecklist');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'checklist-item';
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)';
+    div.innerHTML = `
+      <input type="checkbox" style="flex-shrink:0">
+      <input class="form-control" style="flex:1;padding:4px 8px;height:auto" placeholder="Ex: Laudo técnico, Relatório...">
+      <button type="button" class="btn btn-xs btn-danger" onclick="this.closest('.checklist-item').remove()">✕</button>`;
+    container.appendChild(div);
+  }
+
+  function toggleChecklistItem(i, val) {
+    // Apenas atualiza visualmente — salvo no saveProjeto via DOM scan
+  }
+
+  /* ---- OS auto-gerador ---- */
+  function _nextOS() {
+    const total = DB.getAll('projetos').filter(p => p.ordemServico).length + 1;
+    return `OS-${new Date().getFullYear()}-${String(total).padStart(5,'0')}`;
+  }
+
   function addNew() { openForm(); }
 
-  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade };
+  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade, addChecklistItem, toggleChecklistItem, _nextOS };
 })();

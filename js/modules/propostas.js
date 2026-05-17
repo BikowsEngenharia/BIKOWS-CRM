@@ -564,6 +564,11 @@ const Propostas = (() => {
       <div id="cpanel-proj" style="display:none">
         <div class="form-row">
           <div class="form-group">
+            <label class="form-label">Ordem de Serviço (OS)</label>
+            <input class="form-control" id="cProjOS" value="${typeof Projetos!=='undefined'?Projetos._nextOS():''}" placeholder="OS-2026-00001">
+            <div class="text-xs text-muted mt-1">Gerado automaticamente</div>
+          </div>
+          <div class="form-group">
             <label class="form-label">Código do Projeto</label>
             <input class="form-control" id="cProjCodigo" value="${codSuggest}">
           </div>
@@ -777,8 +782,11 @@ const Propostas = (() => {
       valorPagamento: e.valor || 0,
     }));
 
+    const projOS = document.getElementById('cProjOS')?.value?.trim() || '';
+
     const projeto = DB.create('projetos', {
       titulo: projTitulo,
+      ordemServico: projOS,
       codigo: projCodigo,
       clienteId: prop.clienteId,
       responsavel: projResp,

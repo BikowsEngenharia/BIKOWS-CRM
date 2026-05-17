@@ -65,21 +65,25 @@ const Clientes = (() => {
           ${list.length === 0 ? emptyState() : `
           <table class="tbl">
             <thead><tr>
-              <th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Porte</th>
-              <th>Cidade/UF</th><th>Leads</th><th>Projetos</th><th>Status</th><th>Ações</th>
+              <th>Código</th><th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Porte</th>
+              <th>Cidade/UF</th><th>Leads</th><th>OS</th><th>Faturado</th><th>Status</th><th>Ações</th>
             </tr></thead>
             <tbody>
             ${list.map(c => {
               const cLeads = leads.filter(l => l.clienteId === c.id).length;
-              const cProj = projetos.filter(p => p.clienteId === c.id).length;
+              const cProj = projetos.filter(p => p.clienteId === c.id);
+              const faturado = Utils.sum(cProj.filter(p => ['concluido','em_andamento'].includes(p.status)), 'valor');
+              const npsStars = c.nps ? '⭐'.repeat(c.nps) : '';
               return `<tr>
-                <td><div class="font-bold">${Utils.escHtml(c.nome)}</div><div class="text-xs text-muted">${Utils.escHtml(c.email||'')}</div></td>
+                <td class="text-xs font-bold text-muted">${Utils.escHtml(c.codigoCliente||'—')}</td>
+                <td><div class="font-bold">${Utils.escHtml(c.nome)}</div><div class="text-xs text-muted">${npsStars} ${Utils.escHtml(c.email||'')}</div></td>
                 <td class="text-sm text-muted">${Utils.escHtml(c.cnpj||'—')}</td>
                 <td>${c.segmento ? `<span class="badge badge-blue">${Utils.escHtml(c.segmento)}</span>` : '—'}</td>
                 <td>${c.porte ? `<span class="badge badge-gray">${Utils.escHtml(c.porte)}</span>` : '—'}</td>
                 <td class="text-sm">${Utils.escHtml([c.cidade, c.estado].filter(Boolean).join('/'))||'—'}</td>
                 <td><span class="badge badge-purple">${cLeads}</span></td>
-                <td><span class="badge badge-blue">${cProj}</span></td>
+                <td><span class="badge badge-blue">${cProj.length}</span></td>
+                <td class="text-sm font-bold ${faturado>0?'text-primary':''}">${faturado>0?Utils.formatCurrency(faturado):'—'}</td>
                 <td>${c.ativo !== false ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
                 <td>
                   <div class="tbl-actions">
@@ -126,9 +130,12 @@ const Clientes = (() => {
         <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;padding:16px;background:var(--bg);border-radius:var(--radius)">
           <div style="width:52px;height:52px;border-radius:var(--radius-full);background:var(--primary);color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${Utils.escHtml((c.nome||'?')[0].toUpperCase())}</div>
           <div style="flex:1">
-            <div style="font-size:19px;font-weight:700">${Utils.escHtml(c.nome)}</div>
-            <div class="text-sm text-muted">${c.segmento?`<span class="badge badge-blue">${c.segmento}</span> · `:''} ${Utils.escHtml(c.porte||'')} ${c.cidade?'· '+c.cidade+'/'+c.estado:''}</div>
-            <div class="text-xs text-muted mt-1">CNPJ: ${Utils.escHtml(c.cnpj||'—')} · ${Utils.escHtml(c.email||'—')} · ${Utils.escHtml(c.telefone||'—')}</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font-size:19px;font-weight:700">${Utils.escHtml(c.nome)}</div>
+              ${c.codigoCliente ? `<span style="font-size:11px;background:var(--primary);color:#fff;padding:2px 8px;border-radius:99px;font-weight:700">${Utils.escHtml(c.codigoCliente)}</span>` : ''}
+            </div>
+            <div class="text-sm text-muted">${c.segmento?`<span class="badge badge-blue">${c.segmento}</span> · `:''} ${Utils.escHtml(c.porte||'')} ${c.cidade?'· '+c.cidade+'/'+c.estado:''}${c.nps ? ` · ${'⭐'.repeat(c.nps)}` : ''}</div>
+            <div class="text-xs text-muted mt-1">CNPJ: ${Utils.escHtml(c.cnpj||'—')} · ${Utils.escHtml(c.email||'—')} · ${Utils.escHtml(c.telefone||'—')}${c.engResponsavel?` · Resp: ${Utils.escHtml(c.engResponsavel)}`:''}</div>
           </div>
           <div>${c.ativo!==false?'<span class="badge badge-green">Ativo</span>':'<span class="badge badge-gray">Inativo</span>'}</div>
         </div>
@@ -143,23 +150,77 @@ const Clientes = (() => {
         </div>
 
         <div class="tabs mb-3">
-          <button class="tab-btn active" onclick="switchTab(this,'tabLeads360')">💼 Leads (${leads.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabProjetos360')">📋 Projetos (${projetos.length})</button>
+          <button class="tab-btn active" onclick="switchTab(this,'tabHistorico360')">📋 Histórico de Serviços (${projetos.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabLeads360')">💼 Pipeline (${leads.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabPropostas360')">📄 Propostas (${propostas.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabReceber360')">💰 Recebíveis (${recebiveis.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabReceber360')">💰 Financeiro (${recebiveis.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">✅ Atividades (${atividades.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">👤 Contatos (${contatos.length})</button>
         </div>
 
-        <div id="tabLeads360">
+        <!-- HISTÓRICO DE SERVIÇOS -->
+        <div id="tabHistorico360">
+          ${(() => {
+            if (!projetos.length) return '<div class="text-sm text-muted p-3">Nenhum serviço realizado ainda.</div>';
+            const concluidos = projetos.filter(p => p.status === 'concluido');
+            const emAndamento = projetos.filter(p => p.status === 'em_andamento');
+            const totalFaturado = Utils.sum(projetos, 'valor');
+            const totalRecebidoProj = Utils.sum(concluidos, 'valor');
+            return `
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+                <div style="background:var(--bg);padding:10px;border-radius:var(--radius);text-align:center;border-left:3px solid var(--primary)">
+                  <div class="text-xs text-muted">Total Serviços</div>
+                  <div class="font-bold" style="font-size:18px">${projetos.length}</div>
+                </div>
+                <div style="background:var(--bg);padding:10px;border-radius:var(--radius);text-align:center;border-left:3px solid #10b981">
+                  <div class="text-xs text-muted">Concluídos</div>
+                  <div class="font-bold" style="color:#10b981;font-size:18px">${concluidos.length}</div>
+                </div>
+                <div style="background:var(--bg);padding:10px;border-radius:var(--radius);text-align:center;border-left:3px solid #3b82f6">
+                  <div class="text-xs text-muted">Em Andamento</div>
+                  <div class="font-bold" style="color:#3b82f6;font-size:18px">${emAndamento.length}</div>
+                </div>
+                <div style="background:var(--bg);padding:10px;border-radius:var(--radius);text-align:center;border-left:3px solid var(--primary)">
+                  <div class="text-xs text-muted">Total Faturado</div>
+                  <div class="font-bold" style="color:var(--primary);font-size:14px">${Utils.formatCurrency(totalFaturado)}</div>
+                </div>
+              </div>
+              <table class="tbl">
+                <thead><tr>
+                  <th>OS</th><th>Código</th><th>Serviço</th><th>Valor</th>
+                  <th>ART</th><th>Início</th><th>Conclusão</th><th>NPS</th><th>Status</th><th></th>
+                </tr></thead>
+                <tbody>
+                  ${[...projetos].sort((a,b)=>(b.dataInicio||'').localeCompare(a.dataInicio||'')).map(p => {
+                    const artOk = p.art?.numero;
+                    const artBadge = artOk
+                      ? `<span class="badge badge-green text-xs" title="ART ${p.art.numero}">✅ ${Utils.escHtml(p.art.numero)}</span>`
+                      : (p.status === 'em_andamento'
+                          ? `<span class="badge badge-red text-xs">⚠ Pendente</span>`
+                          : `<span class="badge badge-gray text-xs">—</span>`);
+                    const npsProj = p.npsCliente ? '⭐'.repeat(p.npsCliente) : '—';
+                    return `<tr>
+                      <td class="text-xs font-bold text-muted">${Utils.escHtml(p.ordemServico||'—')}</td>
+                      <td class="text-xs text-muted">${Utils.escHtml(p.codigo||'—')}</td>
+                      <td class="font-bold text-sm">${Utils.escHtml(p.titulo)}</td>
+                      <td class="font-bold text-primary">${Utils.formatCurrency(p.valor)}</td>
+                      <td>${artBadge}</td>
+                      <td class="text-xs text-muted">${Utils.formatDate(p.dataInicio)}</td>
+                      <td class="text-xs text-muted">${p.status==='concluido'?Utils.formatDate(p.prazo):'—'}</td>
+                      <td class="text-xs">${npsProj}</td>
+                      <td>${Utils.projBadge(p.status)}</td>
+                      <td><button class="btn btn-xs btn-secondary" onclick="Modal.close();Projetos.view('${p.id}')">Ver</button></td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>`;
+          })()}
+        </div>
+
+        <div id="tabLeads360" class="hidden">
           ${leads.length ? `<table class="tbl"><thead><tr><th>Título</th><th>Status</th><th>Valor</th><th>Responsável</th><th>Próxima Ação</th></tr></thead><tbody>
             ${leads.map(l=>`<tr><td class="font-bold text-sm">${Utils.escHtml(l.titulo)}</td><td>${Utils.leadBadge(l.status)}</td><td class="font-bold text-primary">${Utils.formatCurrency(l.valorEstimado)}</td><td class="text-sm">${Utils.escHtml(l.responsavel||'—')}</td><td class="text-xs ${Utils.isOverdue(l.dataProximaAcao)?'text-danger':''}">${Utils.formatDate(l.dataProximaAcao)}</td></tr>`).join('')}
           </tbody></table>` : '<div class="text-sm text-muted p-3">Nenhum lead</div>'}
-        </div>
-        <div id="tabProjetos360" class="hidden">
-          ${projetos.length ? `<table class="tbl"><thead><tr><th>Projeto</th><th>Código</th><th>Status</th><th>Prazo</th><th>Valor</th></tr></thead><tbody>
-            ${projetos.map(p=>{const dias=Utils.daysUntil(p.prazo);return`<tr><td class="font-bold text-sm">${Utils.escHtml(p.titulo)}</td><td class="text-xs text-muted">${Utils.escHtml(p.codigo||'—')}</td><td>${Utils.projBadge(p.status)}</td><td class="${dias!=null&&dias<0?'text-danger':''} text-sm">${Utils.formatDate(p.prazo)}</td><td class="font-bold">${Utils.formatCurrency(p.valor)}</td></tr>`;}).join('')}
-          </tbody></table>` : '<div class="text-sm text-muted p-3">Nenhum projeto</div>'}
         </div>
         <div id="tabPropostas360" class="hidden">
           ${propostas.length ? `<table class="tbl"><thead><tr><th>Nº</th><th>Título</th><th>Valor</th><th>Validade</th><th>Status</th></tr></thead><tbody>
@@ -204,10 +265,16 @@ const Clientes = (() => {
     });
   }
 
+  function _nextCodigoCliente() {
+    const total = DB.getAll('clientes').length + 1;
+    return 'CLI-' + String(total).padStart(4, '0');
+  }
+
   function openForm(id = null) {
     const config = DB.getConfig();
     const c = id ? DB.get('clientes', id) : null;
     const estados = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+    const codSuggest = c?.codigoCliente || _nextCodigoCliente();
 
     Modal.open({
       title: id ? 'Editar Cliente' : 'Novo Cliente',
@@ -219,7 +286,12 @@ const Clientes = (() => {
             <input class="form-control" id="fNome" value="${Utils.escHtml(c?.nome||'')}" placeholder="Nome da empresa">
           </div>
           <div class="form-group">
-            <label class="form-label">CNPJ</label>
+            <label class="form-label">Código Interno</label>
+            <input class="form-control" id="fCodigoCliente" value="${Utils.escHtml(codSuggest)}" placeholder="CLI-0001">
+            <div class="text-xs text-muted mt-1">Código único do cliente no sistema</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">CNPJ / CPF</label>
             <input class="form-control" id="fCnpj" value="${Utils.escHtml(c?.cnpj||'')}" placeholder="XX.XXX.XXX/XXXX-XX" maxlength="18" oninput="Utils.autoFormatCNPJ(this)">
           </div>
         </div>
@@ -266,10 +338,23 @@ const Clientes = (() => {
             <label class="form-label">Telefone</label>
             <input class="form-control" id="fTelefone" value="${Utils.escHtml(c?.telefone||'')}" placeholder="(XX) XXXXX-XXXX">
           </div>
+          <div class="form-group">
+            <label class="form-label">Site</label>
+            <input class="form-control" id="fSite" value="${Utils.escHtml(c?.site||'')}" placeholder="www.empresa.com.br">
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Site</label>
-          <input class="form-control" id="fSite" value="${Utils.escHtml(c?.site||'')}" placeholder="www.empresa.com.br">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Engenheiro de Conta / Responsável</label>
+            <input class="form-control" id="fEngResponsavel" value="${Utils.escHtml(c?.engResponsavel||'')}" placeholder="Responsável pelo relacionamento">
+          </div>
+          <div class="form-group">
+            <label class="form-label">NPS / Satisfação Geral</label>
+            <select class="form-control" id="fNps">
+              <option value="">Não avaliado</option>
+              ${[5,4,3,2,1].map(n => `<option value="${n}" ${c?.nps==n?'selected':''}>${'⭐'.repeat(n)} — ${['','Muito insatisfeito','Insatisfeito','Neutro','Satisfeito','Muito satisfeito'][n]}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Observações</label>
@@ -284,9 +369,17 @@ const Clientes = (() => {
     const nome = document.getElementById('fNome').value.trim();
     if (!nome) { Toast.error('Nome obrigatório'); return; }
     const cnpj = document.getElementById('fCnpj').value.trim();
-    if (cnpj && !Utils.validateCNPJ(cnpj)) { Toast.error('CNPJ inválido'); return; }
+    const codigoCliente = document.getElementById('fCodigoCliente').value.trim();
+
+    // Verifica duplicidade do código
+    if (codigoCliente) {
+      const duplicado = DB.getAll('clientes').find(c => c.codigoCliente === codigoCliente && c.id !== id);
+      if (duplicado) { Toast.error(`Código ${codigoCliente} já está em uso por "${duplicado.nome}"`); return; }
+    }
+
     const data = {
       nome,
+      codigoCliente,
       cnpj,
       segmento: document.getElementById('fSegmento').value,
       porte: document.getElementById('fPorte').value,
@@ -296,6 +389,8 @@ const Clientes = (() => {
       email: document.getElementById('fEmail').value,
       telefone: document.getElementById('fTelefone').value,
       site: document.getElementById('fSite').value,
+      engResponsavel: document.getElementById('fEngResponsavel').value,
+      nps: Number(document.getElementById('fNps').value) || null,
       observacoes: document.getElementById('fObs').value,
     };
     if (id) { DB.update('clientes', id, data); Toast.success('Cliente atualizado'); }

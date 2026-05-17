@@ -51,6 +51,43 @@ const DB = (() => {
   }
 
   /* ====================================================
+     AUDITORIA
+     ==================================================== */
+  const AUDIT_ENTITIES = ['leads','clientes','projetos','propostas','contratos','licitacoes','atividades'];
+
+  function _auditLog(operacao, entity, record) {
+    if (!AUDIT_ENTITIES.includes(entity)) return;
+    try {
+      const AUDIT_KEY = 'crm_auditoria';
+      const MAX_LOGS = 500;
+      const logs = JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]');
+
+      const nome = record?.titulo || record?.nome || record?.numero || record?.orgao || record?.id?.substring(0,8) || '—';
+
+      logs.unshift({
+        ts: new Date().toISOString(),
+        op: operacao,
+        entidade: entity,
+        registroId: record?.id || '—',
+        resumo: nome,
+      });
+
+      if (logs.length > MAX_LOGS) logs.length = MAX_LOGS;
+      localStorage.setItem(AUDIT_KEY, JSON.stringify(logs));
+    } catch (e) { /* silencioso */ }
+  }
+
+  function getAuditLog() {
+    try {
+      return JSON.parse(localStorage.getItem('crm_auditoria') || '[]');
+    } catch(e) { return []; }
+  }
+
+  function clearAuditLog() {
+    localStorage.removeItem('crm_auditoria');
+  }
+
+  /* ====================================================
      CRUD (cache-first)
      ==================================================== */
   function create(entity, data) {
@@ -61,6 +98,7 @@ const DB = (() => {
       updatedAt: new Date().toISOString(),
     };
     _cache[entity].push(record);
+    _auditLog('create', entity, record);
     _sbUpsert(entity, record);
     return record;
   }
@@ -73,11 +111,14 @@ const DB = (() => {
       ...data,
       updatedAt: new Date().toISOString(),
     };
+    _auditLog('update', entity, _cache[entity][idx]);
     _sbUpsert(entity, _cache[entity][idx]);
     return _cache[entity][idx];
   }
 
   function remove(entity, id) {
+    const toDelete = _cache[entity].find(r => r.id === id);
+    _auditLog('delete', entity, toDelete);
     _cache[entity] = _cache[entity].filter(r => r.id !== id);
     _sbDelete(entity, id);
   }
@@ -366,5 +407,6 @@ const DB = (() => {
     getAll, get, create, update, remove,
     getConfig, saveConfig,
     loadAll, subscribeRealtime, initSampleData,
+    getAuditLog, clearAuditLog,
   };
 })();

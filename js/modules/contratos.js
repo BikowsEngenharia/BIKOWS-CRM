@@ -13,6 +13,18 @@ const Contratos = (() => {
 
   let _filter = { status: '', clienteId: '' };
 
+  function _nextNumeroContrato() {
+    const ano = new Date().getFullYear();
+    const todos = DB.getAll('contratos');
+    let max = 0;
+    todos.forEach(c => {
+      if (!c.numero) return;
+      const m = c.numero.match(/^CONTR-\d{4}-(\d+)/);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return `CONTR-${ano}-${String(max + 1).padStart(5, '0')}`;
+  }
+
   function _statusBadge(status) {
     const s = STATUS[status] || { label: status, color: '#94a3b8' };
     return `<span style="font-size:11px;font-weight:600;background:${s.color}20;color:${s.color};padding:2px 8px;border-radius:99px;border:1px solid ${s.color}44">${s.label}</span>`;
@@ -219,7 +231,6 @@ const Contratos = (() => {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const c = id ? DB.get('contratos', id) : null;
-    const nextNum = 'CTR-' + new Date().getFullYear() + '-' + String(DB.getAll('contratos').length + 1).padStart(3,'0');
 
     const clientOpts = clientes.map(cl => `<option value="${cl.id}" ${c?.clienteId===cl.id?'selected':''}>${Utils.escHtml(cl.nome)}</option>`).join('');
     const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${c?.responsavel===r?'selected':''}>${r}</option>`).join('');
@@ -229,12 +240,15 @@ const Contratos = (() => {
       title: id ? 'Editar Contrato' : 'Novo Contrato',
       size: 'modal-lg',
       body: `
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Nº do Contrato</label>
-            <input class="form-control" id="fcNum" value="${Utils.escHtml(c?.numero||nextNum)}">
+        <div class="form-group">
+          <label class="form-label">Número do Contrato</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="form-control" id="fContratoNumero" value="${Utils.escHtml(c?.numero || _nextNumeroContrato())}" style="font-family:var(--font-mono);font-weight:700;font-size:15px;letter-spacing:.5px">
+            <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">Auto-gerado</span>
           </div>
-          <div class="form-group">
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
             <label class="form-label">Status</label>
             <select class="form-control" id="fcStatus">${statusOpts}</select>
           </div>
@@ -313,7 +327,7 @@ const Contratos = (() => {
     if (!valor) { Toast.error('Valor obrigatório'); return; }
 
     const data = {
-      numero:             document.getElementById('fcNum').value,
+      numero:             document.getElementById('fContratoNumero').value.trim(),
       objeto,
       clienteId:          document.getElementById('fcCliente').value,
       responsavel:        document.getElementById('fcResp').value,

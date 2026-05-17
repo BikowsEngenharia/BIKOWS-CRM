@@ -149,6 +149,22 @@ const Config = (() => {
           </div>
         </div>
 
+        <!-- Log de Auditoria -->
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header">
+            <div class="card-title">🔍 Log de Auditoria</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input class="form-control" style="max-width:200px;font-size:12px"
+                placeholder="Filtrar por entidade ou resumo..."
+                id="auditSearch" oninput="Config.filterAudit(this.value)">
+              <button class="btn btn-xs btn-secondary" onclick="Config.clearAudit()">🗑 Limpar</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;max-height:320px;overflow-y:auto" id="auditLogContainer">
+            ${_renderAuditLog('')}
+          </div>
+        </div>
+
         <!-- Backup e Restauração -->
         <div class="card">
           <div class="card-header"><div class="card-title">💾 Backup e Restauração</div></div>
@@ -526,5 +542,58 @@ const Config = (() => {
     reader.readAsText(file);
   }
 
-  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, exportData, importData, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup };
+  function _renderAuditLog(filtro) {
+    const logs = DB.getAuditLog();
+    const f = (filtro || '').toLowerCase();
+    const filtered = f ? logs.filter(l =>
+      l.entidade?.toLowerCase().includes(f) ||
+      l.resumo?.toLowerCase().includes(f) ||
+      l.op?.toLowerCase().includes(f)
+    ) : logs;
+
+    if (filtered.length === 0) {
+      return '<div class="empty-state" style="padding:24px"><div class="empty-sub">Nenhum registro de auditoria ainda.</div></div>';
+    }
+
+    const opIcon  = { create: '✅', update: '✏️', delete: '🗑' };
+    const opColor = { create: '#10b981', update: '#3b82f6', delete: '#ef4444' };
+    const entIcon = { leads:'💼', clientes:'🏢', projetos:'🔧', propostas:'📄', contratos:'📋', licitacoes:'🏛', atividades:'📌' };
+
+    return `
+      <table class="tbl">
+        <thead><tr><th style="width:160px">Data/Hora</th><th style="width:80px">Operação</th><th style="width:100px">Módulo</th><th>Registro</th></tr></thead>
+        <tbody>
+          ${filtered.slice(0, 200).map(l => {
+            const dt = new Date(l.ts);
+            const dataHora = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+            const cor   = opColor[l.op] || '#94a3b8';
+            const icone = opIcon[l.op]  || '•';
+            const entIcn = entIcon[l.entidade] || '📦';
+            return `<tr>
+              <td class="text-xs text-muted" style="font-family:var(--font-mono)">${dataHora}</td>
+              <td><span style="font-size:11px;font-weight:700;color:${cor};background:${cor}18;padding:2px 6px;border-radius:99px">${icone} ${l.op}</span></td>
+              <td class="text-xs">${entIcn} ${l.entidade}</td>
+              <td class="text-sm" style="color:var(--text-secondary)">${Utils.escHtml(l.resumo||'—')}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="text-xs text-muted" style="padding:8px 16px">${filtered.length} registro(s) — exibindo até 200</div>
+    `;
+  }
+
+  function filterAudit(val) {
+    const el = document.getElementById('auditLogContainer');
+    if (el) el.innerHTML = _renderAuditLog(val);
+  }
+
+  function clearAudit() {
+    if (!confirm('Limpar todo o log de auditoria?')) return;
+    DB.clearAuditLog();
+    const el = document.getElementById('auditLogContainer');
+    if (el) el.innerHTML = _renderAuditLog('');
+    Toast.success('Log de auditoria limpo.');
+  }
+
+  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, exportData, importData, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup, filterAudit, clearAudit };
 })();

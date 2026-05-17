@@ -24,6 +24,8 @@ const App = (() => {
 
   let _currentPage = 'dashboard';
   let _sidebarCollapsed = false;
+  let _searchResultActions = [];
+  let _searchSelectedIdx = -1;
 
   // Mapa de entidade → página para refresh por Realtime
   const _ENTITY_PAGE = {
@@ -62,6 +64,12 @@ const App = (() => {
 
     navigate('dashboard');
     updateNotifBadge();
+
+    // Keyboard navigation for global search
+    const searchInput = document.getElementById('globalSearch');
+    if (searchInput) {
+      searchInput.addEventListener('keydown', _handleSearchKeydown);
+    }
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -286,38 +294,221 @@ const App = (() => {
     });
   }
 
+  function _highlight(text, term) {
+    if (!text || !term) return Utils.escHtml(text || '');
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return Utils.escHtml(String(text)).replace(new RegExp(`(${escaped})`, 'gi'), '<mark style="background:#fef08a;border-radius:2px;padding:0 1px">$1</mark>');
+  }
+
+  function _handleSearchKeydown(e) {
+    const panel = document.getElementById('searchPanel');
+    if (!panel || panel.style.display === 'none') return;
+    const items = panel.querySelectorAll('.search-result-item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _searchSelectedIdx = Math.min(_searchSelectedIdx + 1, items.length - 1);
+      _updateSearchSelection(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _searchSelectedIdx = Math.max(_searchSelectedIdx - 1, -1);
+      _updateSearchSelection(items);
+    } else if (e.key === 'Enter' && _searchSelectedIdx >= 0) {
+      e.preventDefault();
+      if (_searchResultActions[_searchSelectedIdx]) {
+        _searchResultActions[_searchSelectedIdx]();
+        closeSearch();
+      }
+    }
+  }
+
+  function _updateSearchSelection(items) {
+    items.forEach((item, i) => {
+      item.style.background = i === _searchSelectedIdx ? 'var(--primary-light, #eff6ff)' : '';
+    });
+  }
+
   function search(term) {
     const panel = document.getElementById('searchPanel');
     if (!term || term.length < 2) { if (panel) panel.style.display = 'none'; return; }
 
-    const results = [];
+    _searchSelectedIdx = -1;
+    _searchResultActions = [];
+
     const t = term.toLowerCase();
-    DB.getAll('clientes').filter(c => c.nome?.toLowerCase().includes(t)||c.cnpj?.includes(t)).slice(0,4).forEach(c =>
-      results.push({ icon:'🏢', title: c.nome, sub: c.segmento||c.cidade||'', page: 'clientes' }));
-    DB.getAll('leads').filter(l => l.titulo?.toLowerCase().includes(t)||l.decisor?.toLowerCase().includes(t)).slice(0,4).forEach(l =>
-      results.push({ icon:'💼', title: l.titulo, sub: Utils.getClientName(l.clienteId), page: 'pipeline' }));
-    DB.getAll('projetos').filter(p => p.titulo?.toLowerCase().includes(t)||p.codigo?.toLowerCase().includes(t)).slice(0,3).forEach(p =>
-      results.push({ icon:'📋', title: p.titulo, sub: Utils.getClientName(p.clienteId)+' · '+Utils.formatDate(p.prazo), page: 'projetos' }));
-    DB.getAll('contatos').filter(c => c.nome?.toLowerCase().includes(t)||c.email?.toLowerCase().includes(t)).slice(0,3).forEach(c =>
-      results.push({ icon:'👤', title: c.nome, sub: c.cargo||'', page: 'contatos' }));
-    DB.getAll('propostas').filter(p => p.titulo?.toLowerCase().includes(t)||p.numero?.toLowerCase().includes(t)).slice(0,3).forEach(p =>
-      results.push({ icon:'📄', title: p.numero+' · '+p.titulo, sub: Utils.getClientName(p.clienteId), page: 'propostas' }));
-    DB.getAll('atividades').filter(a => a.titulo?.toLowerCase().includes(t)).slice(0,2).forEach(a =>
-      results.push({ icon:'✅', title: a.titulo, sub: Utils.getClientName(a.clienteId)+' · '+Utils.formatDate(a.data), page: 'atividades' }));
+
+    // Estrutura: { category, icon, items: [{title, sub, action}] }
+    const groups = [];
+
+    // Clientes (max 4)
+    const clientes = DB.getAll('clientes').filter(c =>
+      c.nome?.toLowerCase().includes(t) ||
+      c.cnpj?.includes(t) ||
+      c.segmento?.toLowerCase().includes(t) ||
+      c.cidade?.toLowerCase().includes(t)
+    ).slice(0, 4);
+    if (clientes.length) {
+      groups.push({
+        icon: '🏢', category: 'Clientes', items: clientes.map(c => ({
+          title: c.nome,
+          sub: (c.segmento || '') + (c.cidade ? ' · ' + c.cidade : ''),
+          action: () => { try { App.navigate('clientes'); setTimeout(() => Clientes.view(c.id), 300); } catch(e) { App.navigate('clientes'); } }
+        }))
+      });
+    }
+
+    // Leads (max 4)
+    const leads = DB.getAll('leads').filter(l =>
+      l.titulo?.toLowerCase().includes(t) ||
+      l.decisor?.toLowerCase().includes(t) ||
+      Utils.getClientName(l.clienteId)?.toLowerCase().includes(t)
+    ).slice(0, 4);
+    if (leads.length) {
+      groups.push({
+        icon: '💼', category: 'Leads', items: leads.map(l => ({
+          title: l.titulo,
+          sub: Utils.getClientName(l.clienteId),
+          action: () => { try { App.navigate('pipeline'); setTimeout(() => Pipeline.viewLead(l.id), 300); } catch(e) { App.navigate('pipeline'); } }
+        }))
+      });
+    }
+
+    // Projetos (max 3)
+    const projetos = DB.getAll('projetos').filter(p =>
+      p.titulo?.toLowerCase().includes(t) ||
+      p.codigo?.toLowerCase().includes(t) ||
+      Utils.getClientName(p.clienteId)?.toLowerCase().includes(t)
+    ).slice(0, 3);
+    if (projetos.length) {
+      groups.push({
+        icon: '📋', category: 'Projetos', items: projetos.map(p => ({
+          title: p.titulo,
+          sub: Utils.getClientName(p.clienteId) + (p.prazo ? ' · ' + Utils.formatDate(p.prazo) : ''),
+          action: () => { try { App.navigate('projetos'); setTimeout(() => Projetos.view(p.id), 300); } catch(e) { App.navigate('projetos'); } }
+        }))
+      });
+    }
+
+    // Propostas (max 3)
+    const propostas = DB.getAll('propostas').filter(p =>
+      p.titulo?.toLowerCase().includes(t) ||
+      p.numero?.toLowerCase().includes(t) ||
+      Utils.getClientName(p.clienteId)?.toLowerCase().includes(t)
+    ).slice(0, 3);
+    if (propostas.length) {
+      groups.push({
+        icon: '📄', category: 'Propostas', items: propostas.map(p => ({
+          title: (p.numero ? p.numero + ' · ' : '') + p.titulo,
+          sub: Utils.getClientName(p.clienteId),
+          action: () => { try { App.navigate('propostas'); setTimeout(() => Propostas.view(p.id), 300); } catch(e) { App.navigate('propostas'); } }
+        }))
+      });
+    }
+
+    // Contratos (max 2)
+    const contratos = DB.getAll('contratos').filter(ct =>
+      ct.numero?.toLowerCase().includes(t) ||
+      ct.titulo?.toLowerCase().includes(t) ||
+      Utils.getClientName(ct.clienteId)?.toLowerCase().includes(t)
+    ).slice(0, 2);
+    if (contratos.length) {
+      groups.push({
+        icon: '📝', category: 'Contratos', items: contratos.map(ct => ({
+          title: (ct.numero ? ct.numero + ' · ' : '') + (ct.titulo || ''),
+          sub: Utils.getClientName(ct.clienteId),
+          action: () => { try { App.navigate('contratos'); setTimeout(() => Contratos.view(ct.id), 300); } catch(e) { App.navigate('contratos'); } }
+        }))
+      });
+    }
+
+    // Licitações (max 2)
+    const licitacoes = DB.getAll('licitacoes').filter(l =>
+      l.numero?.toLowerCase().includes(t) ||
+      l.orgao?.toLowerCase().includes(t) ||
+      l.objeto?.toLowerCase().includes(t)
+    ).slice(0, 2);
+    if (licitacoes.length) {
+      groups.push({
+        icon: '🏛', category: 'Licitações', items: licitacoes.map(l => ({
+          title: (l.numero ? l.numero + ' · ' : '') + (l.orgao || ''),
+          sub: l.objeto ? Utils.truncate(l.objeto, 60) : '',
+          action: () => { try { App.navigate('licitacoes'); setTimeout(() => Licitacoes.view(l.id), 300); } catch(e) { App.navigate('licitacoes'); } }
+        }))
+      });
+    }
+
+    // Contatos (max 2)
+    const contatos = DB.getAll('contatos').filter(c =>
+      c.nome?.toLowerCase().includes(t) ||
+      c.email?.toLowerCase().includes(t) ||
+      c.empresa?.toLowerCase().includes(t)
+    ).slice(0, 2);
+    if (contatos.length) {
+      groups.push({
+        icon: '👤', category: 'Contatos', items: contatos.map(c => ({
+          title: c.nome,
+          sub: (c.cargo || '') + (c.empresa ? ' · ' + c.empresa : ''),
+          action: () => { App.navigate('contatos'); }
+        }))
+      });
+    }
+
+    // Recebíveis (max 2)
+    const recebiveis = DB.getAll('recebiveis').filter(r =>
+      r.descricao?.toLowerCase().includes(t) ||
+      Utils.getClientName(r.clienteId)?.toLowerCase().includes(t)
+    ).slice(0, 2);
+    if (recebiveis.length) {
+      groups.push({
+        icon: '💰', category: 'Recebíveis', items: recebiveis.map(r => ({
+          title: r.descricao || '(sem descrição)',
+          sub: Utils.getClientName(r.clienteId),
+          action: () => { App.navigate('financeiro'); }
+        }))
+      });
+    }
 
     if (!panel) return;
-    if (!results.length) {
-      panel.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Nenhum resultado para "'+Utils.escHtml(term)+'"</div>';
-    } else {
-      panel.innerHTML = results.map(r => `
-        <div class="search-result-item" onclick="App.navigate('${r.page}');App.closeSearch()">
-          <span class="search-result-icon">${r.icon}</span>
-          <div><div class="search-result-title">${Utils.escHtml(r.title)}</div><div class="search-result-sub">${Utils.escHtml(r.sub)}</div></div>
-          <span class="search-result-page">${r.page}</span>
-        </div>`).join('');
+
+    const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
+
+    if (!totalItems) {
+      panel.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Nenhum resultado para "${Utils.escHtml(term)}"</div>`;
+      panel.style.display = 'block';
+      return;
     }
+
+    // Construir HTML agrupado e preencher _searchResultActions
+    let globalIdx = 0;
+    let html = `<div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted)">${totalItems} resultado${totalItems !== 1 ? 's' : ''} para "<strong>${Utils.escHtml(term)}</strong>"</div>`;
+
+    groups.forEach(group => {
+      html += `<div style="padding:6px 12px 2px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px">${group.icon} ${Utils.escHtml(group.category)} (${group.items.length})</div>`;
+      group.items.forEach(item => {
+        const idx = globalIdx++;
+        _searchResultActions.push(item.action);
+        html += `
+          <div class="search-result-item" data-result-index="${idx}" onclick="_searchResultActions_call(${idx})" style="cursor:pointer">
+            <span class="search-result-icon">${group.icon}</span>
+            <div style="flex:1;min-width:0">
+              <div class="search-result-title">${_highlight(item.title, term)}</div>
+              ${item.sub ? `<div class="search-result-sub">${_highlight(item.sub, term)}</div>` : ''}
+            </div>
+            <span style="font-size:10px;color:var(--text-muted);flex-shrink:0">↵</span>
+          </div>`;
+      });
+    });
+
+    panel.innerHTML = html;
     panel.style.display = 'block';
   }
+
+  // Exposed helper so inline onclick can call result actions
+  window._searchResultActions_call = function(idx) {
+    if (_searchResultActions[idx]) {
+      _searchResultActions[idx]();
+      App.closeSearch();
+    }
+  };
 
   function closeSearch() {
     const panel = document.getElementById('searchPanel');

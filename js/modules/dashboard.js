@@ -3,6 +3,32 @@
    ========================================== */
 const Dashboard = (() => {
 
+  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+
+  function _filtrarPorPeriodo(lista, campo) {
+    if (_periodo === 'tudo') return lista;
+    const hoje = new Date();
+    let inicio;
+    if (_periodo === 'mes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicio = new Date(hoje.getFullYear(), q * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicio = new Date(hoje.getFullYear(), s, 1);
+    } else if (_periodo === 'ano') {
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicio.toISOString().split('T')[0];
+    return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
+  }
+
+  function setPeriodo(p) {
+    _periodo = p;
+    render();
+  }
+
   function render() {
     const leads = DB.getAll('leads');
     const projetos = DB.getAll('projetos');
@@ -11,16 +37,24 @@ const Dashboard = (() => {
     const recebiveis = DB.getAll('recebiveis');
     const contasPagar = DB.getAll('contaspagar');
 
-    const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
-    const ganhos = leads.filter(l => l.status === 'fechado_ganho');
-    const perdidos = leads.filter(l => l.status === 'fechado_perdido');
+    // Dados filtrados por período
+    const leadsFiltrados = _filtrarPorPeriodo(leads, 'dataEntrada');
+    const projetosFiltrados = _filtrarPorPeriodo(projetos, 'dataInicio');
+    const atividadesFiltradas = _filtrarPorPeriodo(atividades, 'data');
+
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const periodoLabel = periodoLabels[_periodo] || '';
+
+    const ativos = leadsFiltrados.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const ganhos = leadsFiltrados.filter(l => l.status === 'fechado_ganho');
+    const perdidos = leadsFiltrados.filter(l => l.status === 'fechado_perdido');
     const totalPipeline = Utils.sum(ativos, 'valorEstimado');
     const receitaFechada = Utils.sum(ganhos, 'valorFechado');
-    const taxaConversao = (leads.length > 0) ? ((ganhos.length / leads.length) * 100).toFixed(0) : 0;
+    const taxaConversao = (leadsFiltrados.length > 0) ? ((ganhos.length / leadsFiltrados.length) * 100).toFixed(0) : 0;
 
-    const pendentes = atividades.filter(a => a.status === 'pendente');
+    const pendentes = atividadesFiltradas.filter(a => a.status === 'pendente');
     const atrasadas = pendentes.filter(a => Utils.isOverdue(a.data));
-    const projetosAtivos = projetos.filter(p => p.status === 'em_andamento');
+    const projetosAtivos = projetosFiltrados.filter(p => p.status === 'em_andamento');
 
     // Calcular recebíveis: a vencer e vencidos
     let totalReceberAVencer = 0, totalReceberVencido = 0, totalRecebido = 0;
@@ -62,6 +96,15 @@ const Dashboard = (() => {
         <h2 class="sec-title">Dashboard</h2>
         <div class="sec-actions">
           <span class="text-muted text-sm">${new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</span>
+          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
+            ${[
+              { k:'mes',       l:'Este Mês' },
+              { k:'trimestre', l:'Trimestre' },
+              { k:'semestre',  l:'Semestre' },
+              { k:'ano',       l:'Este Ano' },
+              { k:'tudo',      l:'Tudo' },
+            ].map(p => `<button onclick="Dashboard.setPeriodo('${p.k}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p.k?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${p.l}</button>`).join('')}
+          </div>
         </div>
       </div>
 
@@ -71,13 +114,13 @@ const Dashboard = (() => {
       <!-- KPIs -->
       <div class="kpi-grid">
         <div class="kpi-card" style="--kpi-color:#1a56db">
-          <div class="kpi-label">Pipeline Ativo</div>
+          <div class="kpi-label">Pipeline Ativo <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="kpi-sub">${ativos.length} oportunidades abertas</div>
           <div class="kpi-icon">💼</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#10b981">
-          <div class="kpi-label">Receita Fechada</div>
+          <div class="kpi-label">Receita Fechada <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${Utils.formatCurrency(receitaFechada)}</div>
           <div class="kpi-sub">${ganhos.length} negócios ganhos</div>
           <div class="kpi-icon">🏆</div>
@@ -89,7 +132,7 @@ const Dashboard = (() => {
           <div class="kpi-icon">💰</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#8b5cf6">
-          <div class="kpi-label">Taxa de Conversão</div>
+          <div class="kpi-label">Taxa de Conversão <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${taxaConversao}%</div>
           <div class="kpi-sub">${ganhos.length} ganhos / ${perdidos.length} perdidos</div>
           <div class="kpi-icon">📈</div>
@@ -249,12 +292,12 @@ const Dashboard = (() => {
       containerId: 'chartFunnel',
       data: statusOrder.map(s => ({
         label: Utils.LEAD_STATUS[s].label,
-        value: leads.filter(l => l.status === s).length,
+        value: leadsFiltrados.filter(l => l.status === s).length,
         color: Utils.LEAD_STATUS[s].color,
       })).filter(d => d.value > 0),
     });
 
-    const bySegmento = Utils.groupBy(leads, 'segmento');
+    const bySegmento = Utils.groupBy(leadsFiltrados, 'segmento');
     Charts.donut({
       containerId: 'chartSegmento',
       data: Object.entries(bySegmento).map(([k,v], i) => ({ label: k, value: v.length })),
@@ -263,26 +306,29 @@ const Dashboard = (() => {
 
     // Receita últimos 6 meses — usa lançamentos reais (receitas recebidas)
     const lancamentos = DB.getAll('lancamentos');
+    const lancamentosFiltrados = _filtrarPorPeriodo(lancamentos, 'data');
     const monthData = [];
     for (let i = 5; i >= 0; i--) {
       const dt = new Date(); dt.setMonth(dt.getMonth() - i);
       const mesStr = dt.toISOString().substring(0, 7);
-      const val = lancamentos
+      const val = lancamentosFiltrados
         .filter(l => l.tipo === 'receita' && l.status === 'recebido' && l.data?.startsWith(mesStr))
         .reduce((s, l) => s + (l.valor || 0), 0);
       monthData.push({ value: val, label: Utils.monthLabel(-i), color: '#1a56db' });
     }
     Charts.bar({ containerId: 'chartReceita', data: monthData, height: 180, showValues: false });
 
-    const projStatus = Utils.groupBy(projetos, 'status');
+    const projStatus = Utils.groupBy(projetosFiltrados, 'status');
     Charts.donut({
       containerId: 'chartProjetos',
       data: Object.entries(projStatus).map(([k,v]) => ({ label: Utils.PROJ_STATUS[k]?.label || k, value: v.length })),
       size: 160,
     });
 
-    // Gráfico de origem dos leads
-    const origemData = Object.entries(origemCount).map(([k,v]) => ({ label: k, value: v }));
+    // Gráfico de origem dos leads (filtrado)
+    const origemCountFiltrado = {};
+    leadsFiltrados.filter(l => l.origemLead).forEach(l => { origemCountFiltrado[l.origemLead] = (origemCountFiltrado[l.origemLead]||0) + 1; });
+    const origemData = Object.entries(origemCountFiltrado).map(([k,v]) => ({ label: k, value: v }));
     if (origemData.length > 0) {
       Charts.donut({ containerId: 'chartOrigem', data: origemData, size: 160 });
     } else {
@@ -574,5 +620,5 @@ const Dashboard = (() => {
     </div>`;
   }
 
-  return { render };
+  return { render, setPeriodo };
 })();

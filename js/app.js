@@ -19,6 +19,7 @@ const App = (() => {
     relatorios:  { title: 'Relatórios',      module: Relatorios,   addLabel: null },
     metas:      { title: 'Metas & KPIs',    module: Metas,       addLabel: '+ Nova Meta' },
     marketing:  { title: 'Marketing',       module: Marketing,   addLabel: '+ Novo Conteúdo' },
+    trafego:    { title: 'Tráfego Pago',    module: Trafego,     addLabel: '+ Nova Campanha' },
     config:     { title: 'Configurações',   module: Config,      addLabel: null },
   };
 
@@ -37,6 +38,7 @@ const App = (() => {
     metas: 'metas',
     marketing_posts: 'marketing', marketing_campanhas: 'marketing',
     marketing_ideias: 'marketing', marketing_kpis: 'marketing',
+    trafego_campanhas: 'trafego', trafego_metas: 'trafego',
   };
 
   function refreshIfNeeded(entity) {

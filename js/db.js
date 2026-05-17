@@ -10,6 +10,7 @@ const DB = (() => {
     'propostas','recebiveis','funcionarios','lancamentos',
     'contaspagar','folha','licitacoes','metas','contratos',
     'marketing_posts','marketing_campanhas','marketing_ideias','marketing_kpis',
+    'trafego_campanhas','trafego_metas',
   ];
 
   // Cache em memória — populado por loadAll()

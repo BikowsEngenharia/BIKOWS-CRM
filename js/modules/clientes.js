@@ -156,6 +156,7 @@ const Clientes = (() => {
           <button class="tab-btn" onclick="switchTab(this,'tabReceber360')">💰 Financeiro (${recebiveis.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">✅ Atividades (${atividades.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">👤 Contatos (${contatos.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabTimeline360')">🕐 Interações</button>
         </div>
 
         <!-- HISTÓRICO DE SERVIÇOS -->
@@ -253,6 +254,30 @@ const Clientes = (() => {
             <div class="font-bold text-sm">${Utils.escHtml(ct.nome)}${ct.principal?' <span class="badge badge-blue">Principal</span>':''}</div>
             <div class="text-xs text-muted">${Utils.escHtml(ct.cargo||'')}${ct.email?' · '+Utils.escHtml(ct.email):''}${ct.telefone?' · '+Utils.escHtml(ct.telefone):''}</div>
           </div>`).join('') : '<div class="text-sm text-muted p-3">Nenhum contato</div>'}
+        </div>
+
+        <!-- TIMELINE DE INTERAÇÕES -->
+        <div id="tabTimeline360" class="hidden">
+          ${(() => {
+            const contratos360 = DB.getAll('contratos').filter(ct => ct.clienteId === id);
+            const eventos = [];
+            leads.forEach(l => eventos.push({ data: l.criadoEm || l.dataProximaAcao || '', tipo: 'Lead', icone: '💼', cor: '#3b82f6', titulo: l.titulo || 'Lead sem título', detalhe: l.status || '' }));
+            projetos.forEach(p => eventos.push({ data: p.criadoEm || p.dataInicio || '', tipo: 'Projeto', icone: '🔧', cor: '#10b981', titulo: p.titulo || 'Projeto sem título', detalhe: [p.status, p.ordemServico ? 'OS: ' + p.ordemServico : ''].filter(Boolean).join(' · ') }));
+            contratos360.forEach(ct => eventos.push({ data: ct.criadoEm || ct.dataInicio || '', tipo: 'Contrato', icone: '📋', cor: '#8b5cf6', titulo: ct.numero || 'Contrato', detalhe: [ct.status, ct.valor ? Utils.formatCurrency(ct.valor) : ''].filter(Boolean).join(' · ') }));
+            propostas.forEach(p => eventos.push({ data: p.criadoEm || p.data || '', tipo: 'Proposta', icone: '📄', cor: '#f59e0b', titulo: p.numero || p.titulo || 'Proposta', detalhe: [p.status, p.valor ? Utils.formatCurrency(p.valor) : ''].filter(Boolean).join(' · ') }));
+            atividades.forEach(a => eventos.push({ data: a.data || a.criadoEm || '', tipo: 'Atividade', icone: '📌', cor: '#64748b', titulo: a.titulo || 'Atividade', detalhe: [a.tipo, a.status].filter(Boolean).join(' · ') }));
+            eventos.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+            if (!eventos.length) return '<div class="text-sm text-muted p-3">Nenhuma interação registrada ainda.</div>';
+            return `<div style="position:relative;padding-left:24px;border-left:2px solid var(--border);margin:8px 0">
+              ${eventos.map(ev => `
+              <div style="position:relative;margin-bottom:16px">
+                <div style="position:absolute;left:-29px;width:14px;height:14px;border-radius:50%;background:${ev.cor};border:2px solid var(--surface)"></div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">${ev.data ? Utils.formatDate(ev.data) : '—'} · ${Utils.escHtml(ev.tipo)}</div>
+                <div style="font-weight:600;font-size:13px">${ev.icone} ${Utils.escHtml(ev.titulo)}</div>
+                ${ev.detalhe ? `<div style="font-size:12px;color:var(--text-secondary)">${Utils.escHtml(ev.detalhe)}</div>` : ''}
+              </div>`).join('')}
+            </div>`;
+          })()}
         </div>
 
         ${c.observacoes ? `<div class="detail-field mt-4"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(c.observacoes)}</div></div>` : ''}

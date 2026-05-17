@@ -10,6 +10,7 @@ const Relatorios = (() => {
       <div class="sec-header">
         <h2 class="sec-title">Relatórios</h2>
         <div class="sec-actions">
+          <button class="btn btn-secondary" onclick="Relatorios.exportarCSV()">📥 Exportar CSV</button>
           <button class="btn btn-secondary" onclick="window.print()">🖨 Imprimir</button>
         </div>
       </div>
@@ -19,6 +20,7 @@ const Relatorios = (() => {
         <button class="tab-btn ${_tab==='operacional'?'active':''}" onclick="Relatorios.setTab('operacional')">🔧 Operacional</button>
         <button class="tab-btn ${_tab==='clientes'?'active':''}" onclick="Relatorios.setTab('clientes')">🏢 Clientes</button>
         <button class="tab-btn ${_tab==='licitacoes'?'active':''}" onclick="Relatorios.setTab('licitacoes')">🏛 Licitações</button>
+        <button class="tab-btn ${_tab==='margem'?'active':''}" onclick="Relatorios.setTab('margem')">📊 Margem</button>
       </div>
       <div id="relContent">${renderTab()}</div>
     `;
@@ -37,6 +39,7 @@ const Relatorios = (() => {
     if (_tab === 'operacional') return renderOperacional();
     if (_tab === 'clientes') return renderClientesTab();
     if (_tab === 'licitacoes') return renderLicitacoesTab();
+    if (_tab === 'margem') return renderMargemTab();
     return '';
   }
 
@@ -513,5 +516,269 @@ const Relatorios = (() => {
     `;
   }
 
-  return { render, setTab };
+  function renderMargemTab() {
+    const projetos = DB.getAll('projetos');
+    const recebiveis = DB.getAll('recebiveis');
+
+    // Helper: soma recebimentos de um projeto
+    const receitaProjeto = (projetoId) => {
+      let total = 0;
+      recebiveis.filter(r => r.projetoId === projetoId).forEach(r => {
+        (r.parcelas||[]).forEach(p => { if (p.status === 'recebido') total += p.valor||0; });
+      });
+      return total;
+    };
+
+    // Calcular margem por projeto
+    const projetosComMargem = projetos.map(p => {
+      const receita = receitaProjeto(p.id) || p.valor || 0;
+      const custo = p.custoEstimado || p.custoReal || 0;
+      const margem = receita - custo;
+      const margemPct = receita > 0 ? (margem / receita) * 100 : null;
+      const tipoServico = p.tipoServico || p.segmento || 'Não classificado';
+      return { ...p, receita, custo, margem, margemPct, tipoServico };
+    }).filter(p => p.receita > 0 || p.custo > 0);
+
+    // Verificar se há dados suficientes
+    if (projetosComMargem.length === 0) {
+      return `
+        <div class="card" style="text-align:center;padding:48px 32px">
+          <div style="font-size:48px;margin-bottom:16px">📊</div>
+          <div class="font-bold" style="font-size:18px;margin-bottom:8px">Sem dados financeiros suficientes</div>
+          <div class="text-muted" style="max-width:480px;margin:0 auto">
+            Para visualizar a margem por serviço, cadastre os custos nos projetos e registre os recebimentos no módulo Financeiro.
+          </div>
+        </div>`;
+    }
+
+    // Agrupar por tipo de serviço
+    const byTipo = {};
+    projetosComMargem.forEach(p => {
+      if (!byTipo[p.tipoServico]) byTipo[p.tipoServico] = [];
+      byTipo[p.tipoServico].push(p);
+    });
+
+    // Calcular KPIs por grupo
+    const grupos = Object.entries(byTipo).map(([tipo, pList]) => {
+      const receitaTotal = pList.reduce((s, p) => s + p.receita, 0);
+      const custoTotal = pList.reduce((s, p) => s + p.custo, 0);
+      const margemTotal = receitaTotal - custoTotal;
+      const margemPct = receitaTotal > 0 ? (margemTotal / receitaTotal) * 100 : null;
+      return { tipo, pList, receitaTotal, custoTotal, margemTotal, margemPct };
+    }).sort((a, b) => (b.margemPct||0) - (a.margemPct||0));
+
+    // KPIs gerais
+    const totalReceita = projetosComMargem.reduce((s, p) => s + p.receita, 0);
+    const totalCusto = projetosComMargem.reduce((s, p) => s + p.custo, 0);
+    const margemMedia = totalReceita > 0 ? ((totalReceita - totalCusto) / totalReceita * 100) : 0;
+    const maiorMargem = grupos[0];
+    const menorMargem = grupos[grupos.length - 1];
+
+    // Status de margem
+    const statusMargem = (pct) => {
+      if (pct === null) return '<span class="text-muted">—</span>';
+      if (pct >= 50) return '<span style="color:#10b981;font-weight:700">✅ Ótima</span>';
+      if (pct >= 30) return '<span style="color:#f59e0b;font-weight:700">⚠ Regular</span>';
+      return '<span style="color:#ef4444;font-weight:700">❌ Baixa</span>';
+    };
+
+    // Top 5 maior e menor margem (projetos individuais com receita > 0)
+    const ordenados = [...projetosComMargem].filter(p => p.margemPct !== null).sort((a, b) => b.margemPct - a.margemPct);
+    const top5maior = ordenados.slice(0, 5);
+    const top5menor = [...ordenados].reverse().slice(0, 5);
+
+    return `
+      <div class="kpi-grid mb-4">
+        <div class="kpi-card" style="--kpi-color:#1a56db">
+          <div class="kpi-label">Margem Média Geral</div>
+          <div class="kpi-value">${margemMedia.toFixed(1)}%</div>
+          <div class="kpi-sub">${Utils.formatCurrency(totalReceita - totalCusto)} de margem</div>
+        </div>
+        <div class="kpi-card" style="--kpi-color:#10b981">
+          <div class="kpi-label">Maior Margem</div>
+          <div class="kpi-value" style="font-size:16px">${maiorMargem ? Utils.escHtml(maiorMargem.tipo) : '—'}</div>
+          <div class="kpi-sub">${maiorMargem?.margemPct !== null ? maiorMargem.margemPct.toFixed(1)+'%' : ''}</div>
+        </div>
+        <div class="kpi-card" style="--kpi-color:#ef4444">
+          <div class="kpi-label">Menor Margem</div>
+          <div class="kpi-value" style="font-size:16px">${menorMargem && menorMargem !== maiorMargem ? Utils.escHtml(menorMargem.tipo) : '—'}</div>
+          <div class="kpi-sub">${menorMargem && menorMargem !== maiorMargem && menorMargem.margemPct !== null ? menorMargem.margemPct.toFixed(1)+'%' : ''}</div>
+        </div>
+        <div class="kpi-card" style="--kpi-color:#8b5cf6">
+          <div class="kpi-label">Total Analisado</div>
+          <div class="kpi-value">${projetosComMargem.length}</div>
+          <div class="kpi-sub">${grupos.length} tipos de serviço</div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header"><div class="card-title">Margem por Tipo de Serviço</div></div>
+        <div class="card-body">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Serviço</th>
+                <th>Projetos</th>
+                <th>Receita Total</th>
+                <th>Custo Total</th>
+                <th>Margem R$</th>
+                <th>Margem %</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${grupos.map(g => `<tr>
+                <td class="font-bold">${Utils.escHtml(g.tipo)}</td>
+                <td style="text-align:center">${g.pList.length}</td>
+                <td class="text-success">${Utils.formatCurrency(g.receitaTotal)}</td>
+                <td class="text-danger">${Utils.formatCurrency(g.custoTotal)}</td>
+                <td class="font-bold ${g.margemTotal >= 0 ? 'text-success' : 'text-danger'}">${Utils.formatCurrency(g.margemTotal)}</td>
+                <td class="font-bold">${g.margemPct !== null ? g.margemPct.toFixed(1)+'%' : '—'}</td>
+                <td>${statusMargem(g.margemPct)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-4">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Top 5 — Maior Margem</div></div>
+          <div class="card-body">
+            <table class="tbl">
+              <thead><tr><th>Projeto</th><th>Tipo</th><th>Receita</th><th>Margem %</th></tr></thead>
+              <tbody>
+                ${top5maior.length === 0 ? '<tr><td colspan="4" class="text-muted text-center">Sem dados</td></tr>' :
+                top5maior.map(p => `<tr>
+                  <td class="font-bold text-sm">${Utils.escHtml(p.titulo||p.ordemServico||'—')}</td>
+                  <td><span class="badge badge-blue">${Utils.escHtml(p.tipoServico)}</span></td>
+                  <td class="text-success">${Utils.formatCurrency(p.receita)}</td>
+                  <td class="font-bold text-success">${p.margemPct.toFixed(1)}%</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Top 5 — Menor Margem</div></div>
+          <div class="card-body">
+            <table class="tbl">
+              <thead><tr><th>Projeto</th><th>Tipo</th><th>Receita</th><th>Margem %</th></tr></thead>
+              <tbody>
+                ${top5menor.length === 0 ? '<tr><td colspan="4" class="text-muted text-center">Sem dados</td></tr>' :
+                top5menor.map(p => `<tr>
+                  <td class="font-bold text-sm">${Utils.escHtml(p.titulo||p.ordemServico||'—')}</td>
+                  <td><span class="badge badge-blue">${Utils.escHtml(p.tipoServico)}</span></td>
+                  <td class="text-success">${Utils.formatCurrency(p.receita)}</td>
+                  <td class="font-bold ${p.margemPct < 30 ? 'text-danger' : 'text-warning'}">${p.margemPct.toFixed(1)}%</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function exportarCSV() {
+    let rows = [], filename = '';
+
+    if (_tab === 'comercial') {
+      filename = 'relatorio_comercial';
+      const leads = DB.getAll('leads');
+      rows.push(['numero', 'cliente', 'status', 'valor_estimado', 'valor_fechado', 'origem', 'responsavel', 'data_entrada']);
+      leads.forEach(l => {
+        const cliente = DB.get('clientes', l.clienteId);
+        rows.push([
+          l.numero||'', cliente?.nome||l.clienteId||'', l.status||'',
+          l.valorEstimado||0, l.valorFechado||0,
+          l.origemLead||'', l.responsavel||'', l.dataEntrada||''
+        ]);
+      });
+    } else if (_tab === 'financeiro') {
+      filename = 'relatorio_financeiro';
+      const recebiveis = DB.getAll('recebiveis');
+      rows.push(['cliente', 'descricao', 'parcela', 'vencimento', 'valor', 'status']);
+      recebiveis.forEach(r => {
+        const cliente = DB.get('clientes', r.clienteId);
+        (r.parcelas||[]).forEach((p, i) => {
+          rows.push([
+            cliente?.nome||r.clienteId||'', r.descricao||'',
+            i+1, p.vencimento||'', p.valor||0, p.status||''
+          ]);
+        });
+      });
+    } else if (_tab === 'operacional') {
+      filename = 'relatorio_operacional';
+      const projetos = DB.getAll('projetos');
+      rows.push(['os', 'titulo', 'cliente', 'status', 'prazo', 'art_numero', 'art_status', 'responsavel']);
+      projetos.forEach(p => {
+        rows.push([
+          p.ordemServico||'', p.titulo||'',
+          Utils.getClientName(p.clienteId)||'', p.status||'',
+          p.prazo||'', p.art?.numero||'', p.art?.status||'', p.responsavel||''
+        ]);
+      });
+    } else if (_tab === 'clientes') {
+      filename = 'relatorio_clientes';
+      const clientes = DB.getAll('clientes');
+      rows.push(['codigo', 'nome', 'cnpj', 'segmento', 'porte', 'cidade', 'estado', 'nps', 'eng_responsavel']);
+      clientes.forEach(c => {
+        rows.push([
+          c.codigo||'', c.nome||'', c.cnpj||'',
+          c.segmento||'', c.porte||'', c.cidade||'', c.estado||'',
+          c.nps||'', c.engResponsavel||''
+        ]);
+      });
+    } else if (_tab === 'licitacoes') {
+      filename = 'relatorio_licitacoes';
+      const lics = DB.getAll('licitacoes');
+      rows.push(['numero', 'orgao', 'modalidade', 'status', 'data_abertura', 'valor_estimado', 'resultado']);
+      lics.forEach(l => {
+        rows.push([
+          l.numero||'', l.orgao||'', l.modalidade||'',
+          l.status||'', l.dataAbertura||'',
+          l.valorEstimado||0, l.resultado||''
+        ]);
+      });
+    } else if (_tab === 'margem') {
+      filename = 'relatorio_margem';
+      const projetos = DB.getAll('projetos');
+      const recebiveis = DB.getAll('recebiveis');
+      const receitaProjeto = (projetoId) => {
+        let total = 0;
+        recebiveis.filter(r => r.projetoId === projetoId).forEach(r => {
+          (r.parcelas||[]).forEach(p => { if (p.status === 'recebido') total += p.valor||0; });
+        });
+        return total;
+      };
+      rows.push(['projeto', 'tipo_servico', 'cliente', 'receita', 'custo', 'margem_rs', 'margem_pct']);
+      projetos.forEach(p => {
+        const receita = receitaProjeto(p.id) || p.valor || 0;
+        const custo = p.custoEstimado || p.custoReal || 0;
+        if (receita === 0 && custo === 0) return;
+        const margem = receita - custo;
+        const margemPct = receita > 0 ? (margem / receita * 100).toFixed(2) : '';
+        rows.push([
+          p.titulo||p.ordemServico||'', p.tipoServico||p.segmento||'',
+          Utils.getClientName(p.clienteId)||'',
+          receita, custo, margem, margemPct
+        ]);
+      });
+    }
+
+    if (rows.length <= 1) {
+      alert('Nenhum dado para exportar nesta aba.');
+      return;
+    }
+
+    const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(';')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename + '_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+  }
+
+  return { render, setTab, exportarCSV };
 })();

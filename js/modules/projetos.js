@@ -295,6 +295,22 @@ const Projetos = (() => {
         </div>` : ''}
 
         ${p.observacoes ? `<div class="mt-3 detail-field"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(p.observacoes)}</div></div>` : ''}
+
+        ${(() => {
+          const contratoVinculado = DB.getAll('contratos').find(ct => ct.projetoId === p.id);
+          if (!contratoVinculado) return '';
+          const cvStatus = contratoVinculado.status || 'ativo';
+          const cvStatusMap = { ativo: { label: 'Ativo', color: '#10b981' }, renovando: { label: 'Renovando', color: '#f59e0b' }, vencido: { label: 'Vencido', color: '#ef4444' }, encerrado: { label: 'Encerrado', color: '#94a3b8' }, rascunho: { label: 'Rascunho', color: '#8b5cf6' } };
+          const cvS = cvStatusMap[cvStatus] || { label: cvStatus, color: '#94a3b8' };
+          const cvBadge = `<span style="font-size:11px;font-weight:600;background:${cvS.color}20;color:${cvS.color};padding:2px 8px;border-radius:99px;border:1px solid ${cvS.color}44">${cvS.label}</span>`;
+          return `<div style="background:#f5f3ff;border:1px solid #8b5cf6;border-radius:8px;padding:12px;margin-top:8px">
+            <div style="font-size:11px;color:#8b5cf6;font-weight:700;margin-bottom:4px">📋 CONTRATO VINCULADO</div>
+            <div style="font-weight:600">${Utils.escHtml(contratoVinculado.numero || 'Sem número')}</div>
+            <div style="font-size:12px">${cvBadge} · ${Utils.formatCurrency(contratoVinculado.valor)}</div>
+            <button onclick="Modal.close();App.navigate('contratos');setTimeout(()=>Contratos.view('${contratoVinculado.id}'),300)" class="btn btn-xs btn-secondary" style="margin-top:8px">Ver contrato →</button>
+          </div>`;
+        })()}
+
         <div class="mt-4 flex gap-2">
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-secondary btn-sm" onclick="Modal.close();ProjetoFinanceiro.open('${id}')">💰 Financeiro</button>

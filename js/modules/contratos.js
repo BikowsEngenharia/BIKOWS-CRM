@@ -145,6 +145,20 @@ const Contratos = (() => {
         </div>
         ${c.descricao ? `<div class="detail-field mb-3"><div class="detail-label">Descrição / Escopo</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(c.descricao)}</div></div>` : ''}
         ${c.observacoes ? `<div class="detail-field mb-3"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(c.observacoes)}</div></div>` : ''}
+        ${(() => {
+          if (!c.projetoId) return '';
+          const pj = DB.get('projetos', c.projetoId);
+          if (!pj) return '';
+          return `<div class="detail-field mb-3">
+            <div class="detail-label">Projeto Vinculado</div>
+            <div class="detail-value">
+              <span style="cursor:pointer;color:var(--primary);font-weight:600;text-decoration:underline"
+                onclick="Modal.close();App.navigate('projetos');setTimeout(()=>Projetos.view('${c.projetoId}'),300)">
+                ${pj.ordemServico ? Utils.escHtml(pj.ordemServico) + ' — ' : ''}${Utils.escHtml(pj.titulo||'')}
+              </span>
+            </div>
+          </div>`;
+        })()}
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
           ${status === 'vencido' || status === 'renovando' ? `<button class="btn btn-success btn-sm" onclick="Contratos.renovar('${id}')">🔄 Renovar Contrato</button>` : ''}
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Contratos.openForm('${id}')">✏ Editar</button>
@@ -277,6 +291,13 @@ const Contratos = (() => {
           <textarea class="form-control" id="fcDescricao" rows="3">${Utils.escHtml(c?.descricao||'')}</textarea>
         </div>
         <div class="form-group">
+          <label class="form-label">Projeto Vinculado</label>
+          <select class="form-control" id="fContratoProjetoId">
+            <option value="">— Nenhum —</option>
+            ${DB.getAll('projetos').map(pj => `<option value="${pj.id}" ${c?.projetoId===pj.id?'selected':''}>${pj.ordemServico?pj.ordemServico+' — ':''}${Utils.escHtml(pj.titulo||'')}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Observações</label>
           <textarea class="form-control" id="fcObs" rows="2">${Utils.escHtml(c?.observacoes||'')}</textarea>
         </div>
@@ -305,6 +326,7 @@ const Contratos = (() => {
       status:             document.getElementById('fcStatus').value,
       descricao:          document.getElementById('fcDescricao').value,
       observacoes:        document.getElementById('fcObs').value,
+      projetoId:          document.getElementById('fContratoProjetoId').value || null,
     };
 
     if (id) { DB.update('contratos', id, data); Toast.success('Contrato atualizado'); }

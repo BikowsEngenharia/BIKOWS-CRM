@@ -333,6 +333,15 @@ const App = (() => {
     if (btn) btn.textContent = isDark ? '☀️' : '🌙';
   }
 
+  function toggleDarkMode() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const newTheme = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('crm_theme', newTheme);
+    const icon = document.getElementById('darkModeIcon');
+    if (icon) icon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+  }
+
   /* ================================================
      CAPTURA RÁPIDA — adicionar item em 2 cliques
      ================================================ */
@@ -490,9 +499,16 @@ const App = (() => {
       const btn = document.getElementById('darkToggle');
       if (btn) btn.textContent = '☀️';
     }
+    // Restore data-theme dark mode (sidebar toggle)
+    const savedTheme = localStorage.getItem('crm_theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      const icon = document.getElementById('darkModeIcon');
+      if (icon) icon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleDark, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture };
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

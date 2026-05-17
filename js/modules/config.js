@@ -149,6 +149,22 @@ const Config = (() => {
           </div>
         </div>
 
+        <!-- Backup e Restauração -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">💾 Backup e Restauração</div></div>
+          <div class="card-body">
+            <p class="text-sm text-muted mb-3">Faça backup de todos os dados do CRM ou restaure a partir de um arquivo de backup anterior.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="Config.exportBackup()">📥 Baixar Backup Completo</button>
+              <label class="btn btn-secondary" style="cursor:pointer">
+                📤 Restaurar Backup
+                <input type="file" accept=".json" style="display:none" onchange="Config.importBackup(event)">
+              </label>
+            </div>
+            <div class="text-xs text-muted mt-2">Último backup: <span id="lastBackupDate">—</span></div>
+          </div>
+        </div>
+
         <!-- Notificações -->
         <div class="card" style="grid-column:1/-1;">
           <div class="card-header"><div class="card-title">🔔 Notificações e Lembretes</div></div>
@@ -251,6 +267,10 @@ const Config = (() => {
     // Render Google Calendar status after DOM is ready
     setTimeout(() => {
       if (typeof GoogleCal !== 'undefined') GoogleCal.renderStatus('#gcalStatusCard');
+      // Show last backup date
+      const lb = localStorage.getItem('crm_last_backup');
+      const el = document.getElementById('lastBackupDate');
+      if (el && lb) el.textContent = Utils.formatDate(lb.split('T')[0]) + ' às ' + lb.split('T')[1].substring(0, 5);
     }, 50);
   }
 
@@ -448,5 +468,63 @@ const Config = (() => {
     if (grp) grp.style.display = show ? '' : 'none';
   }
 
-  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, exportData, importData, resetData, saveNotificacoes, toggleEmailDest };
+  function exportBackup() {
+    const backup = {
+      versao: '1.0',
+      data: new Date().toISOString(),
+      empresa: DB.getConfig()?.empresa || 'CRM',
+      dados: {}
+    };
+    const colecoes = ['leads','clientes','projetos','propostas','contratos','atividades',
+      'recebiveis','lancamentos','contaspagar','licitacoes','marketing_posts','metas',
+      'contatos','folha','config'];
+    colecoes.forEach(c => {
+      try { backup.dados[c] = DB.getAll(c); } catch(e) {}
+    });
+    backup.dados.config = DB.getConfig();
+
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `backup-crm-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    localStorage.setItem('crm_last_backup', new Date().toISOString());
+    Toast.success('Backup realizado com sucesso!');
+    // Update displayed date
+    const el = document.getElementById('lastBackupDate');
+    const lb = localStorage.getItem('crm_last_backup');
+    if (el && lb) el.textContent = Utils.formatDate(lb.split('T')[0]) + ' às ' + lb.split('T')[1].substring(0, 5);
+  }
+
+  function importBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const backup = JSON.parse(e.target.result);
+        if (!backup.dados) { Toast.error('Arquivo de backup inválido.'); return; }
+        const dataLabel = backup.data ? Utils.formatDate(backup.data.split('T')[0]) : '?';
+        if (!confirm(`Restaurar backup de ${dataLabel}?\n\nISTO SUBSTITUIRÁ TODOS OS DADOS ATUAIS.\n\nDeseja continuar?`)) return;
+
+        Object.entries(backup.dados).forEach(([col, data]) => {
+          if (col === 'config') { DB.saveConfig(data); return; }
+          if (Array.isArray(data)) {
+            localStorage.setItem('crm_' + col, JSON.stringify(data));
+          }
+        });
+        Toast.success('Backup restaurado! Recarregando...');
+        setTimeout(() => location.reload(), 1500);
+      } catch(err) {
+        Toast.error('Erro ao ler arquivo de backup: ' + err.message);
+      }
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, exportData, importData, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup };
 })();

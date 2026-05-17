@@ -72,6 +72,28 @@ const Pipeline = (() => {
     _toggleLicitacaoSection(sel.value);
   }
 
+  let _filter = {
+    search: '', status: '', segmento: '',
+    responsavel: '', origemLead: '',
+    valorMin: '', valorMax: '',
+    dataEntradaDe: '', dataEntradaAte: '',
+  };
+
+  function setFilter(key, value) {
+    _filter[key] = value;
+    render();
+  }
+
+  function clearFilters() {
+    _filter = {
+      search: '', status: '', segmento: '',
+      responsavel: '', origemLead: '',
+      valorMin: '', valorMax: '',
+      dataEntradaDe: '', dataEntradaAte: '',
+    };
+    render();
+  }
+
   let dragId = null;
 
   /* ---- Detecção de lead frio ---- */
@@ -157,20 +179,66 @@ const Pipeline = (() => {
       <div class="sec-header">
         <h2 class="sec-title">Pipeline CRM</h2>
         <div class="sec-actions">
-          <select class="filter-select" id="filterResp" onchange="Pipeline.render()">
-            <option value="">Todos os responsáveis</option>
-            ${config.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('')}
-          </select>
-          <select class="filter-select" id="filterOrigem" onchange="Pipeline.render()">
-            <option value="">Todas as origens</option>
-            ${Object.keys(_ORIGENS_MAP).map(o => `<option value="${o}">${_origemIcon(o)} ${o}</option>`).join('')}
-          </select>
           <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Ver somente licitações">🏛 Licitações</button>
           <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
           <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
           <button class="btn btn-primary" onclick="Pipeline.openForm()">+ Novo Lead</button>
         </div>
       </div>
+
+      <!-- FILTROS AVANÇADOS -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <select class="filter-select" onchange="Pipeline.setFilter('responsavel',this.value)">
+          <option value="">Todos os responsáveis</option>
+          ${[...new Set(DB.getAll('leads').map(l => l.responsavel).filter(Boolean))].map(r => `<option value="${r}" ${_filter.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('')}
+        </select>
+        <select class="filter-select" onchange="Pipeline.setFilter('origemLead',this.value)">
+          <option value="">Todas as origens</option>
+          ${Object.keys(_ORIGENS_MAP).map(o => `<option value="${o}" ${_filter.origemLead===o?'selected':''}>${_origemIcon(o)} ${o}</option>`).join('')}
+        </select>
+        <select class="filter-select" onchange="Pipeline.setFilter('segmento',this.value)">
+          <option value="">Todos os segmentos</option>
+          ${config.segmentos.map(s => `<option value="${s}" ${_filter.segmento===s?'selected':''}>${Utils.escHtml(s)}</option>`).join('')}
+        </select>
+        <input class="form-control" style="max-width:130px" type="number" placeholder="Valor mín. (R$)"
+          value="${_filter.valorMin}" onchange="Pipeline.setFilter('valorMin',this.value)" title="Filtrar por valor mínimo">
+        <input class="form-control" style="max-width:130px" type="number" placeholder="Valor máx. (R$)"
+          value="${_filter.valorMax}" onchange="Pipeline.setFilter('valorMax',this.value)" title="Filtrar por valor máximo">
+        <input class="form-control" style="max-width:145px" type="date" title="Data de entrada — de"
+          value="${_filter.dataEntradaDe}" onchange="Pipeline.setFilter('dataEntradaDe',this.value)">
+        <input class="form-control" style="max-width:145px" type="date" title="Data de entrada — até"
+          value="${_filter.dataEntradaAte}" onchange="Pipeline.setFilter('dataEntradaAte',this.value)">
+      </div>
+
+      <!-- CHIPS DE FILTROS ATIVOS -->
+      ${(() => {
+        const chips = [];
+        if (_filter.responsavel) chips.push(`<span class="badge badge-blue" style="cursor:pointer" onclick="Pipeline.setFilter('responsavel','')">👤 ${Utils.escHtml(_filter.responsavel)} ×</span>`);
+        if (_filter.origemLead) chips.push(`<span class="badge badge-blue" style="cursor:pointer" onclick="Pipeline.setFilter('origemLead','')">📡 ${Utils.escHtml(_filter.origemLead)} ×</span>`);
+        if (_filter.segmento) chips.push(`<span class="badge badge-blue" style="cursor:pointer" onclick="Pipeline.setFilter('segmento','')">🏭 ${Utils.escHtml(_filter.segmento)} ×</span>`);
+        if (_filter.valorMin) chips.push(`<span class="badge badge-blue" style="cursor:pointer" onclick="Pipeline.setFilter('valorMin','')">≥ ${Utils.formatCurrency(Number(_filter.valorMin))} ×</span>`);
+        if (_filter.valorMax) chips.push(`<span class="badge badge-blue" style="cursor:pointer" onclick="Pipeline.setFilter('valorMax','')">≤ ${Utils.formatCurrency(Number(_filter.valorMax))} ×</span>`);
+        if (_filter.dataEntradaDe) chips.push(`<span class="badge badge-blue" style="cursor:pointer" onclick="Pipeline.setFilter('dataEntradaDe','')">📅 De ${Utils.formatDate(_filter.dataEntradaDe)} ×</span>`);
+        if (_filter.dataEntradaAte) chips.push(`<span class="badge badge-blue" style="cursor:pointer" onclick="Pipeline.setFilter('dataEntradaAte','')">📅 Até ${Utils.formatDate(_filter.dataEntradaAte)} ×</span>`);
+        if (!chips.length) return '';
+        const totalFiltrado = (() => {
+          let ls = DB.getAll('leads');
+          if (_filter.responsavel) ls = ls.filter(l => l.responsavel === _filter.responsavel);
+          if (_filter.origemLead) ls = ls.filter(l => l.origemLead === _filter.origemLead);
+          if (_filter.segmento) ls = ls.filter(l => l.segmento === _filter.segmento);
+          if (_filter.valorMin) ls = ls.filter(l => (l.valorEstimado||0) >= Number(_filter.valorMin));
+          if (_filter.valorMax) ls = ls.filter(l => (l.valorEstimado||0) <= Number(_filter.valorMax));
+          if (_filter.dataEntradaDe) ls = ls.filter(l => (l.dataEntrada||l.createdAt||'').slice(0,10) >= _filter.dataEntradaDe);
+          if (_filter.dataEntradaAte) ls = ls.filter(l => (l.dataEntrada||l.createdAt||'').slice(0,10) <= _filter.dataEntradaAte);
+          return ls.length;
+        })();
+        return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px">
+          <span class="text-xs text-muted">Filtros ativos:</span>
+          ${chips.join('')}
+          <button class="btn btn-xs btn-danger" onclick="Pipeline.clearFilters()">Limpar todos</button>
+          <span class="text-xs text-muted" style="margin-left:auto">Exibindo <strong>${totalFiltrado}</strong> leads</span>
+        </div>`;
+      })()}
 
       <div class="pipeline-summary mb-4">
         <div class="pipeline-stage">
@@ -219,11 +287,14 @@ const Pipeline = (() => {
   }
 
   function renderColumn(stage, allLeads) {
-    const filterResp = document.getElementById('filterResp')?.value || '';
-    const filterOrigem = document.getElementById('filterOrigem')?.value || '';
     let leads = allLeads.filter(l => l.status === stage.key);
-    if (filterResp) leads = leads.filter(l => l.responsavel === filterResp);
-    if (filterOrigem) leads = leads.filter(l => l.origemLead === filterOrigem);
+    if (_filter.responsavel) leads = leads.filter(l => l.responsavel === _filter.responsavel);
+    if (_filter.origemLead) leads = leads.filter(l => l.origemLead === _filter.origemLead);
+    if (_filter.segmento) leads = leads.filter(l => l.segmento === _filter.segmento);
+    if (_filter.valorMin) leads = leads.filter(l => (l.valorEstimado||0) >= Number(_filter.valorMin));
+    if (_filter.valorMax) leads = leads.filter(l => (l.valorEstimado||0) <= Number(_filter.valorMax));
+    if (_filter.dataEntradaDe) leads = leads.filter(l => (l.dataEntrada||l.createdAt||'').slice(0,10) >= _filter.dataEntradaDe);
+    if (_filter.dataEntradaAte) leads = leads.filter(l => (l.dataEntrada||l.createdAt||'').slice(0,10) <= _filter.dataEntradaAte);
     const total = Utils.sum(leads, 'valorEstimado');
     const ponderado = leads.reduce((s,l) => s + (l.valorEstimado||0) * (stage.prob/100), 0);
 
@@ -1069,11 +1140,10 @@ const Pipeline = (() => {
 
   /* ---- Atalho para filtrar somente licitações ---- */
   function filtrarLicitacoes() {
-    const sel = document.getElementById('filterOrigem');
-    if (sel) { sel.value = 'Licitação Pública'; render(); }
-    // Se não tem nenhuma licitação, avisa
     const total = DB.getAll('leads').filter(l => l.origemLead === 'Licitação Pública').length;
-    if (total === 0) Toast.info('Nenhum lead com origem "Licitação Pública" cadastrado ainda.');
+    if (total === 0) { Toast.info('Nenhum lead com origem "Licitação Pública" cadastrado ainda.'); return; }
+    _filter.origemLead = 'Licitação Pública';
+    render();
   }
 
   return {
@@ -1082,6 +1152,7 @@ const Pipeline = (() => {
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
     relatorioOrigem, filtrarLicitacoes,
+    setFilter, clearFilters,
     _previewOrigem, _toggleLicitacaoSection,
   };
 })();

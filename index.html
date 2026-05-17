@@ -137,6 +137,11 @@
       </a>
     </nav>
     <div class="sidebar-bottom">
+      <button id="darkModeBtn" onclick="App.toggleDarkMode()" title="Alternar modo escuro"
+        style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 16px;background:none;border:none;cursor:pointer;color:var(--sb-text);font-size:13px;border-radius:var(--radius);margin-bottom:4px;transition:var(--t)">
+        <span id="darkModeIcon">🌙</span>
+        <span class="sidebar-label">Modo Escuro</span>
+      </button>
       <a class="nav-link" data-page="config" href="#">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M1 12h2M21 12h2M12 1v2M12 21v2"/></svg>
         <span>Configurações</span>

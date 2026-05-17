@@ -115,6 +115,11 @@ const Licitacoes = (() => {
         <div class="sec-actions">
           <button class="btn btn-secondary" onclick="Licitacoes.setTab('lista')" id="btnTabLista">📋 Lista</button>
           <button class="btn btn-secondary" onclick="Licitacoes.setTab('kanban')" id="btnTabKanban">🏛 Kanban</button>
+          <label class="btn btn-secondary" style="cursor:pointer" title="Importar licitações via CSV">
+            📥 Importar CSV
+            <input type="file" accept=".csv,.txt" style="display:none" onchange="Licitacoes.importCSV(event)">
+          </label>
+          <button class="btn btn-secondary" onclick="Licitacoes.downloadCSVTemplate()">📋 Modelo CSV</button>
           <button class="btn btn-primary" onclick="Licitacoes.openForm()">+ Nova Licitação</button>
         </div>
       </div>
@@ -942,9 +947,96 @@ const Licitacoes = (() => {
 
   function addNew() { openForm(); }
 
+  /* ── CSV Import / Export ─────────────────────────────────────────────── */
+
+  function downloadCSVTemplate() {
+    const bom = '﻿';
+    const header = 'numero;orgao;modalidade;portal;objeto;dataAbertura;valorEstimado;status';
+    const example = '2025/001;Prefeitura de Exemplo;Pregão Eletrônico;Comprasnet (PNCP);Serviços de engenharia;2025-12-01;150000;identificada';
+    const csv = bom + header + '\n' + example;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'modelo-licitacoes.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        let text = e.target.result;
+        // Remove BOM if present
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+        if (lines.length < 2) { Toast.error('CSV vazio ou sem dados.'); return; }
+
+        // Detect separator
+        const headerLine = lines[0];
+        const sep = headerLine.includes(';') ? ';' : ',';
+
+        // Parse header columns
+        const cols = headerLine.split(sep).map(c => c.trim().toLowerCase());
+
+        // Column name mapping
+        const colMap = {
+          'numero': 'numero',
+          'orgao': 'orgao', 'órgão': 'orgao',
+          'modalidade': 'modalidade',
+          'portal': 'portal',
+          'objeto': 'objeto',
+          'dataabertura': 'dataAbertura', 'data abertura': 'dataAbertura', 'data_abertura': 'dataAbertura',
+          'valorestimado': 'valorEstimado', 'valor estimado': 'valorEstimado', 'valor_estimado': 'valorEstimado',
+          'status': 'status',
+        };
+
+        let imported = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(sep).map(v => v.trim());
+          const row = {};
+          cols.forEach((col, idx) => {
+            const mapped = colMap[col];
+            if (mapped) row[mapped] = values[idx] || '';
+          });
+
+          // Skip lines without orgao or numero
+          if (!row.orgao && !row.numero) continue;
+
+          // Parse valorEstimado
+          if (row.valorEstimado) {
+            row.valorEstimado = parseFloat(row.valorEstimado.replace(',', '.')) || null;
+          } else {
+            row.valorEstimado = null;
+          }
+
+          // Validate status
+          if (!row.status || !STATUS[row.status]) row.status = 'identificada';
+
+          DB.create('licitacoes', {
+            ...row,
+            id: Utils.uuid(),
+            createdAt: new Date().toISOString(),
+          });
+          imported++;
+        }
+
+        Toast.success(`${imported} licitação(ões) importada(s)!`);
+        render();
+      } catch (err) {
+        Toast.error('Erro ao processar CSV: ' + err.message);
+      }
+      // Reset input so same file can be re-imported
+      event.target.value = '';
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
   return {
     render, openForm, saveLic, deleteLic, view, setFilter, setTab,
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
-    lancarNoPipeline,
+    lancarNoPipeline, importCSV, downloadCSVTemplate,
   };
 })();

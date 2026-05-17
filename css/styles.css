@@ -78,6 +78,56 @@ html { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoot
   --t: 150ms cubic-bezier(.4,0,.2,1);
 }
 
+/* ---- DARK MODE ---- */
+[data-theme="dark"] {
+  --bg:             #0f1117;
+  --surface:        #1a1f2e;
+  --surface-2:      #222837;
+  --border:         #2d3548;
+  --border-strong:  #3d4a62;
+
+  --text:           #e8edf5;
+  --text-secondary: #9aa8be;
+  --text-muted:     #6b7a94;
+  --text-disabled:  #3d4a62;
+
+  --primary-light:  #1e2d4a;
+  --primary-50:     #172140;
+  --accent-light:   #2d1c1c;
+  --success-light:  #0f2318;
+  --success-border: #1a4030;
+  --warning-light:  #2a1f0a;
+  --warning-border: #4a3510;
+  --danger-light:   #2a1010;
+  --danger-border:  #4a1a1a;
+  --info-light:     #0a2030;
+  --purple-light:   #1a1030;
+  --orange-light:   #2a1808;
+  --teal-light:     #0a2020;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.3);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+  --shadow:    0 4px 10px rgba(0,0,0,.4);
+  --shadow-md: 0 8px 20px rgba(0,0,0,.5);
+  --shadow-lg: 0 20px 40px rgba(0,0,0,.6);
+}
+
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0,0,0,.7);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .tbl tbody tr:hover {
+  background: var(--surface-2);
+}
+
 body {
   font-family: var(--font);
   font-size: 13.5px;

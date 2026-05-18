@@ -110,7 +110,9 @@ const Licitacoes = (() => {
   }
 
   let _filter = { status: '', modalidade: '' };
-  let _tab = 'lista'; // 'lista' | 'kanban'
+  let _tab = 'lista'; // 'lista' | 'kanban' | 'pncp'
+  let _pncpData = [];   // cache dos dados PNCP
+  let _pncpLoading = false;
 
   /* ── Render principal ─────────────────────────────────────────────────── */
 
@@ -146,6 +148,7 @@ const Licitacoes = (() => {
           </div>
           <button class="btn btn-secondary" onclick="Licitacoes.setTab('lista')" id="btnTabLista">📋 Lista</button>
           <button class="btn btn-secondary" onclick="Licitacoes.setTab('kanban')" id="btnTabKanban">🏛 Kanban</button>
+          <button class="btn btn-secondary" onclick="Licitacoes.setTab('pncp')" id="btnTabPncp" style="position:relative">🔍 PNCP Monitor<span id="pncpBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;border-radius:99px;font-size:10px;font-weight:700;padding:1px 5px;min-width:16px;text-align:center"></span></button>
           <label class="btn btn-secondary" style="cursor:pointer" title="Importar licitações via CSV">
             📥 Importar CSV
             <input type="file" accept=".csv,.txt" style="display:none" onchange="Licitacoes.importCSV(event)">
@@ -189,7 +192,7 @@ const Licitacoes = (() => {
       </div>
 
       <div id="licTabContent">
-        ${_tab === 'kanban' ? renderKanban(lics) : renderLista(list, lics, cfg)}
+        ${_tab === 'kanban' ? renderKanban(lics) : _tab === 'pncp' ? renderPNCPTab() : renderLista(list, lics, cfg)}
       </div>
     `;
 
@@ -199,10 +202,187 @@ const Licitacoes = (() => {
       document.getElementById('btnTabLista')?.classList.toggle('btn-secondary', _tab !== 'lista');
       document.getElementById('btnTabKanban')?.classList.toggle('btn-primary', _tab === 'kanban');
       document.getElementById('btnTabKanban')?.classList.toggle('btn-secondary', _tab !== 'kanban');
+      document.getElementById('btnTabPncp')?.classList.toggle('btn-primary', _tab === 'pncp');
+      document.getElementById('btnTabPncp')?.classList.toggle('btn-secondary', _tab !== 'pncp');
     }, 0);
+
+    // Carregar badge PNCP em background
+    _loadPncpBadge();
 
     // Auto-lançar no pipeline (10 dias antes da abertura)
     setTimeout(() => _autoLancarNoPipeline(), 200);
+  }
+
+  /* ── PNCP Monitor ─────────────────────────────────────────────────────── */
+
+  async function _loadPncpBadge() {
+    try {
+      const { count } = await _supabase
+        .from('crm_licitacoes')
+        .select('*', { count: 'exact', head: true })
+        .eq('data->>kanban', 'nova');
+      const badge = document.getElementById('pncpBadge');
+      if (badge) {
+        if (count > 0) { badge.textContent = count; badge.style.display = ''; }
+        else badge.style.display = 'none';
+      }
+    } catch {}
+  }
+
+  function renderPNCPTab() {
+    // Dispara carga assíncrona e retorna skeleton
+    if (!_pncpLoading) { _pncpLoading = true; _fetchPncp(); }
+
+    const kanbanCols = [
+      { key: 'nova',       label: '🔍 Novas',           color: '#3b82f6' },
+      { key: 'analisando', label: '📋 Analisando',      color: '#f59e0b' },
+      { key: 'proposta',   label: '📝 Elaborando Prop.', color: '#7c3aed' },
+      { key: 'participar', label: '✅ Vamos Participar', color: '#10b981' },
+      { key: 'descartada', label: '❌ Descartada',       color: '#ef4444' },
+    ];
+
+    if (_pncpData.length === 0) {
+      return `
+        <div class="card">
+          <div style="padding:24px;text-align:center">
+            <div style="font-size:32px;margin-bottom:8px">🏛</div>
+            <div class="font-bold" style="margin-bottom:6px">Carregando licitações do PNCP...</div>
+            <div class="text-sm text-muted">Buscando licitações encontradas automaticamente pelo monitor</div>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="card mb-3">
+        <div style="padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="flex:1">
+            <div class="font-bold">🔍 PNCP Monitor — Licitações Descobertas Automaticamente</div>
+            <div class="text-xs text-muted">${_pncpData.length} licitação(ões) capturadas · Arraste entre colunas ou clique para gerenciar</div>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="Licitacoes.recarregarPncp()">🔄 Atualizar</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;padding-bottom:8px">
+        <div style="display:flex;gap:12px;min-width:${kanbanCols.length * 220}px;align-items:flex-start">
+          ${kanbanCols.map(col => {
+            const cards = _pncpData.filter(l => (l.data?.kanban || 'nova') === col.key);
+            return `
+              <div style="width:220px;flex-shrink:0">
+                <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid ${col.color};margin-bottom:8px">
+                  <div style="font-size:12px;font-weight:700;color:${col.color}">${col.label}</div>
+                  <div style="font-size:11px;color:var(--text-muted)">${cards.length} licitação(ões)</div>
+                </div>
+                ${cards.map(l => _renderPncpCard(l, kanbanCols)).join('')}
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  function _renderPncpCard(l, kanbanCols) {
+    const d = l.data || {};
+    const valor = d.valor ? Utils.formatCurrency(d.valor) : 'Valor N/I';
+    const dataEnc = d.dataEncerramento ? new Date(d.dataEncerramento) : null;
+    const diasEnc = dataEnc ? Math.ceil((dataEnc - new Date()) / 86400000) : null;
+    const encAlert = diasEnc != null && diasEnc >= 0 && diasEnc <= 7;
+
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;${encAlert ? 'border-left:3px solid #ef4444' : ''}">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:3px">${Utils.escHtml(d.numero||d.numeroControlePNCP||'—')} · ${Utils.escHtml(d.uf||'')} · ${Utils.escHtml(d.municipio||'')}</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:6px">${Utils.escHtml(Utils.truncate(d.titulo||'',80))}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">🏛 ${Utils.escHtml(Utils.truncate(d.orgao||'',35))}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <div style="font-size:12px;font-weight:700;color:var(--primary)">${valor}</div>
+          ${diasEnc != null && diasEnc >= 0 ? `<span style="font-size:10px;color:${encAlert?'#ef4444':'#94a3b8'};font-weight:600">📅 ${diasEnc}d restantes</span>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
+          ${d.linkPNCP ? `<a href="${Utils.escHtml(d.linkPNCP)}" target="_blank" class="btn btn-xs btn-secondary" style="font-size:10px">🔗 Edital</a>` : ''}
+          <button class="btn btn-xs btn-primary" style="font-size:10px" onclick="Licitacoes.importarPncp('${l.id}')">↗ Criar Licitação</button>
+          <select class="form-control" style="font-size:10px;padding:2px 4px;height:auto;flex:1;min-width:80px" onchange="Licitacoes.moverKanbanPncp('${l.id}',this.value)">
+            ${kanbanCols.map(c => `<option value="${c.key}" ${(d.kanban||'nova')===c.key?'selected':''}>${c.label}</option>`).join('')}
+          </select>
+        </div>
+      </div>`;
+  }
+
+  async function _fetchPncp() {
+    try {
+      const { data, error } = await _supabase
+        .from('crm_licitacoes')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        _pncpData = data;
+        // Re-render aba se estiver ativa
+        const el = document.getElementById('licTabContent');
+        if (el && _tab === 'pncp') el.innerHTML = renderPNCPTab();
+        _loadPncpBadge();
+      }
+    } catch {}
+    _pncpLoading = false;
+  }
+
+  function recarregarPncp() {
+    _pncpData = [];
+    _pncpLoading = true;
+    const el = document.getElementById('licTabContent');
+    if (el) el.innerHTML = renderPNCPTab();
+    _fetchPncp();
+  }
+
+  async function moverKanbanPncp(id, kanban) {
+    _pncpData = _pncpData.map(l => l.id === id ? { ...l, data: { ...l.data, kanban } } : l);
+    await _supabase.from('crm_licitacoes').update({ data: _pncpData.find(l => l.id === id)?.data }).eq('id', id);
+    _loadPncpBadge();
+    const el = document.getElementById('licTabContent');
+    if (el && _tab === 'pncp') el.innerHTML = renderPNCPTab();
+  }
+
+  function importarPncp(id) {
+    const lic = _pncpData.find(l => l.id === id);
+    if (!lic) return;
+    const d = lic.data || {};
+
+    // Converter data de encerramento para data de abertura (dd/mm para yyyy-mm-dd)
+    let dataAbertura = '';
+    if (d.dataEncerramento) {
+      try { dataAbertura = new Date(d.dataEncerramento).toISOString().split('T')[0]; } catch {}
+    }
+
+    // Mapear modalidade PNCP para local
+    const modalMap = {
+      'Pregão - Eletrônico': 'Pregão Eletrônico',
+      'Pregão - Presencial': 'Pregão Presencial',
+      'Concorrência - Eletrônica': 'Concorrência',
+      'Concorrência - Presencial': 'Concorrência',
+      'Dispensa': 'Dispensa de Licitação',
+      'Inexigibilidade': 'Inexigibilidade',
+    };
+    const modalidade = modalMap[d.modalidade] || d.modalidade || 'Pregão Eletrônico';
+
+    // Criar licitação manual com dados do PNCP
+    const criada = DB.create('licitacoes', {
+      numero:          d.numero || d.numeroControlePNCP || '',
+      objeto:          d.titulo || '',
+      orgao:           d.orgao || '',
+      uasg:            '',
+      modalidade,
+      portal:          'Comprasnet (PNCP)',
+      status:          'identificada',
+      dataPublicacao:  d.dataPublicacao ? d.dataPublicacao.split('T')[0] : '',
+      dataAbertura,
+      valorEstimado:   d.valor || null,
+      linkPortal:      d.linkPNCP || '',
+      linkEdital:      d.linkPNCP || '',
+      observacoes:     `Capturado automaticamente pelo monitor PNCP.\nUF: ${d.uf} · ${d.municipio}\nID PNCP: ${d.numeroControlePNCP||id}`,
+    });
+
+    // Marcar como importada no banco PNCP
+    moverKanbanPncp(id, 'participar');
+
+    Toast.success('✅ Licitação criada no CRM! Configure os detalhes e adicione ao pipeline.');
+    _tab = 'lista';
+    render();
   }
 
   /* ── Auto-lançamento no pipeline ──────────────────────────────────────── */
@@ -1091,6 +1271,6 @@ const Licitacoes = (() => {
     render, openForm, saveLic, deleteLic, view, setFilter, setTab,
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,
-    filtrarKanban,
+    filtrarKanban, recarregarPncp, moverKanbanPncp, importarPncp,
   };
 })();

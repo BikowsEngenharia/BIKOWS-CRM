@@ -1,9 +1,69 @@
 /* ==========================================
    CHARTS.js — Gráficos SVG sem dependências
+   Responsivo: re-renderiza ao redimensionar o contêiner
    ========================================== */
 const Charts = (() => {
 
   const COLORS = ['#1a56db','#10b981','#f59e0b','#ef4444','#8b5cf6','#f97316','#06b6d4','#84cc16','#ec4899','#64748b'];
+
+  // Registro de gráficos ativos: containerId → { type, args }
+  const _registry = new Map();
+
+  // ResizeObserver único para todos os containers
+  let _ro = null;
+  function _initRO() {
+    if (_ro || typeof ResizeObserver === 'undefined') return;
+    let _debounceTimers = {};
+    _ro = new ResizeObserver(entries => {
+      entries.forEach(entry => {
+        const id = entry.target.id;
+        if (!id || !_registry.has(id)) return;
+        clearTimeout(_debounceTimers[id]);
+        _debounceTimers[id] = setTimeout(() => {
+          const rec = _registry.get(id);
+          if (rec) _rerender(id, rec);
+        }, 120);
+      });
+    });
+  }
+
+  function _rerender(id, rec) {
+    try {
+      const el = document.getElementById(id);
+      if (!el || !el.isConnected) { _registry.delete(id); return; }
+      switch (rec.type) {
+        case 'bar':    bar(rec.args);    break;
+        case 'donut':  donut(rec.args);  break;
+        case 'line':   line(rec.args);   break;
+        case 'funnel': funnel(rec.args); break;
+      }
+    } catch (e) {
+      console.warn('[Charts.rerender]', id, e.message);
+    }
+  }
+
+  function _register(type, args) {
+    const id = args.containerId;
+    if (!id) return;
+    _initRO();
+    const el = document.getElementById(id);
+    if (!el) return;
+    _registry.set(id, { type, args });
+    if (_ro && !_ro._observed?.has(id)) {
+      _ro.observe(el);
+      if (!_ro._observed) _ro._observed = new Set();
+      _ro._observed.add(id);
+    }
+  }
+
+  // Fallback window resize para browsers sem ResizeObserver
+  let _winTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_winTimer);
+    _winTimer = setTimeout(() => {
+      _registry.forEach((rec, id) => _rerender(id, rec));
+    }, 200);
+  });
 
   /* --- BAR CHART --- */
   function bar({ containerId, data, height = 200, showValues = true }) {
@@ -35,28 +95,32 @@ const Charts = (() => {
       const color = d.color || COLORS[i % COLORS.length];
       bars += `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${color}" rx="4" opacity=".9"/>`;
       if (showValues && d.value > 0) {
-        const label = d.value >= 1000 ? Utils.formatCurrency(d.value).replace('R$ ','R$') : d.value;
+        const label = d.value >= 1000 ? Utils.formatCurrency(d.value).replace('R$ ','R$') : d.value;
         bars += `<text x="${x + barW/2}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">${label}</text>`;
       }
       const lbl = (d.label || '').length > 6 ? d.label.slice(0,6)+'…' : (d.label || '');
       bars += `<text x="${x + barW/2}" y="${pad.t + ih + 14}" text-anchor="middle" font-size="10" fill="#64748b">${lbl}</text>`;
     });
 
-    el.innerHTML = `<svg viewBox="0 0 ${w} ${height}" width="100%" height="${height}">
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${height}" width="100%" height="${height}" style="display:block">
       ${yLines}${yLabels}
       <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t+ih}" stroke="#e2e8f0"/>
       <line x1="${pad.l}" y1="${pad.t+ih}" x2="${w-pad.r}" y2="${pad.t+ih}" stroke="#e2e8f0"/>
       ${bars}
     </svg>`;
+    _register('bar', { containerId, data, height, showValues });
   }
 
   /* --- DONUT CHART --- */
-  function donut({ containerId, data, size = 180, showLegend = true }) {
+  function donut({ containerId, data, size: _sizeHint = 180, showLegend = true }) {
     const el = document.getElementById(containerId);
     if (!el || !data.length) return;
     const total = data.reduce((s, d) => s + d.value, 0);
     if (total === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-sub">Sem dados</div></div>'; return; }
 
+    // Tamanho responsivo: usa largura do container, respeitando o hint como máximo
+    const containerW = el.clientWidth || _sizeHint * 2;
+    const size = Math.min(Math.max(Math.floor(containerW * 0.45), 100), _sizeHint);
     const cx = size / 2, cy = size / 2, r = size * 0.36, stroke = size * 0.18;
     let paths = '';
     let angle = -Math.PI / 2;
@@ -73,9 +137,10 @@ const Charts = (() => {
       paths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z" fill="${color}" opacity=".9"/>`;
     });
 
+    const fontSize = Math.max(Math.round(size * 0.075), 9);
     const inner = `<circle cx="${cx}" cy="${cy}" r="${r - stroke}" fill="white"/>
-      <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="13" font-weight="800" fill="#1a202c">${total}</text>
-      <text x="${cx}" y="${cy+14}" text-anchor="middle" font-size="10" fill="#64748b">total</text>`;
+      <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="${fontSize + 2}" font-weight="800" fill="#1a202c">${total}</text>
+      <text x="${cx}" y="${cy+Math.round(fontSize*1.5)}" text-anchor="middle" font-size="${fontSize - 1}" fill="#64748b">total</text>`;
 
     let legend = '';
     if (showLegend) {
@@ -94,6 +159,7 @@ const Charts = (() => {
       </svg>
       ${legend}
     </div>`;
+    _register('donut', { containerId, data, size: _sizeHint, showLegend });
   }
 
   /* --- LINE CHART --- */
@@ -143,12 +209,13 @@ const Charts = (() => {
       });
     }
 
-    el.innerHTML = `<svg viewBox="0 0 ${w} ${height}" width="100%" height="${height}">
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${height}" width="100%" height="${height}" style="display:block">
       ${gridLines}${yLabels}
       <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t+ih}" stroke="#e2e8f0"/>
       <line x1="${pad.l}" y1="${pad.t+ih}" x2="${w-pad.r}" y2="${pad.t+ih}" stroke="#e2e8f0"/>
       ${paths}${xLabels}
     </svg>`;
+    _register('line', { containerId, series, height, showDots });
   }
 
   /* --- FUNNEL CHART --- */
@@ -170,6 +237,7 @@ const Charts = (() => {
     });
     html += '</div>';
     el.innerHTML = html;
+    _register('funnel', { containerId, data });
   }
 
   // Wrappers defensivos — falha em um chart não derruba a página inteira

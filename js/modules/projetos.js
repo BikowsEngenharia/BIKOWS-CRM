@@ -80,11 +80,11 @@ const Projetos = (() => {
       </div>
 
       <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
-        <div class="kpi-card" style="--kpi-color:#3b82f6"><div class="kpi-label">Em Andamento</div><div class="kpi-value">${emAnd}</div><div class="kpi-sub">todos</div><div class="kpi-icon">🔧</div></div>
-        <div class="kpi-card" style="--kpi-color:#ef4444"><div class="kpi-label">Atrasados</div><div class="kpi-value">${atrasados}</div><div class="kpi-icon">⚠</div></div>
-        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Iniciados <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${iniciadosPeriodo}</div><div class="kpi-icon">🚀</div></div>
-        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Concluídos <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${concluidosPeriodo}</div><div class="kpi-icon">✅</div></div>
-        <div class="kpi-card" style="--kpi-color:${margemGeral >= 40 ? '#10b981' : margemGeral >= 20 ? '#f59e0b' : '#ef4444'}">
+        <div class="kpi-card" style="--kpi-color:#3b82f6;cursor:pointer" onclick="Projetos.drillDown('em_andamento')"><div class="kpi-label">Em Andamento</div><div class="kpi-value">${emAnd}</div><div class="kpi-sub">todos</div><div class="kpi-icon">🔧</div></div>
+        <div class="kpi-card" style="--kpi-color:#ef4444;cursor:pointer" onclick="Projetos.drillDown('atrasados')"><div class="kpi-label">Atrasados</div><div class="kpi-value">${atrasados}</div><div class="kpi-icon">⚠</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db;cursor:pointer" onclick="Projetos.drillDown('concluidos')"><div class="kpi-label">Iniciados <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${iniciadosPeriodo}</div><div class="kpi-icon">🚀</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" onclick="Projetos.drillDown('concluidos')"><div class="kpi-label">Concluídos <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${concluidosPeriodo}</div><div class="kpi-icon">✅</div></div>
+        <div class="kpi-card" style="--kpi-color:${margemGeral >= 40 ? '#10b981' : margemGeral >= 20 ? '#f59e0b' : '#ef4444'};cursor:pointer" onclick="Projetos.drillDown('sem_art')">
           <div class="kpi-label">Margem Média</div>
           <div class="kpi-value">${margemGeral}%</div>
           <div class="kpi-icon">📈</div>
@@ -789,7 +789,93 @@ const Projetos = (() => {
     return `OS-${new Date().getFullYear()}-${String(total).padStart(5,'0')}`;
   }
 
+  function drillDown(tipo) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const projetos = DB.getAll('projetos');
+    const projetosFiltrados = _filtrarPorPeriodo(projetos, 'dataInicio');
+    let title = '', items = [], cols = [], rowFn = () => [];
+
+    if (tipo === 'em_andamento') {
+      title = 'Em Andamento';
+      items = projetos.filter(p => p.status === 'em_andamento');
+      cols = ['Projeto', 'Cliente', 'Responsável', 'Prazo'];
+      rowFn = p => {
+        const c = DB.get('clientes', p.clienteId);
+        const nomeCliente = c?.nome || '—';
+        return [
+          Utils.escHtml(p.titulo),
+          Utils.escHtml(nomeCliente),
+          Utils.escHtml(p.responsavel || '—'),
+          Utils.formatDate(p.prazo),
+        ];
+      };
+    } else if (tipo === 'atrasados') {
+      title = 'Atrasados';
+      items = projetos.filter(p => p.status === 'em_andamento' && Utils.isOverdue(p.prazo));
+      cols = ['Projeto', 'Prazo', 'Dias Atraso', 'Responsável'];
+      rowFn = p => {
+        const dias = Utils.daysUntil(p.prazo);
+        const diasStr = dias !== null ? `<span style="color:#ef4444;font-weight:600">${Math.abs(dias)}d</span>` : '—';
+        return [
+          Utils.escHtml(p.titulo),
+          Utils.formatDate(p.prazo),
+          diasStr,
+          Utils.escHtml(p.responsavel || '—'),
+        ];
+      };
+    } else if (tipo === 'concluidos') {
+      title = 'Concluídos';
+      items = projetosFiltrados.filter(p => p.status === 'concluido');
+      cols = ['Projeto', 'Cliente', 'Prazo', 'Responsável'];
+      rowFn = p => {
+        const c = DB.get('clientes', p.clienteId);
+        const nomeCliente = c?.nome || '—';
+        return [
+          Utils.escHtml(p.titulo),
+          Utils.escHtml(nomeCliente),
+          Utils.formatDate(p.prazo),
+          Utils.escHtml(p.responsavel || '—'),
+        ];
+      };
+    } else if (tipo === 'sem_art') {
+      title = 'Sem ART';
+      items = projetos.filter(p => p.status === 'em_andamento' && !p.art?.numero);
+      cols = ['Projeto', 'Cliente', 'Responsável'];
+      rowFn = p => {
+        const c = DB.get('clientes', p.clienteId);
+        const nomeCliente = c?.nome || '—';
+        return [
+          Utils.escHtml(p.titulo),
+          Utils.escHtml(nomeCliente),
+          Utils.escHtml(p.responsavel || '—'),
+        ];
+      };
+    }
+
+    if (!items) return;
+    Modal.open({
+      title: `${title} — ${items.length} registro(s)`,
+      body: `
+        <div style="max-height:55vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
+              ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
+            </tr></thead>
+            <tbody>${items.length ? items.map(item => {
+              const cells = rowFn(item);
+              return `<tr style="border-bottom:1px solid var(--border);cursor:pointer"
+                onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+                ${cells.map(v=>`<td style="padding:8px 12px">${v}</td>`).join('')}</tr>`;
+            }).join('') : `<tr><td colspan="${cols.length}" style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum registro</td></tr>`}
+            </tbody>
+          </table>
+        </div>`,
+      saveCb: null,
+    });
+    setTimeout(() => { const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; }, 0);
+  }
+
   function addNew() { openForm(); }
 
-  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade, addChecklistItem, toggleChecklistItem, _nextOS, setPeriodo };
+  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade, addChecklistItem, toggleChecklistItem, _nextOS, setPeriodo, drillDown };
 })();

@@ -280,22 +280,22 @@ const Pipeline = (() => {
       })()}
 
       <div class="pipeline-summary mb-4">
-        <div class="pipeline-stage">
+        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads ativos" onclick="Pipeline.drillDown('pipeline_total')">
           <div class="ps-label">Total em Pipeline <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
           <div class="ps-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="ps-count">${ativos.length} oportunidades abertas</div>
         </div>
-        <div class="pipeline-stage" title="Receita esperada = valor × probabilidade por etapa">
+        <div class="pipeline-stage" title="Receita esperada = valor × probabilidade por etapa; clique para ver propostas abertas" style="cursor:pointer" onclick="Pipeline.drillDown('propostas_abertas')">
           <div class="ps-label">Receita Esperada 🎯</div>
           <div class="ps-value" style="color:var(--success)">${Utils.formatCurrency(receitaPond)}</div>
           <div class="ps-count">previsão realista ponderada</div>
         </div>
-        <div class="pipeline-stage">
+        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver receita fechada" onclick="Pipeline.drillDown('receita_fechada')">
           <div class="ps-label">Fechado / Ganho <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
           <div class="ps-value">${Utils.formatCurrency(Utils.sum(ganhos,'valorFechado'))}</div>
           <div class="ps-count">${ganhos.length} negócios</div>
         </div>
-        <div class="pipeline-stage">
+        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads frios" onclick="Pipeline.drillDown('leads_frios')">
           <div class="ps-label">Taxa de Conversão <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
           <div class="ps-value">${taxa}%</div>
           <div class="ps-count">${leadsFiltrados.filter(l=>l.status==='fechado_perdido').length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
@@ -1098,6 +1098,96 @@ const Pipeline = (() => {
 
   function addNew() { openForm(); }
 
+  /* ---- Drill-down dos KPI cards ---- */
+  function drillDown(tipo) {
+    const hoje = new Date().toISOString().split('T')[0];
+    let title = '', items = [], cols = [], rowFn = () => [];
+
+    const allLeads = DB.getAll('leads');
+    const leadsAtivos = allLeads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+
+    if (tipo === 'pipeline_total') {
+      title = 'Total em Pipeline';
+      items = leadsAtivos;
+      cols = ['Lead', 'Etapa', 'Valor', 'Responsável'];
+      rowFn = l => {
+        const stage = STAGES.find(s => s.key === l.status);
+        return [
+          Utils.escHtml(l.titulo),
+          `<span style="font-size:11px;color:${stage?.color||'#64748b'}">${stage?.label||l.status}</span>`,
+          Utils.formatCurrency(l.valorEstimado),
+          Utils.escHtml(l.responsavel || '—'),
+        ];
+      };
+    } else if (tipo === 'receita_fechada') {
+      title = 'Receita Fechada / Ganho';
+      items = allLeads.filter(l => l.status === 'fechado_ganho');
+      cols = ['Lead', 'Valor Fechado', 'Data', 'Responsável'];
+      rowFn = l => [
+        Utils.escHtml(l.titulo),
+        `<strong>${Utils.formatCurrency(l.valorFechado)}</strong>`,
+        Utils.formatDate(l.updatedAt ? l.updatedAt.split('T')[0] : l.createdAt?.split('T')[0]),
+        Utils.escHtml(l.responsavel || '—'),
+      ];
+    } else if (tipo === 'leads_frios') {
+      title = 'Leads Frios';
+      items = leadsAtivos.filter(l => _isLeadFrio(l));
+      cols = ['Lead', 'Etapa', 'Dias sem Atualização', 'Responsável'];
+      rowFn = l => {
+        const stage = STAGES.find(s => s.key === l.status);
+        const dias = _diasSemAtualizacao(l);
+        return [
+          Utils.escHtml(l.titulo),
+          `<span style="font-size:11px;color:${stage?.color||'#64748b'}">${stage?.label||l.status}</span>`,
+          `<span style="color:#f59e0b;font-weight:700">${dias != null ? dias + 'd' : '—'}</span>`,
+          Utils.escHtml(l.responsavel || '—'),
+        ];
+      };
+    } else if (tipo === 'propostas_abertas') {
+      title = 'Propostas em Aberto';
+      items = leadsAtivos.filter(l => ['proposta_elaboracao','proposta_enviada'].includes(l.status));
+      cols = ['Lead', 'Etapa', 'Valor', 'Responsável'];
+      rowFn = l => {
+        const stage = STAGES.find(s => s.key === l.status);
+        return [
+          Utils.escHtml(l.titulo),
+          `<span style="font-size:11px;color:${stage?.color||'#64748b'}">${stage?.label||l.status}</span>`,
+          Utils.formatCurrency(l.valorEstimado),
+          Utils.escHtml(l.responsavel || '—'),
+        ];
+      };
+    } else if (tipo === 'em_negociacao') {
+      title = 'Em Negociação';
+      items = leadsAtivos.filter(l => l.status === 'negociacao');
+      cols = ['Lead', 'Valor', 'Próxima Ação', 'Responsável'];
+      rowFn = l => [
+        Utils.escHtml(l.titulo),
+        `<strong>${Utils.formatCurrency(l.valorEstimado)}</strong>`,
+        Utils.escHtml(l.proximaAcao || '—'),
+        Utils.escHtml(l.responsavel || '—'),
+      ];
+    }
+
+    Modal.open({
+      title: `${title} — ${items.length} registro(s)`,
+      body: `<div style="max-height:55vh;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
+            ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
+          </tr></thead>
+          <tbody>${items.length ? items.map(item=>{
+            const cells = rowFn(item);
+            return `<tr style="border-bottom:1px solid var(--border);cursor:pointer"
+              onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+              ${cells.map(v=>`<td style="padding:8px 12px">${v}</td>`).join('')}</tr>`;
+          }).join('') : `<tr><td colspan="${cols.length}" style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum registro</td></tr>`}
+          </tbody>
+        </table></div>`,
+      saveCb: null,
+    });
+    setTimeout(()=>{ const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; },0);
+  }
+
   /* ---- Relatório de leads por canal de origem ---- */
   function relatorioOrigem() {
     const leads = DB.getAll('leads');
@@ -1210,6 +1300,7 @@ const Pipeline = (() => {
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
     relatorioOrigem, filtrarLicitacoes,
     setFilter, clearFilters, setPeriodo,
+    drillDown,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
   };
 })();

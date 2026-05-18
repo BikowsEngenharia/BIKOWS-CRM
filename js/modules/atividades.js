@@ -63,10 +63,10 @@ const Atividades = (() => {
       </div>
 
       <div class="stats-row mb-4">
-        <div class="stat-box"><div class="stat-val">${pendentes}</div><div class="stat-lbl">Pendentes <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div></div>
-        <div class="stat-box" style="border-left:3px solid var(--danger)"><div class="stat-val text-danger">${atrasadas}</div><div class="stat-lbl">Atrasadas</div></div>
-        <div class="stat-box" style="border-left:3px solid var(--warning)"><div class="stat-val">${hoje}</div><div class="stat-lbl">Para Hoje</div></div>
-        <div class="stat-box"><div class="stat-val text-success">${concluidas}</div><div class="stat-lbl">Concluídas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div></div>
+        <div class="stat-box" style="cursor:pointer" onclick="Atividades.drillDown('pendentes')"><div class="stat-val">${pendentes}</div><div class="stat-lbl">Pendentes <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div></div>
+        <div class="stat-box" style="border-left:3px solid var(--danger);cursor:pointer" onclick="Atividades.drillDown('atrasadas')"><div class="stat-val text-danger">${atrasadas}</div><div class="stat-lbl">Atrasadas</div></div>
+        <div class="stat-box" style="border-left:3px solid var(--warning);cursor:pointer" onclick="Atividades.drillDown('hoje')"><div class="stat-val">${hoje}</div><div class="stat-lbl">Para Hoje</div></div>
+        <div class="stat-box" style="cursor:pointer" onclick="Atividades.drillDown('concluidas')"><div class="stat-val text-success">${concluidas}</div><div class="stat-lbl">Concluídas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div></div>
       </div>
 
       ${_selected.size > 0 ? `
@@ -295,7 +295,88 @@ const Atividades = (() => {
     });
   }
 
+  function drillDown(tipo, tipoFiltro) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const atividades = DB.getAll('atividades');
+    const atividadesFiltradas = _filtrarPorPeriodo(atividades, 'data');
+    let title = '', items = [], cols = [], rowFn = () => [];
+
+    if (tipo === 'atrasadas') {
+      title = 'Atrasadas';
+      items = atividadesFiltradas.filter(a => a.status === 'pendente' && a.data && a.data < hoje);
+      cols = ['Atividade', 'Tipo', 'Data', 'Responsável'];
+      rowFn = a => [
+        Utils.escHtml(a.titulo),
+        Utils.escHtml(Utils.ATIV_TIPO?.[a.tipo]?.label || a.tipo || '—'),
+        Utils.formatDate(a.data),
+        Utils.escHtml(a.responsavel || '—'),
+      ];
+    } else if (tipo === 'hoje') {
+      title = 'Para Hoje';
+      items = atividadesFiltradas.filter(a => a.status === 'pendente' && a.data === hoje);
+      cols = ['Atividade', 'Tipo', 'Hora', 'Responsável'];
+      rowFn = a => [
+        Utils.escHtml(a.titulo),
+        Utils.escHtml(Utils.ATIV_TIPO?.[a.tipo]?.label || a.tipo || '—'),
+        Utils.escHtml(a.hora || '—'),
+        Utils.escHtml(a.responsavel || '—'),
+      ];
+    } else if (tipo === 'pendentes') {
+      title = 'Pendentes';
+      items = atividadesFiltradas.filter(a => a.status === 'pendente');
+      cols = ['Atividade', 'Tipo', 'Data', 'Responsável'];
+      rowFn = a => [
+        Utils.escHtml(a.titulo),
+        Utils.escHtml(Utils.ATIV_TIPO?.[a.tipo]?.label || a.tipo || '—'),
+        Utils.formatDate(a.data),
+        Utils.escHtml(a.responsavel || '—'),
+      ];
+    } else if (tipo === 'concluidas') {
+      title = 'Concluídas';
+      items = atividadesFiltradas.filter(a => a.status === 'concluida');
+      cols = ['Atividade', 'Tipo', 'Data Conclusão', 'Responsável'];
+      rowFn = a => [
+        Utils.escHtml(a.titulo),
+        Utils.escHtml(Utils.ATIV_TIPO?.[a.tipo]?.label || a.tipo || '—'),
+        Utils.formatDate(a.data),
+        Utils.escHtml(a.responsavel || '—'),
+      ];
+    } else if (tipo === 'por_tipo') {
+      const tipoLabel = Utils.ATIV_TIPO?.[tipoFiltro]?.label || tipoFiltro || '—';
+      title = `Tipo: ${tipoLabel}`;
+      items = atividadesFiltradas.filter(a => a.tipo === tipoFiltro);
+      cols = ['Atividade', 'Data', 'Responsável'];
+      rowFn = a => [
+        Utils.escHtml(a.titulo),
+        Utils.formatDate(a.data),
+        Utils.escHtml(a.responsavel || '—'),
+      ];
+    }
+
+    if (!items) return;
+    Modal.open({
+      title: `${title} — ${items.length} registro(s)`,
+      body: `
+        <div style="max-height:55vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
+              ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
+            </tr></thead>
+            <tbody>${items.length ? items.map(item => {
+              const cells = rowFn(item);
+              return `<tr style="border-bottom:1px solid var(--border);cursor:pointer"
+                onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+                ${cells.map(v=>`<td style="padding:8px 12px">${v}</td>`).join('')}</tr>`;
+            }).join('') : `<tr><td colspan="${cols.length}" style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum registro</td></tr>`}
+            </tbody>
+          </table>
+        </div>`,
+      saveCb: null,
+    });
+    setTimeout(() => { const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; }, 0);
+  }
+
   function addNew() { openForm(); }
 
-  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir, setPeriodo };
+  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir, setPeriodo, drillDown };
 })();

@@ -21,6 +21,7 @@ const App = (() => {
     marketing:  { title: 'Marketing',       module: Marketing,   addLabel: '+ Novo Conteúdo' },
     trafego:    { title: 'Tráfego Pago',    module: Trafego,     addLabel: '+ Nova Campanha' },
     config:     { title: 'Configurações',   module: Config,      addLabel: null },
+    prospeccao: { title: 'Prospecção',      module: Prospeccao,  addLabel: null },
   };
 
   let _currentPage = 'dashboard';

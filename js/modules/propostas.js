@@ -144,10 +144,10 @@ const Propostas = (() => {
       </div>
 
       <div class="kpi-grid">
-        <div class="kpi-card" style="--kpi-color:#f97316"><div class="kpi-label">Em Aberto <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${totalEnviadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorEmAberto)}</div><div class="kpi-icon">📤</div></div>
-        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Aprovadas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${totalAprovadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorAprovado)}</div><div class="kpi-icon">✅</div></div>
-        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Taxa de Aprovação <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${taxa}%</div><div class="kpi-sub">${propostas.length} no período</div><div class="kpi-icon">📊</div></div>
-        <div class="kpi-card" style="--kpi-color:#8b5cf6"><div class="kpi-label">Total das Propostas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(Utils.sum(propostas,'valor'))}</div><div class="kpi-icon">💼</div></div>
+        <div class="kpi-card" style="--kpi-color:#f97316;cursor:pointer" title="Clique para ver propostas em aberto" onclick="Propostas.drillDown('em_aberto')"><div class="kpi-label">Em Aberto <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${totalEnviadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorEmAberto)}</div><div class="kpi-icon">📤</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" title="Clique para ver propostas aprovadas" onclick="Propostas.drillDown('aprovadas')"><div class="kpi-label">Aprovadas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${totalAprovadas}</div><div class="kpi-sub">${Utils.formatCurrency(valorAprovado)}</div><div class="kpi-icon">✅</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db;cursor:pointer" title="Clique para ver propostas vencendo em 7 dias" onclick="Propostas.drillDown('vencendo')"><div class="kpi-label">Taxa de Aprovação <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value">${taxa}%</div><div class="kpi-sub">${propostas.length} no período</div><div class="kpi-icon">📊</div></div>
+        <div class="kpi-card" style="--kpi-color:#8b5cf6;cursor:pointer" title="Clique para ver propostas reprovadas" onclick="Propostas.drillDown('reprovadas')"><div class="kpi-label">Total das Propostas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(Utils.sum(propostas,'valor'))}</div><div class="kpi-icon">💼</div></div>
       </div>
 
       <div class="card">
@@ -1006,6 +1006,95 @@ const Propostas = (() => {
 
   function addNew() { openForm(); }
 
+  /* ---- Drill-down dos KPI cards ---- */
+  function drillDown(tipo) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const em7dias = new Date(); em7dias.setDate(em7dias.getDate() + 7);
+    const em7diasStr = em7dias.toISOString().split('T')[0];
+
+    let title = '', items = [], cols = [], rowFn = () => [];
+    const todasPropostas = DB.getAll('propostas');
+
+    const getCliente = p => DB.get('clientes', p.clienteId)?.nome || p.clienteNome || '—';
+
+    if (tipo === 'em_aberto') {
+      title = 'Propostas em Aberto';
+      items = todasPropostas.filter(p => ['enviada','negociacao'].includes(p.status));
+      cols = ['Proposta', 'Cliente', 'Valor', 'Validade'];
+      rowFn = p => [
+        Utils.escHtml(p.numero || p.titulo),
+        Utils.escHtml(getCliente(p)),
+        `<strong>${Utils.formatCurrency(p.valor)}</strong>`,
+        Utils.formatDate(p.validade),
+      ];
+    } else if (tipo === 'aprovadas') {
+      title = 'Propostas Aprovadas';
+      items = todasPropostas.filter(p => p.status === 'aprovada');
+      cols = ['Proposta', 'Cliente', 'Valor', 'Data'];
+      rowFn = p => [
+        Utils.escHtml(p.numero || p.titulo),
+        Utils.escHtml(getCliente(p)),
+        `<strong style="color:var(--success)">${Utils.formatCurrency(p.valor)}</strong>`,
+        Utils.formatDate(p.updatedAt ? p.updatedAt.split('T')[0] : p.createdAt?.split('T')[0]),
+      ];
+    } else if (tipo === 'reprovadas') {
+      title = 'Propostas Reprovadas / Recusadas';
+      items = todasPropostas.filter(p => p.status === 'reprovada' || p.status === 'recusada');
+      cols = ['Proposta', 'Cliente', 'Valor', 'Motivo Perda'];
+      rowFn = p => [
+        Utils.escHtml(p.numero || p.titulo),
+        Utils.escHtml(getCliente(p)),
+        Utils.formatCurrency(p.valor),
+        Utils.escHtml(p.motivoPerda || '—'),
+      ];
+    } else if (tipo === 'vencendo') {
+      title = 'Propostas Vencendo em 7 dias';
+      items = todasPropostas.filter(p =>
+        p.validade && p.validade >= hoje && p.validade <= em7diasStr &&
+        ['enviada','negociacao','elaboracao'].includes(p.status)
+      );
+      cols = ['Proposta', 'Cliente', 'Valor', 'Validade'];
+      rowFn = p => [
+        Utils.escHtml(p.numero || p.titulo),
+        Utils.escHtml(getCliente(p)),
+        `<strong>${Utils.formatCurrency(p.valor)}</strong>`,
+        `<span style="color:#f97316;font-weight:700">${Utils.formatDate(p.validade)}</span>`,
+      ];
+    } else if (tipo === 'vencidas') {
+      title = 'Propostas Vencidas';
+      items = todasPropostas.filter(p =>
+        p.validade && p.validade < hoje &&
+        ['enviada','negociacao'].includes(p.status)
+      );
+      cols = ['Proposta', 'Cliente', 'Valor', 'Validade'];
+      rowFn = p => [
+        Utils.escHtml(p.numero || p.titulo),
+        Utils.escHtml(getCliente(p)),
+        Utils.formatCurrency(p.valor),
+        `<span style="color:var(--danger);font-weight:700">${Utils.formatDate(p.validade)}</span>`,
+      ];
+    }
+
+    Modal.open({
+      title: `${title} — ${items.length} registro(s)`,
+      body: `<div style="max-height:55vh;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
+            ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
+          </tr></thead>
+          <tbody>${items.length ? items.map(item=>{
+            const cells = rowFn(item);
+            return `<tr style="border-bottom:1px solid var(--border);cursor:pointer"
+              onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+              ${cells.map(v=>`<td style="padding:8px 12px">${v}</td>`).join('')}</tr>`;
+          }).join('') : `<tr><td colspan="${cols.length}" style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum registro</td></tr>`}
+          </tbody>
+        </table></div>`,
+      saveCb: null,
+    });
+    setTimeout(()=>{ const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; },0);
+  }
+
   return {
     render, openForm, saveProposta, deleteProposta, view, setFilter, changeStatus,
     criarRecebivel, addNew, addItemRow, removeItemRow, _setItemField,
@@ -1013,5 +1102,6 @@ const Propostas = (() => {
     _addEtapaContrato, _renderEtapasContrato, _setEtapaCampo, _removeEtapaContrato,
     nextNumeroProposta: _nextNumeroProposta, // exposto para uso no pipeline
     setPeriodo,
+    drillDown,
   };
 })();

@@ -92,10 +92,10 @@ const Contratos = (() => {
       </div>
 
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Ativos</div><div class="kpi-value">${ativos}</div><div class="kpi-icon">📋</div></div>
-        <div class="kpi-card" style="--kpi-color:#f59e0b"><div class="kpi-label">Renovando em 30d</div><div class="kpi-value">${renovando}</div><div class="kpi-icon">🔄</div></div>
-        <div class="kpi-card" style="--kpi-color:#ef4444"><div class="kpi-label">Vencidos</div><div class="kpi-value">${vencidos}</div><div class="kpi-icon">⚠</div></div>
-        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Valor em Vigência</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(valorTotal)}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" onclick="Contratos.drillDown('ativos')"><div class="kpi-label">Ativos</div><div class="kpi-value">${ativos}</div><div class="kpi-icon">📋</div></div>
+        <div class="kpi-card" style="--kpi-color:#f59e0b;cursor:pointer" onclick="Contratos.drillDown('vencendo')"><div class="kpi-label">Renovando em 30d</div><div class="kpi-value">${renovando}</div><div class="kpi-icon">🔄</div></div>
+        <div class="kpi-card" style="--kpi-color:#ef4444;cursor:pointer" onclick="Contratos.drillDown('vencidos')"><div class="kpi-label">Vencidos</div><div class="kpi-value">${vencidos}</div><div class="kpi-icon">⚠</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db;cursor:pointer" onclick="Contratos.drillDown('encerrados')"><div class="kpi-label">Valor em Vigência</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(valorTotal)}</div><div class="kpi-icon">💰</div></div>
       </div>
 
       ${renovando > 0 || vencidos > 0 ? `
@@ -390,7 +390,92 @@ const Contratos = (() => {
     });
   }
 
+  function drillDown(tipo) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const contratos = DB.getAll('contratos');
+    const contratosFiltrados = _filtrarPorPeriodo(contratos, 'dataInicio');
+    let title = '', items = [], cols = [], rowFn = () => [];
+
+    if (tipo === 'ativos') {
+      title = 'Ativos';
+      items = contratosFiltrados.filter(c => _autoStatus(c) === 'ativo');
+      cols = ['Contrato', 'Cliente', 'Valor', 'Vencimento'];
+      rowFn = c => [
+        Utils.escHtml(c.objeto || c.numero || '—'),
+        Utils.escHtml(DB.get('clientes', c.clienteId)?.nome || '—'),
+        Utils.formatCurrency(c.valor),
+        Utils.formatDate(c.dataFim || c.vencimento),
+      ];
+    } else if (tipo === 'vencendo') {
+      title = 'Vencendo em 30 dias';
+      items = contratos.filter(c => {
+        const dias = Utils.daysUntil(c.dataFim || c.vencimento);
+        return dias !== null && dias >= 0 && dias <= 30 && _autoStatus(c) !== 'encerrado';
+      });
+      cols = ['Contrato', 'Cliente', 'Vencimento', 'Dias Restantes'];
+      rowFn = c => {
+        const dias = Utils.daysUntil(c.dataFim || c.vencimento);
+        const diasStr = dias !== null ? `<span style="color:#f59e0b;font-weight:600">${dias}d</span>` : '—';
+        return [
+          Utils.escHtml(c.objeto || c.numero || '—'),
+          Utils.escHtml(DB.get('clientes', c.clienteId)?.nome || '—'),
+          Utils.formatDate(c.dataFim || c.vencimento),
+          diasStr,
+        ];
+      };
+    } else if (tipo === 'vencidos') {
+      title = 'Vencidos';
+      items = contratos.filter(c => {
+        const dias = Utils.daysUntil(c.dataFim || c.vencimento);
+        return dias !== null && dias < 0 && c.status !== 'encerrado' && c.status !== 'cancelado';
+      });
+      cols = ['Contrato', 'Cliente', 'Vencimento', 'Dias Vencido'];
+      rowFn = c => {
+        const dias = Utils.daysUntil(c.dataFim || c.vencimento);
+        const diasStr = dias !== null ? `<span style="color:#ef4444;font-weight:600">${Math.abs(dias)}d</span>` : '—';
+        return [
+          Utils.escHtml(c.objeto || c.numero || '—'),
+          Utils.escHtml(DB.get('clientes', c.clienteId)?.nome || '—'),
+          Utils.formatDate(c.dataFim || c.vencimento),
+          diasStr,
+        ];
+      };
+    } else if (tipo === 'encerrados') {
+      title = 'Encerrados';
+      items = contratosFiltrados.filter(c => c.status === 'encerrado' || c.status === 'cancelado');
+      cols = ['Contrato', 'Cliente', 'Valor', 'Data Encerramento'];
+      rowFn = c => [
+        Utils.escHtml(c.objeto || c.numero || '—'),
+        Utils.escHtml(DB.get('clientes', c.clienteId)?.nome || '—'),
+        Utils.formatCurrency(c.valor),
+        Utils.formatDate(c.dataFim || c.vencimento),
+      ];
+    }
+
+    if (!items) return;
+    Modal.open({
+      title: `${title} — ${items.length} registro(s)`,
+      body: `
+        <div style="max-height:55vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
+              ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
+            </tr></thead>
+            <tbody>${items.length ? items.map(item => {
+              const cells = rowFn(item);
+              return `<tr style="border-bottom:1px solid var(--border);cursor:pointer"
+                onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+                ${cells.map(v=>`<td style="padding:8px 12px">${v}</td>`).join('')}</tr>`;
+            }).join('') : `<tr><td colspan="${cols.length}" style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum registro</td></tr>`}
+            </tbody>
+          </table>
+        </div>`,
+      saveCb: null,
+    });
+    setTimeout(() => { const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; }, 0);
+  }
+
   function addNew() { openForm(); }
 
-  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo };
+  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo, drillDown };
 })();

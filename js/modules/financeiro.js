@@ -54,12 +54,12 @@ const Financeiro = (() => {
 
     return `
       <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Receita do Mês</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(recMes)}</div><div class="kpi-sub">Valores recebidos</div><div class="kpi-icon">📥</div></div>
-        <div class="kpi-card" style="--kpi-color:#dc2626"><div class="kpi-label">Despesas do Mês</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(dspMes)}</div><div class="kpi-sub">Valores pagos</div><div class="kpi-icon">📤</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" title="Clique para ver recebimentos do período" onclick="Financeiro.drillDown('recebido_periodo')"><div class="kpi-label">Receita do Mês</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(recMes)}</div><div class="kpi-sub">Valores recebidos</div><div class="kpi-icon">📥</div></div>
+        <div class="kpi-card" style="--kpi-color:#dc2626;cursor:pointer" title="Clique para ver lançamentos do período" onclick="Financeiro.drillDown('lancamentos')"><div class="kpi-label">Despesas do Mês</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(dspMes)}</div><div class="kpi-sub">Valores pagos</div><div class="kpi-icon">📤</div></div>
         <div class="kpi-card" style="--kpi-color:${res>=0?'#10b981':'#dc2626'}"><div class="kpi-label">Resultado</div><div class="kpi-value" style="font-size:20px;color:${res>=0?'var(--success)':'var(--danger)'}">${Utils.formatCurrency(res)}</div><div class="kpi-sub">${res>=0?'Superávit':'Déficit'} no mês</div><div class="kpi-icon">📊</div></div>
-        <div class="kpi-card" style="--kpi-color:#d97706"><div class="kpi-label">A Receber</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(aRec)}</div><div class="kpi-sub">Lançamentos pendentes</div><div class="kpi-icon">💳</div></div>
-        <div class="kpi-card" style="--kpi-color:#7c3aed"><div class="kpi-label">A Pagar</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(aPag)}</div><div class="kpi-sub">Contas em aberto</div><div class="kpi-icon">📋</div></div>
-        <div class="kpi-card" style="--kpi-color:#dc2626"><div class="kpi-label">Vencidos</div><div class="kpi-value" style="font-size:20px;color:var(--danger)">${Utils.formatCurrency(venc)}</div><div class="kpi-sub">Parcelas em atraso</div><div class="kpi-icon">⚠️</div></div>
+        <div class="kpi-card" style="--kpi-color:#d97706;cursor:pointer" title="Clique para ver parcelas a vencer" onclick="Financeiro.drillDown('receber_avencer')"><div class="kpi-label">A Receber</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(aRec)}</div><div class="kpi-sub">Lançamentos pendentes</div><div class="kpi-icon">💳</div></div>
+        <div class="kpi-card" style="--kpi-color:#7c3aed;cursor:pointer" title="Clique para ver contas a pagar" onclick="Financeiro.drillDown('pagar_avencer')"><div class="kpi-label">A Pagar</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(aPag)}</div><div class="kpi-sub">Contas em aberto</div><div class="kpi-icon">📋</div></div>
+        <div class="kpi-card" style="--kpi-color:#dc2626;cursor:pointer" title="Clique para ver parcelas vencidas" onclick="Financeiro.drillDown('receber_vencido')"><div class="kpi-label">Vencidos</div><div class="kpi-value" style="font-size:20px;color:var(--danger)">${Utils.formatCurrency(venc)}</div><div class="kpi-sub">Parcelas em atraso</div><div class="kpi-icon">⚠️</div></div>
       </div>
       <div class="grid-2">
         <div class="card"><div class="card-header"><div class="card-title">📊 Receitas — 6 meses</div></div><div class="card-body"><div id="chartRecDesp" style="height:190px"></div></div></div>
@@ -443,5 +443,123 @@ const Financeiro = (() => {
   function deleteRecebivel(id){Utils.confirmDelete('este recebível',()=>{DB.remove('recebiveis',id);Toast.success('Removido');renderTab();});}
   function addNew(){novoLancamento();}
 
-  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew};
+  /* ---- Drill-down dos KPI cards ---- */
+  function drillDown(tipo) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const mes = hoje.substring(0, 7);
+    let title = '', items = [], cols = [], rowFn = () => [];
+
+    if (tipo === 'receber_avencer') {
+      title = 'A Receber — Parcelas a Vencer';
+      items = [];
+      DB.getAll('recebiveis').forEach(r => {
+        const clienteNome = DB.get('clientes', r.clienteId)?.nome || r.cliente || r.titulo || r.descricao || '—';
+        (r.parcelas || []).forEach(p => {
+          if (p.status !== 'recebido' && p.vencimento >= hoje) {
+            items.push({ _clienteNome: clienteNome, _desc: r.descricao, ...p });
+          }
+        });
+      });
+      cols = ['Cliente', 'Descrição', 'Valor', 'Vencimento'];
+      rowFn = p => [
+        Utils.escHtml(p._clienteNome),
+        Utils.escHtml(p._desc || '—'),
+        `<strong>${Utils.formatCurrency(p.valor)}</strong>`,
+        Utils.formatDate(p.vencimento),
+      ];
+    } else if (tipo === 'receber_vencido') {
+      title = 'Parcelas Vencidas';
+      items = [];
+      DB.getAll('recebiveis').forEach(r => {
+        const clienteNome = DB.get('clientes', r.clienteId)?.nome || r.cliente || r.titulo || r.descricao || '—';
+        (r.parcelas || []).forEach(p => {
+          if (p.status !== 'recebido' && p.vencimento < hoje) {
+            const dias = Math.round((new Date(hoje) - new Date(p.vencimento)) / 86400000);
+            items.push({ _clienteNome: clienteNome, _desc: r.descricao, _dias: dias, ...p });
+          }
+        });
+      });
+      cols = ['Cliente', 'Descrição', 'Valor', 'Vencimento', 'Dias Atraso'];
+      rowFn = p => [
+        Utils.escHtml(p._clienteNome),
+        Utils.escHtml(p._desc || '—'),
+        Utils.formatCurrency(p.valor),
+        `<span style="color:var(--danger)">${Utils.formatDate(p.vencimento)}</span>`,
+        `<span style="color:var(--danger);font-weight:700">${p._dias}d</span>`,
+      ];
+    } else if (tipo === 'recebido_periodo') {
+      title = 'Recebimentos do Período';
+      items = [];
+      DB.getAll('recebiveis').forEach(r => {
+        const clienteNome = DB.get('clientes', r.clienteId)?.nome || r.cliente || r.descricao || '—';
+        (r.parcelas || []).forEach(p => {
+          if (p.status === 'recebido' && (p.dataPagamento || '').startsWith(mes)) {
+            items.push({ _clienteNome: clienteNome, ...p });
+          }
+        });
+      });
+      cols = ['Cliente', 'Valor', 'Data Recebimento'];
+      rowFn = p => [
+        Utils.escHtml(p._clienteNome),
+        `<strong style="color:var(--success)">${Utils.formatCurrency(p.valor)}</strong>`,
+        Utils.formatDate(p.dataPagamento),
+      ];
+    } else if (tipo === 'pagar_avencer') {
+      title = 'Contas a Pagar — A Vencer';
+      items = DB.getAll('contaspagar').filter(p => p.status === 'pendente' && (p.vencimento || '') >= hoje);
+      cols = ['Descrição', 'Valor', 'Vencimento', 'Categoria'];
+      rowFn = p => [
+        Utils.escHtml(p.fornecedor || p.descricao || '—'),
+        `<strong>${Utils.formatCurrency(p.valor)}</strong>`,
+        Utils.formatDate(p.vencimento),
+        Utils.escHtml(p.categoria || '—'),
+      ];
+    } else if (tipo === 'pagar_vencido') {
+      title = 'Contas a Pagar — Vencidas';
+      items = DB.getAll('contaspagar').filter(p => p.status === 'pendente' && p.vencimento && p.vencimento < hoje);
+      cols = ['Descrição', 'Valor', 'Vencimento', 'Dias Atraso'];
+      rowFn = p => {
+        const dias = Math.round((new Date(hoje) - new Date(p.vencimento)) / 86400000);
+        return [
+          Utils.escHtml(p.fornecedor || p.descricao || '—'),
+          Utils.formatCurrency(p.valor),
+          `<span style="color:var(--danger)">${Utils.formatDate(p.vencimento)}</span>`,
+          `<span style="color:var(--danger);font-weight:700">${dias}d</span>`,
+        ];
+      };
+    } else if (tipo === 'lancamentos') {
+      title = 'Lançamentos do Período';
+      items = DB.getAll('lancamentos').filter(l => (l.data || '').startsWith(mes));
+      cols = ['Descrição', 'Tipo', 'Valor', 'Data'];
+      rowFn = l => [
+        Utils.escHtml(l.descricao || '—'),
+        l.tipo === 'receita'
+          ? '<span class="badge badge-green">Receita</span>'
+          : '<span class="badge badge-red">Despesa</span>',
+        `<strong class="${l.tipo==='receita'?'text-success':'text-danger'}">${Utils.formatCurrency(l.valor)}</strong>`,
+        Utils.formatDate(l.data),
+      ];
+    }
+
+    Modal.open({
+      title: `${title} — ${items.length} registro(s)`,
+      body: `<div style="max-height:55vh;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
+            ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
+          </tr></thead>
+          <tbody>${items.length ? items.map(item=>{
+            const cells = rowFn(item);
+            return `<tr style="border-bottom:1px solid var(--border);cursor:pointer"
+              onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+              ${cells.map(v=>`<td style="padding:8px 12px">${v}</td>`).join('')}</tr>`;
+          }).join('') : `<tr><td colspan="${cols.length}" style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum registro</td></tr>`}
+          </tbody>
+        </table></div>`,
+      saveCb: null,
+    });
+    setTimeout(()=>{ const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; },0);
+  }
+
+  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew,drillDown};
 })();

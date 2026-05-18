@@ -299,7 +299,7 @@ const Metas = (() => {
           return `
             <div style="background:var(--surface,#fff);border:1px solid ${isAtual?'var(--primary)':'var(--border)'};border-radius:14px;overflow:hidden;${isAtual?'box-shadow:0 0 0 2px rgba(37,99,235,.15);':''}">
               <!-- Header do card -->
-              <div style="background:${isAtual?'linear-gradient(135deg,#0a1628,#1e3a5f)':'var(--surface-2,#f8fafc)'};padding:16px;border-bottom:1px solid var(--border);">
+              <div onclick="Metas.setTab('painel');Metas.setQDash(${qi})" style="cursor:pointer;background:${isAtual?'linear-gradient(135deg,#0a1628,#1e3a5f)':'var(--surface-2,#f8fafc)'};padding:16px;border-bottom:1px solid var(--border);">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                   <div>
                     <div style="font-size:12px;font-weight:700;${isAtual?'color:#7a9bbf':'color:var(--text-muted)'};text-transform:uppercase;letter-spacing:.5px;">${label}${isAtual?' · Atual':''}</div>

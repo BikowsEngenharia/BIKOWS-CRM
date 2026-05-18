@@ -113,25 +113,25 @@ const Dashboard = (() => {
 
       <!-- KPIs -->
       <div class="kpi-grid">
-        <div class="kpi-card" style="--kpi-color:#1a56db">
+        <div class="kpi-card" style="--kpi-color:#1a56db;cursor:pointer" onclick="Dashboard.drillDown('leads_ativos')">
           <div class="kpi-label">Pipeline Ativo <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="kpi-sub">${ativos.length} oportunidades abertas</div>
           <div class="kpi-icon">💼</div>
         </div>
-        <div class="kpi-card" style="--kpi-color:#10b981">
+        <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" onclick="Dashboard.drillDown('leads_ganhos')">
           <div class="kpi-label">Receita Fechada <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${Utils.formatCurrency(receitaFechada)}</div>
           <div class="kpi-sub">${ganhos.length} negócios ganhos</div>
           <div class="kpi-icon">🏆</div>
         </div>
-        <div class="kpi-card" style="--kpi-color:#f59e0b">
+        <div class="kpi-card" style="--kpi-color:#f59e0b;cursor:pointer" onclick="Dashboard.drillDown('receber_avencer')">
           <div class="kpi-label">A Receber</div>
           <div class="kpi-value">${Utils.formatCurrency(totalReceberAVencer + totalReceberVencido)}</div>
           <div class="kpi-sub ${totalReceberVencido > 0 ? 'text-danger' : ''}">${totalReceberVencido > 0 ? `⚠ ${Utils.formatCurrency(totalReceberVencido)} vencido` : 'Em dia'}</div>
           <div class="kpi-icon">💰</div>
         </div>
-        <div class="kpi-card" style="--kpi-color:#8b5cf6">
+        <div class="kpi-card" style="--kpi-color:#8b5cf6;cursor:pointer" onclick="Dashboard.drillDown('leads_novos')">
           <div class="kpi-label">Taxa de Conversão <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${taxaConversao}%</div>
           <div class="kpi-sub">${ganhos.length} ganhos / ${perdidos.length} perdidos</div>
@@ -142,7 +142,7 @@ const Dashboard = (() => {
       <!-- KPIs SECUNDÁRIOS -->
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
         <!-- Licitações em andamento -->
-        <div class="kpi-card" style="--kpi-color:#0f766e">
+        <div class="kpi-card" style="--kpi-color:#0f766e;cursor:pointer" onclick="Dashboard.drillDown('licitacoes_urgentes')">
           <div class="kpi-label">Licitações em Disputa</div>
           <div class="kpi-value">${licsAtivas.length}</div>
           <div class="kpi-sub ${licsUrgentes > 0 ? 'text-danger' : ''}">${licsUrgentes > 0 ? `⚠ ${licsUrgentes} abrindo em ≤7 dias` : Utils.formatCurrency(valorLics) + ' em disputa'}</div>
@@ -691,5 +691,129 @@ const Dashboard = (() => {
     </div>`;
   }
 
-  return { render, setPeriodo };
+  /* ================================================
+     DRILL-DOWN — Modal com lista de itens do KPI
+     ================================================ */
+  function drillDown(tipo) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const configs = {
+      'leads_ativos': {
+        title: '💼 Leads Ativos',
+        get items() { return DB.getAll('leads').filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status)); },
+        cols: ['Lead','Etapa','Valor','Responsável'],
+        row: l => [Utils.escHtml(l.titulo||'—'), Utils.escHtml(l.status||'—'), Utils.formatCurrency(l.valorEstimado||0), Utils.escHtml(l.responsavel||'—')],
+        action: l => `onclick="App.navigate('pipeline');Modal.close()"`,
+      },
+      'leads_ganhos': {
+        title: '🏆 Leads Ganhos',
+        get items() { return DB.getAll('leads').filter(l => l.status === 'fechado_ganho'); },
+        cols: ['Lead','Valor Fechado','Responsável'],
+        row: l => [Utils.escHtml(l.titulo||'—'), Utils.formatCurrency(l.valorFechado||0), Utils.escHtml(l.responsavel||'—')],
+        action: l => `onclick="App.navigate('pipeline');Modal.close()"`,
+      },
+      'leads_novos': {
+        title: '🔵 Leads do Período',
+        get items() {
+          return _filtrarPorPeriodo(DB.getAll('leads'), 'dataEntrada');
+        },
+        cols: ['Lead','Origem','Data','Responsável'],
+        row: l => [Utils.escHtml(l.titulo||'—'), Utils.escHtml(l.origemLead||'—'), Utils.formatDate(l.dataEntrada||''), Utils.escHtml(l.responsavel||'—')],
+        action: l => `onclick="App.navigate('pipeline');Modal.close()"`,
+      },
+      'atividades_atrasadas': {
+        title: '⚠ Atividades Atrasadas',
+        get items() { return DB.getAll('atividades').filter(a => a.status === 'pendente' && a.data && a.data < hoje); },
+        cols: ['Atividade','Tipo','Data','Responsável'],
+        row: a => [Utils.escHtml(a.titulo||'—'), Utils.escHtml(a.tipo||'—'), Utils.formatDate(a.data||''), Utils.escHtml(a.responsavel||'—')],
+        action: a => `onclick="App.navigate('atividades');Modal.close()"`,
+      },
+      'projetos_ativos': {
+        title: '📋 Projetos em Andamento',
+        get items() { return DB.getAll('projetos').filter(p => p.status === 'em_andamento'); },
+        cols: ['Projeto','Cliente','Prazo','Responsável'],
+        row: p => [Utils.escHtml(p.titulo||'—'), Utils.escHtml(Utils.getClientName(p.clienteId)||'—'), Utils.formatDate(p.prazo||''), Utils.escHtml(p.responsavel||'—')],
+        action: p => `onclick="App.navigate('projetos');Modal.close()"`,
+      },
+      'receber_avencer': {
+        title: '💰 Recebíveis a Vencer',
+        get items() {
+          const list = [];
+          DB.getAll('recebiveis').forEach(r => {
+            (r.parcelas||[]).forEach(p => {
+              if (p.status === 'a_vencer' && !Utils.isOverdue(p.vencimento)) {
+                list.push({ ...p, _clienteId: r.clienteId });
+              }
+            });
+          });
+          return list;
+        },
+        cols: ['Cliente','Valor','Vencimento'],
+        row: p => [Utils.escHtml(Utils.getClientName(p._clienteId)||'—'), Utils.formatCurrency(p.valor||0), Utils.formatDate(p.vencimento||'')],
+        action: p => `onclick="App.navigate('financeiro');Modal.close()"`,
+      },
+      'receber_vencido': {
+        title: '🔴 Recebíveis Vencidos',
+        get items() {
+          const list = [];
+          DB.getAll('recebiveis').forEach(r => {
+            (r.parcelas||[]).forEach(p => {
+              if (p.status === 'a_vencer' && Utils.isOverdue(p.vencimento)) {
+                list.push({ ...p, _clienteId: r.clienteId });
+              }
+            });
+          });
+          return list;
+        },
+        cols: ['Cliente','Valor','Vencimento'],
+        row: p => [Utils.escHtml(Utils.getClientName(p._clienteId)||'—'), `<span style="color:#ef4444;font-weight:700">${Utils.formatCurrency(p.valor||0)}</span>`, `<span style="color:#ef4444">${Utils.formatDate(p.vencimento||'')}</span>`],
+        action: p => `onclick="App.navigate('financeiro');Modal.close()"`,
+      },
+      'licitacoes_urgentes': {
+        title: '🏛 Licitações — Abertura em ≤7 dias',
+        get items() {
+          return DB.getAll('licitacoes').filter(l => {
+            if (['ganhou','perdeu','deserta','cancelada'].includes(l.status)) return false;
+            const d = Utils.daysUntil(l.dataAbertura);
+            return d != null && d >= 0 && d <= 7;
+          });
+        },
+        cols: ['Objeto','Órgão','Data Abertura','Valor'],
+        row: l => [Utils.escHtml(l.objeto||l.numero||'—'), Utils.escHtml(l.orgao||'—'), Utils.formatDate(l.dataAbertura||''), Utils.formatCurrency(l.valorEstimado||0)],
+        action: l => `onclick="App.navigate('licitacoes');Modal.close()"`,
+      },
+      'contas_pagar': {
+        title: '💸 Contas a Pagar',
+        get items() { return DB.getAll('contaspagar').filter(c => c.status === 'pendente'); },
+        cols: ['Descrição','Valor','Vencimento'],
+        row: c => [Utils.escHtml(c.fornecedor||c.descricao||'—'), Utils.formatCurrency(c.valor||0), Utils.formatDate(c.vencimento||'')],
+        action: c => `onclick="App.navigate('financeiro');Modal.close()"`,
+      },
+    };
+    const cfg = configs[tipo]; if (!cfg) return;
+    const items = cfg.items;
+    Modal.open({
+      title: `${cfg.title} — ${items.length} registro(s)`,
+      body: `
+        <div style="max-height:55vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
+              ${cfg.cols.map(c => `<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
+            </tr></thead>
+            <tbody>
+              ${items.length ? items.map(item => `
+                <tr style="border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s"
+                    onmouseover="this.style.background='var(--surface-2,#f8fafc)'"
+                    onmouseout="this.style.background=''" ${cfg.action(item)}>
+                  ${cfg.row(item).map(v => `<td style="padding:8px 12px">${v}</td>`).join('')}
+                </tr>`).join('')
+              : `<tr><td colspan="${cfg.cols.length}" style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum registro</td></tr>`}
+            </tbody>
+          </table>
+        </div>`,
+      saveCb: null,
+    });
+    setTimeout(() => { const f = document.getElementById('modalFoot'); if(f) f.style.display='none'; }, 0);
+  }
+
+  return { render, setPeriodo, drillDown };
 })();

@@ -411,12 +411,13 @@ const Licitacoes = (() => {
             return `
               <div style="width:200px;flex-shrink:0">
                 <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid ${s.color};margin-bottom:8px;cursor:pointer;transition:box-shadow .15s"
-                     title="Clique para filtrar por ${s.label}"
-                     onclick="Licitacoes.setFilter('status','${sk}');Licitacoes.setTab('lista')"
+                     title="Clique para filtrar por este status"
+                     onclick="Licitacoes.filtrarKanban('${sk}')"
                      onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'"
                      onmouseout="this.style.boxShadow='none'">
-                  <div style="font-size:12px;font-weight:700;color:${s.color}">${s.label} 🔍</div>
+                  <div style="font-size:12px;font-weight:700;color:${s.color}">${s.label}</div>
                   <div style="font-size:11px;color:var(--text-muted)">${cards.length} · ${Utils.formatCurrency(total)}</div>
+                  <div style="font-size:10px;color:var(--text-muted);margin-top:2px;opacity:.7">🔍 Ver lista filtrada</div>
                 </div>
                 ${cards.map(l => renderKanbanCard(l)).join('')}
               </div>`;
@@ -426,22 +427,24 @@ const Licitacoes = (() => {
           <div style="width:200px;flex-shrink:0">
             <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #10b981;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s"
                  title="Clique para ver todas as ganhas"
-                 onclick="Licitacoes.setFilter('status','ganhou');Licitacoes.setTab('lista')"
+                 onclick="Licitacoes.filtrarKanban('ganhou')"
                  onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'"
                  onmouseout="this.style.boxShadow='none'">
-              <div style="font-size:12px;font-weight:700;color:#10b981">✅ Ganhas 🔍</div>
-              <div style="font-size:11px;color:var(--text-muted)">${lics.filter(l=>l.status==='ganhou').length}</div>
+              <div style="font-size:12px;font-weight:700;color:#10b981">✅ Ganhas</div>
+              <div style="font-size:11px;color:var(--text-muted)">${lics.filter(l=>l.status==='ganhou').length} · ${Utils.formatCurrency(lics.filter(l=>l.status==='ganhou').reduce((s,l)=>s+(l.valorAdjudicado||l.valorProposta||0),0))}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;opacity:.7">🔍 Ver lista filtrada</div>
             </div>
             ${lics.filter(l=>l.status==='ganhou').map(l => renderKanbanCard(l)).join('')}
           </div>
           <div style="width:200px;flex-shrink:0">
             <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #ef4444;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s"
                  title="Clique para ver perdidas/canceladas"
-                 onclick="Licitacoes.setFilter('status','perdeu');Licitacoes.setTab('lista')"
+                 onclick="Licitacoes.filtrarKanban('perdeu')"
                  onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'"
                  onmouseout="this.style.boxShadow='none'">
-              <div style="font-size:12px;font-weight:700;color:#ef4444">❌ Perdidas / Canceladas 🔍</div>
+              <div style="font-size:12px;font-weight:700;color:#ef4444">❌ Perdidas / Canceladas</div>
               <div style="font-size:11px;color:var(--text-muted)">${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).length}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;opacity:.7">🔍 Ver lista filtrada</div>
             </div>
             ${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).map(l => renderKanbanCard(l)).join('')}
           </div>
@@ -990,6 +993,13 @@ const Licitacoes = (() => {
 
   function addNew() { openForm(); }
 
+  /* ── Filtrar kanban — troca para lista com status aplicado ──────────── */
+  function filtrarKanban(status) {
+    _filter.status = status;
+    _tab = 'lista';
+    render();
+  }
+
   /* ── CSV Import / Export ─────────────────────────────────────────────── */
 
   function downloadCSVTemplate() {
@@ -1081,5 +1091,6 @@ const Licitacoes = (() => {
     render, openForm, saveLic, deleteLic, view, setFilter, setTab,
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,
+    filtrarKanban,
   };
 })();

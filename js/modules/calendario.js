@@ -202,7 +202,7 @@ const Calendario = (() => {
 
     const rows = events.map(ev => {
       const clienteNome = ev.raw && ev.raw.clienteId
-        ? Utils.escHtml(Utils.getClientName ? Utils.getClientName(ev.raw.clienteId) : ev.raw.clienteId)
+        ? Utils.escHtml(Utils.getClientName?.(ev.raw.clienteId) || ev.raw.clienteId || '')
         : '';
       const typeLabels = {
         atividade:  'Atividade',

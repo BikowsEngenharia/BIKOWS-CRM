@@ -173,9 +173,14 @@ const Trafego = (() => {
     _renderTab();
   }
 
+  let _setTabPending = false;
   function _setTab(tab) {
+    if (_setTabPending || _tab === tab) return;
+    _setTabPending = true;
     _tab = tab;
-    render();
+    requestAnimationFrame(() => {
+      try { render(); } finally { _setTabPending = false; }
+    });
   }
 
   function _renderTab() {

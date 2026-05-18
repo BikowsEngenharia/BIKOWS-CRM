@@ -128,23 +128,22 @@ const Config = (() => {
           </div>
         </div>
 
-        <!-- Dados do sistema -->
+        <!-- Backup e Restauração (consolidado) -->
         <div class="card">
-          <div class="card-header"><div class="card-title">💾 Backup e Dados</div></div>
+          <div class="card-header"><div class="card-title">💾 Backup e Restauração</div></div>
           <div class="card-body">
-            <div class="flex gap-2 mb-3">
-              <button class="btn btn-success" onclick="Config.exportData()">📤 Exportar Backup</button>
+            <p class="text-sm text-muted mb-3">Exporte um backup completo de todos os dados do CRM ou restaure a partir de um arquivo anterior. Dados são sincronizados com o Supabase.</p>
+            <div class="flex gap-2 mb-3" style="flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="Config.exportBackup()">📥 Baixar Backup Completo</button>
               <label class="btn btn-secondary" style="cursor:pointer">
-                📥 Importar Backup
-                <input type="file" accept=".json" style="display:none" onchange="Config.importData(event)">
+                📤 Restaurar Backup
+                <input type="file" accept=".json" style="display:none" onchange="Config.importBackup(event)">
               </label>
-            </div>
-            <div class="flex gap-2">
               <button class="btn btn-danger" onclick="Config.resetData()">🗑 Limpar Todos os Dados</button>
             </div>
-            <div class="text-xs text-muted mt-3">
-              ⚠ Dados armazenados no navegador. <strong>Exporte regularmente!</strong><br>
-              Limpar o cache do browser apaga todos os dados sem recuperação.
+            <div class="text-xs text-muted">
+              Último backup: <span id="lastBackupDate">—</span><br>
+              ⚠ <strong>Exporte regularmente!</strong> O reset apaga dados sem recuperação.
             </div>
           </div>
         </div>
@@ -162,22 +161,6 @@ const Config = (() => {
           </div>
           <div class="card-body" style="padding:0;max-height:320px;overflow-y:auto" id="auditLogContainer">
             ${_renderAuditLog('')}
-          </div>
-        </div>
-
-        <!-- Backup e Restauração -->
-        <div class="card">
-          <div class="card-header"><div class="card-title">💾 Backup e Restauração</div></div>
-          <div class="card-body">
-            <p class="text-sm text-muted mb-3">Faça backup de todos os dados do CRM ou restaure a partir de um arquivo de backup anterior.</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-primary" onclick="Config.exportBackup()">📥 Baixar Backup Completo</button>
-              <label class="btn btn-secondary" style="cursor:pointer">
-                📤 Restaurar Backup
-                <input type="file" accept=".json" style="display:none" onchange="Config.importBackup(event)">
-              </label>
-            </div>
-            <div class="text-xs text-muted mt-2">Último backup: <span id="lastBackupDate">—</span></div>
           </div>
         </div>
 
@@ -402,56 +385,7 @@ const Config = (() => {
     render();
   }
 
-  function exportData() {
-    const data = {
-      version: '2.0',
-      exportedAt: new Date().toISOString(),
-      empresa: DB.getConfig().empresa || 'CRM',
-      clientes:      DB.getAll('clientes'),
-      contatos:      DB.getAll('contatos'),
-      leads:         DB.getAll('leads'),
-      projetos:      DB.getAll('projetos'),
-      atividades:    DB.getAll('atividades'),
-      propostas:     DB.getAll('propostas'),
-      recebiveis:    DB.getAll('recebiveis'),
-      funcionarios:  DB.getAll('funcionarios'),
-      lancamentos:   DB.getAll('lancamentos'),
-      contaspagar:   DB.getAll('contaspagar'),
-      folha:         DB.getAll('folha'),
-      licitacoes:    DB.getAll('licitacoes'),
-      config:        DB.getConfig(),
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `crm-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    const total = Object.values(data).filter(Array.isArray).reduce((s,a)=>s+a.length,0);
-    Toast.success(`Backup exportado! ${total} registros salvos.`);
-  }
-
-  function importData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target.result);
-        const entities = ['clientes','contatos','leads','projetos','atividades','propostas','recebiveis','funcionarios','lancamentos','contaspagar','folha','licitacoes'];
-        const total = entities.reduce((s,k)=>s+(data[k]?.length||0),0);
-        Confirm.show('Importar dados?', `Isso substituirá TODOS os dados atuais. O backup contém ${total} registros. Confirmar?`, () => {
-          entities.forEach(k => { if (data[k]) localStorage.setItem('crm_'+k, JSON.stringify(data[k])); });
-          if (data.config) localStorage.setItem('crm_config', JSON.stringify(data.config));
-          localStorage.setItem('crm__init', '1');
-          Toast.success('Dados importados com sucesso! Recarregando...');
-          setTimeout(() => window.location.reload(), 1500);
-        });
-      } catch { Toast.error('Arquivo inválido ou corrompido'); }
-    };
-    reader.readAsText(file);
-  }
+  // exportData/importData legados removidos — usar exportBackup/importBackup (consolidado).
 
   function resetData() {
     Confirm.show('Limpar todos os dados?', 'ATENÇÃO: Esta ação apagará TODOS os dados do CRM. Esta ação não pode ser desfeita!', () => {
@@ -534,20 +468,60 @@ const Config = (() => {
     reader.onload = e => {
       try {
         const backup = JSON.parse(e.target.result);
-        if (!backup.dados) { Toast.error('Arquivo de backup inválido.'); return; }
-        const dataLabel = backup.data ? Utils.formatDate(backup.data.split('T')[0]) : '?';
-        if (!confirm(`Restaurar backup de ${dataLabel}?\n\nISTO SUBSTITUIRÁ TODOS OS DADOS ATUAIS.\n\nDeseja continuar?`)) return;
 
-        Object.entries(backup.dados).forEach(([col, data]) => {
-          if (col === 'config') { DB.saveConfig(data); return; }
-          if (Array.isArray(data)) {
-            localStorage.setItem('crm_' + col, JSON.stringify(data));
+        // Validação de campos obrigatórios
+        if (!backup || typeof backup !== 'object') {
+          Toast.error('Arquivo não é um JSON de backup válido.'); return;
+        }
+        // Aceita formato v1 (`dados`) E v2 (`clientes`/`leads` no root)
+        const v2 = !backup.dados && (backup.clientes || backup.leads || backup.projetos);
+        const dados = backup.dados || (v2 ? backup : null);
+        if (!dados) {
+          Toast.error('Backup sem campo "dados". Verifique o arquivo.'); return;
+        }
+
+        const dataLabel = (backup.data || backup.exportedAt) ?
+          Utils.formatDate((backup.data || backup.exportedAt).split('T')[0]) : 'data desconhecida';
+
+        // Conta registros para mostrar ao usuário
+        const totalRegistros = Object.values(dados)
+          .filter(Array.isArray)
+          .reduce((s, arr) => s + arr.length, 0);
+
+        if (!confirm(`Restaurar backup de ${dataLabel}?\n\n${totalRegistros} registros serão importados (MERGE).\n\nObs: itens com IDs iguais aos do backup serão sobrescritos no Supabase. Itens novos adicionados após o backup serão mantidos. Para substituição total, use "Limpar Todos os Dados" antes.\n\nDeseja continuar?`)) {
+          event.target.value = '';
+          return;
+        }
+
+        Toast.success('Restaurando backup... Aguarde.');
+
+        // Restaura via DB.create — internamente faz upsert no Supabase + atualiza cache
+        Object.entries(dados).forEach(([col, items]) => {
+          if (col === 'config') {
+            DB.saveConfig(items);
+            return;
           }
+          if (!Array.isArray(items)) return;
+
+          // Mapa de chaves legadas v2 → v3
+          const colName = ({ marketing: 'marketing_posts' }[col]) || col;
+
+          items.forEach(item => {
+            try {
+              if (item && typeof item === 'object' && item.id) {
+                DB.create(colName, item);
+              }
+            } catch (e) {
+              console.warn('[Backup] falha ao importar item em', col, e);
+            }
+          });
         });
-        Toast.success('Backup restaurado! Recarregando...');
-        setTimeout(() => location.reload(), 1500);
-      } catch(err) {
-        Toast.error('Erro ao ler arquivo de backup: ' + err.message);
+
+        Toast.success(`Backup restaurado: ${totalRegistros} registros! Recarregando...`);
+        setTimeout(() => location.reload(), 2000);
+      } catch (err) {
+        Toast.error('Erro ao ler arquivo: ' + (err.message || 'JSON inválido'));
+        console.error('[importBackup]', err);
       }
       event.target.value = '';
     };
@@ -607,5 +581,5 @@ const Config = (() => {
     Toast.success('Log de auditoria limpo.');
   }
 
-  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, exportData, importData, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup, filterAudit, clearAudit };
+  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup, filterAudit, clearAudit };
 })();

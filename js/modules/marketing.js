@@ -5,14 +5,14 @@ const Marketing = (() => {
 
   /* ---- Constantes ---- */
   const CANAIS = ['LinkedIn','Instagram','YouTube','Google Meu Negócio','Site/Blog'];
-  const CANAL_ICONS = { 'LinkedIn':'ðŸ’¼','Instagram':'ðŸ“¸','YouTube':'â–¶ï¸','Google Meu Negócio':'ðŸ“','Site/Blog':'ðŸŒ' };
+  const CANAL_ICONS = { 'LinkedIn':'💼','Instagram':'📸','YouTube':'▶️','Google Meu Negócio':'📍','Site/Blog':'🌐' };
   const CANAL_COLORS = { 'LinkedIn':'#0077B5','Instagram':'#E1306C','YouTube':'#FF0000','Google Meu Negócio':'#4285F4','Site/Blog':'#059669' };
   const FORMATOS = ['Post Imagem','Carrossel','Vídeo Curto (Reels/Shorts)','Vídeo Longo','Artigo/Blog','Story','Notícia (GMN)','Outro'];
   const PILARES = ['Segurança do Trabalho','Engenharia e Projetos','Cases e Resultados','Equipe e Cultura','Dicas Técnicas','Licitações','Outro'];
   const STATUS_POST = ['ideia','rascunho','agendado','publicado','pausado'];
   const STATUS_CORES = { ideia:'#94a3b8', rascunho:'#d97706', agendado:'#2563eb', publicado:'#059669', pausado:'#dc2626' };
   const PRIORIDADES = ['alta','media','baixa'];
-  const PRIOR_ICONS = { alta:'ðŸ”´', media:'ðŸŸ¡', baixa:'ðŸŸ¢' };
+  const PRIOR_ICONS = { alta:'🔴', media:'🟡', baixa:'🟢' };
 
   /* ---- Estado ---- */
   let _tab = 'calendario';
@@ -70,11 +70,11 @@ const Marketing = (() => {
 
       <div class="tabs" style="margin:16px 0 0 0">
         ${[
-          {id:'calendario', label:'ðŸ“… Calendário'},
-          {id:'campanhas',  label:'ðŸš€ Campanhas'},
-          {id:'ideias',     label:'ðŸ’¡ Banco de Ideias'},
-          {id:'kpis',       label:'ðŸ“Š KPIs'},
-          {id:'estrategia', label:'ðŸŽ¯ Estratégia'},
+          {id:'calendario', label:'📅 Calendário'},
+          {id:'campanhas',  label:'🚀 Campanhas'},
+          {id:'ideias',     label:'💡 Banco de Ideias'},
+          {id:'kpis',       label:'📊 KPIs'},
+          {id:'estrategia', label:'🎯 Estratégia'},
         ].map(t => `<button class="tab-btn${_tab===t.id?' active':''}" onclick="Marketing._setTab('${t.id}')">${t.label}</button>`).join('')}
       </div>
 
@@ -83,9 +83,15 @@ const Marketing = (() => {
     _renderTab();
   }
 
+  let _setTabPending = false;
   function _setTab(tab) {
+    if (_setTabPending || _tab === tab) return; // debounce + ignora click duplo
+    _setTabPending = true;
     _tab = tab;
-    render();
+    // requestAnimationFrame garante que state foi commitado antes de renderizar
+    requestAnimationFrame(() => {
+      try { render(); } finally { _setTabPending = false; }
+    });
   }
 
   function _renderTab() {
@@ -147,9 +153,9 @@ const Marketing = (() => {
           ${STATUS_POST.map(s => `<option value="${s}"${_filtroStatus===s?' selected':''}>${s}</option>`).join('')}
         </select>
         <div style="flex:1"></div>
-        <button class="btn btn-ghost btn-sm" onclick="Marketing._downloadTemplate()">â¬‡ Template CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="Marketing._downloadTemplate()">⬇ Template CSV</button>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer">
-          ðŸ“¥ Importar CSV
+          📥 Importar CSV
           <input type="file" accept=".csv" style="display:none" onchange="Marketing._importCSV(event)">
         </label>
         <button class="btn btn-primary btn-sm" onclick="Marketing.openPostForm()">+ Novo Post</button>
@@ -158,7 +164,7 @@ const Marketing = (() => {
       <!-- Lista de posts -->
       ${filtrados.length === 0 ? `
         <div class="empty-state">
-          <div class="empty-icon">ðŸ“…</div>
+          <div class="empty-icon">📅</div>
           <div class="empty-title">Nenhum conteúdo planejado para este mês</div>
           <div class="empty-sub">Clique em "+ Novo Post" para começar a preencher o calendário.</div>
         </div>
@@ -168,7 +174,7 @@ const Marketing = (() => {
 
   function _renderPostCard(p) {
     const cor = CANAL_COLORS[p.canal] || '#64748b';
-    const icon = CANAL_ICONS[p.canal] || 'ðŸ“¢';
+    const icon = CANAL_ICONS[p.canal] || '📢';
     const statusCor = STATUS_CORES[p.status] || '#94a3b8';
     const dataFmt = p.data ? Utils.formatDate(p.data) : '—';
     return `
@@ -183,8 +189,8 @@ const Marketing = (() => {
         </div>
         <div class="tbl-actions">
           <button class="btn-icon" title="Editar" onclick="Marketing.openPostForm('${p.id}')">âœ</button>
-          <button class="btn-icon" title="Duplicar" onclick="Marketing.duplicatePost('${p.id}')">ðŸ“‹</button>
-          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deletePost('${p.id}')">ðŸ—‘</button>
+          <button class="btn-icon" title="Duplicar" onclick="Marketing.duplicatePost('${p.id}')">📋</button>
+          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deletePost('${p.id}')">🗑</button>
         </div>
       </div>
     `;
@@ -406,7 +412,7 @@ const Marketing = (() => {
       <!-- Cards -->
       ${campanhas.length === 0 ? `
         <div class="empty-state">
-          <div class="empty-icon">ðŸš€</div>
+          <div class="empty-icon">🚀</div>
           <div class="empty-title">Nenhuma campanha cadastrada</div>
           <div class="empty-sub">Crie sua primeira campanha de marketing.</div>
         </div>
@@ -434,7 +440,7 @@ const Marketing = (() => {
           <span class="status-post-badge" style="background:${cor}">${c.status||'—'}</span>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
-          ðŸ“… ${c.dataInicio ? Utils.formatDate(c.dataInicio) : '—'} â†’ ${c.dataFim ? Utils.formatDate(c.dataFim) : '—'}
+          📅 ${c.dataInicio ? Utils.formatDate(c.dataInicio) : '—'} â†’ ${c.dataFim ? Utils.formatDate(c.dataFim) : '—'}
         </div>
         <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px">${canais}</div>
         ${orcamento > 0 ? `
@@ -448,11 +454,11 @@ const Marketing = (() => {
             </div>
           </div>
         ` : ''}
-        ${c.leads ? `<div style="font-size:12px;color:var(--success);margin-bottom:8px">ðŸŽ¯ ${c.leads} leads gerados</div>` : ''}
+        ${c.leads ? `<div style="font-size:12px;color:var(--success);margin-bottom:8px">🎯 ${c.leads} leads gerados</div>` : ''}
         <div class="tbl-actions" style="justify-content:flex-end">
-          <button class="btn-icon" onclick="Marketing.viewCampanha('${c.id}')">ðŸ‘</button>
+          <button class="btn-icon" onclick="Marketing.viewCampanha('${c.id}')">👁</button>
           <button class="btn-icon" onclick="Marketing.openCampanhaForm('${c.id}')">âœ</button>
-          <button class="btn-icon text-danger" onclick="Marketing.deleteCampanha('${c.id}')">ðŸ—‘</button>
+          <button class="btn-icon text-danger" onclick="Marketing.deleteCampanha('${c.id}')">🗑</button>
         </div>
       </div>
     `;
@@ -630,7 +636,7 @@ const Marketing = (() => {
 
       ${ideias.length === 0 ? `
         <div class="empty-state">
-          <div class="empty-icon">ðŸ’¡</div>
+          <div class="empty-icon">💡</div>
           <div class="empty-title">Banco de ideias vazio</div>
           <div class="empty-sub">Registre suas ideias de conteúdo para não perder nada.</div>
         </div>
@@ -640,8 +646,8 @@ const Marketing = (() => {
 
   function _renderIdeiaCard(i) {
     const cor = CANAL_COLORS[i.canal] || '#64748b';
-    const icon = CANAL_ICONS[i.canal] || 'ðŸ“¢';
-    const priorIcon = PRIOR_ICONS[i.prioridade] || 'âšª';
+    const icon = CANAL_ICONS[i.canal] || '📢';
+    const priorIcon = PRIOR_ICONS[i.prioridade] || '⚪';
     const borderCor = i.prioridade === 'alta' ? '#dc2626' : i.prioridade === 'media' ? '#d97706' : '#059669';
     return `
       <div class="ideia-card" style="border-left-color:${borderCor}">
@@ -656,8 +662,8 @@ const Marketing = (() => {
         </div>
         <div class="tbl-actions">
           <button class="btn-icon" title="Editar" onclick="Marketing.openIdeiaForm('${i.id}')">âœ</button>
-          <button class="btn-icon" title="Usar como post" onclick="Marketing.usarIdeia('${i.id}')">âž¡</button>
-          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deleteIdeia('${i.id}')">ðŸ—‘</button>
+          <button class="btn-icon" title="Usar como post" onclick="Marketing.usarIdeia('${i.id}')">➡</button>
+          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deleteIdeia('${i.id}')">🗑</button>
         </div>
       </div>
     `;
@@ -821,7 +827,7 @@ const Marketing = (() => {
   }
 
   function _renderKpiCanalCard(canal, dados, mes) {
-    const icon = CANAL_ICONS[canal] || 'ðŸ“Š';
+    const icon = CANAL_ICONS[canal] || '📊';
     const cor  = CANAL_COLORS[canal] || '#64748b';
     const metricas = KPI_METRICAS[canal] || [];
 
@@ -919,7 +925,7 @@ const Marketing = (() => {
         <!-- Persona -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ‘¤ Persona Principal</div>
+            <div class="estrategia-section-title">👤 Persona Principal</div>
             <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('persona')">âœ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.persona || 'Clique em Editar para definir a persona principal da Bikows.')}</div>
@@ -928,7 +934,7 @@ const Marketing = (() => {
         <!-- Proposta de Valor -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ’Ž Proposta de Valor</div>
+            <div class="estrategia-section-title">💎 Proposta de Valor</div>
             <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('proposta')">âœ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.proposta || 'Descreva o que torna a Bikows única no mercado.')}</div>
@@ -937,7 +943,7 @@ const Marketing = (() => {
         <!-- Tom de Voz -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ—£ Tom de Voz</div>
+            <div class="estrategia-section-title">🗣 Tom de Voz</div>
             <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('tom')">âœ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.tom || 'Defina como a Bikows se comunica: técnico mas acessível, confiante...')}</div>
@@ -946,7 +952,7 @@ const Marketing = (() => {
         <!-- Objetivos -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸŽ¯ Objetivos de Marketing</div>
+            <div class="estrategia-section-title">🎯 Objetivos de Marketing</div>
             <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('objetivos')">âœ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.objetivos || 'Liste os principais objetivos de marketing da empresa.')}</div>
@@ -964,7 +970,7 @@ const Marketing = (() => {
         <!-- Pilares de Conteúdo -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ› Pilares de Conteúdo</div>
+            <div class="estrategia-section-title">🏻 Pilares de Conteúdo</div>
             <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('pilares')">âœ Editar</button>
           </div>
           <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
@@ -980,7 +986,7 @@ const Marketing = (() => {
         <!-- Frequência por Canal -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ“† Frequência por Canal</div>
+            <div class="estrategia-section-title">📆 Frequência por Canal</div>
             <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('frequencia')">âœ Editar</button>
           </div>
           <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">

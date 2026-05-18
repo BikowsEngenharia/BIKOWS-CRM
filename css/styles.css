@@ -1696,39 +1696,73 @@ body.dark-mode .bottom-nav {
 }
 
 /* ==========================================
-   MOBILE TABLE — card-based view
-   Em mobile, transforma tabela em cards verticais
-   Aplicar classe .tbl-mobile-cards no <table>
+   MOBILE TABLE — card view automático
+   Em mobile (≤640px), TODAS as tabelas .tbl viram cards verticais.
+   Cada linha vira card, cada célula vira linha empilhada.
+   Se houver atributo data-label no <td>, exibe como label antes do valor.
    ========================================== */
 @media (max-width: 640px) {
-  .tbl.tbl-mobile-cards thead { display: none; }
-  .tbl.tbl-mobile-cards,
-  .tbl.tbl-mobile-cards tbody,
-  .tbl.tbl-mobile-cards tr,
-  .tbl.tbl-mobile-cards td { display: block; width: 100%; }
-  .tbl.tbl-mobile-cards tr {
+  .table-wrap { overflow-x: visible; }
+  .tbl { min-width: 0; border-collapse: separate; border-spacing: 0; }
+  .tbl thead { display: none; }
+  .tbl, .tbl tbody, .tbl tr { display: block; width: 100%; }
+  .tbl tr {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     margin-bottom: 10px;
-    padding: 10px;
+    padding: 10px 12px;
     box-shadow: var(--shadow-xs);
   }
-  .tbl.tbl-mobile-cards tr:hover td { background: transparent; }
-  .tbl.tbl-mobile-cards td {
-    padding: 4px 0;
-    border: none;
-    text-align: left;
+  .tbl tr:hover td { background: transparent !important; }
+  .tbl td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    text-align: right;
+    width: 100%;
   }
-  .tbl.tbl-mobile-cards td:before {
+  .tbl td:last-child { border-bottom: none; padding-top: 8px; }
+  .tbl td[data-label]:before {
     content: attr(data-label);
-    display: block;
-    font-size: 10px;
+    display: inline-block;
+    font-size: 10.5px;
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: .5px;
-    margin-bottom: 2px;
+    text-align: left;
+    flex-shrink: 0;
+  }
+  /* Sem data-label: célula ocupa largura total, alinhada à esquerda */
+  .tbl td:not([data-label]) {
+    justify-content: flex-start;
+    text-align: left;
+  }
+  /* Linha com ações (geralmente última) — botões em linha */
+  .tbl td:has(.tbl-actions) {
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 10px;
+  }
+  .tbl td:has(.tbl-actions):before { margin-bottom: 4px; }
+  .tbl-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  /* Primeira célula sem data-label fica como título do card */
+  .tbl td:first-child:not([data-label]):before { display: none; }
+  .tbl td:first-child:not([data-label]) {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    padding-top: 0;
+    font-weight: 600;
+    color: var(--text);
   }
 }
 

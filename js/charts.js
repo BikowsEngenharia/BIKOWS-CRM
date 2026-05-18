@@ -172,5 +172,30 @@ const Charts = (() => {
     el.innerHTML = html;
   }
 
-  return { bar, donut, line, funnel };
+  // Wrappers defensivos — falha em um chart não derruba a página inteira
+  function _safe(fn, name) {
+    return function(...args) {
+      try {
+        return fn.apply(null, args);
+      } catch (err) {
+        console.warn(`[Charts.${name}] erro:`, err.message);
+        // tenta inserir placeholder se o containerId for válido
+        try {
+          const cid = args[0]?.containerId;
+          if (cid) {
+            const el = document.getElementById(cid);
+            if (el) el.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px">📊 Gráfico indisponível</div>';
+          }
+        } catch {}
+        return null;
+      }
+    };
+  }
+
+  return {
+    bar:    _safe(bar, 'bar'),
+    donut:  _safe(donut, 'donut'),
+    line:   _safe(line, 'line'),
+    funnel: _safe(funnel, 'funnel'),
+  };
 })();

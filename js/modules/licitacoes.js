@@ -727,7 +727,7 @@ const Licitacoes = (() => {
         <div id="licTabChecklist" class="hidden">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
             <div style="flex:1;background:var(--border);border-radius:100px;height:8px;overflow:hidden">
-              <div style="width:${pctChecklist}%;height:100%;background:${pctChecklist===100?'#10b981':pctChecklist>50?'#f59e0b':'#3b82f6'};border-radius:100px;transition:width .3s"></div>
+              <div class="progress-bar-inner" style="width:${pctChecklist}%;height:100%;background:${pctChecklist===100?'#10b981':pctChecklist>50?'#f59e0b':'#3b82f6'};border-radius:100px;transition:width .3s"></div>
             </div>
             <span class="font-bold text-sm">${marcados}/${totalItens} itens (${pctChecklist}%)</span>
           </div>

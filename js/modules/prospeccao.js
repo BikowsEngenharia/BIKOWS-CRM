@@ -45,10 +45,26 @@ const Prospeccao = (() => {
 
   function _mapSegmento(tipos) {
     if (!tipos || !Array.isArray(tipos)) return 'Indústria';
+    // Lista de segmentos do usuário (config), em lowercase para fuzzy match
+    const segmentosUsuario = (() => {
+      try {
+        return (DB.getConfig()?.segmentos || []).map(s => ({ raw: s, lower: s.toLowerCase() }));
+      } catch { return []; }
+    })();
+
     for (const t of tipos) {
       const key = t.toLowerCase();
+      // 1) Primeiro tenta match no _CATEGORIA_MAP padrão
       for (const [cat, seg] of Object.entries(_CATEGORIA_MAP)) {
-        if (key.includes(cat)) return seg;
+        if (key.includes(cat)) {
+          // Se o segmento mapeado bate com algum customizado do usuário, prioriza o do usuário
+          const match = segmentosUsuario.find(s => s.lower === seg.toLowerCase());
+          return match ? match.raw : seg;
+        }
+      }
+      // 2) Tenta match direto com segmentos customizados do usuário
+      for (const s of segmentosUsuario) {
+        if (key.includes(s.lower) || s.lower.includes(key)) return s.raw;
       }
     }
     return 'Indústria';

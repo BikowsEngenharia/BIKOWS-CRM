@@ -1,19 +1,28 @@
 /* ==========================================
-   CRM ENGENHARIA — Design System v2
+   BIKOWS CRM — Design System v3
+   Refinado: tipografia, espaçamento, profundidade, responsividade
    ========================================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
 
 /* ---- RESET ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* ---- TOKENS ---- */
 :root {
-  /* Bikows Brand */
+  /* Bikows Brand — azul refinado com mais profundidade */
   --primary:        #1d4ed8;
   --primary-dark:   #1e40af;
   --primary-hover:  #1a3fbf;
   --primary-light:  #eff6ff;
   --primary-50:     #dbeafe;
+  --primary-grad:   linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
 
   --accent:         #b91c1c;
   --accent-light:   #fef2f2;
@@ -36,86 +45,110 @@ html { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoot
   --teal:           #0d9488;
   --teal-light:     #f0fdfa;
 
-  /* Backgrounds — levemente azulado, premium */
-  --bg:             #eef2f7;
+  /* Backgrounds — neutro azulado premium */
+  --bg:             #f1f5fa;
   --surface:        #ffffff;
-  --surface-2:      #f6f9fc;
-  --border:         #dde4ef;
-  --border-strong:  #b8c5d8;
+  --surface-2:      #f7fafd;
+  --surface-3:      #eef3f9;
+  --border:         #e1e7f0;
+  --border-strong:  #c4cfdf;
 
-  /* Texto — alto contraste mas suave */
-  --text:           #0d1b2e;
-  --text-secondary: #3d5068;
-  --text-muted:     #7a8fa6;
-  --text-disabled:  #bfccd9;
+  /* Texto — escala de contraste otimizada */
+  --text:           #0b1729;
+  --text-secondary: #41546d;
+  --text-muted:     #7587a0;
+  --text-disabled:  #c4cfdf;
 
-  /* Sidebar — navy profundo Bikows */
+  /* Sidebar — navy Bikows mais sutil */
   --sb-bg:          #0a1628;
+  --sb-bg-2:        #0f1d33;
   --sb-hover:       #152238;
   --sb-active-bg:   #1d4ed8;
-  --sb-text:        #7a9bbf;
+  --sb-text:        #8aa5c4;
   --sb-text-active: #ffffff;
   --sb-border:      rgba(255,255,255,.06);
-  --sb-width:       232px;
-  --sb-collapsed:   62px;
+  --sb-width:       236px;
+  --sb-collapsed:   64px;
 
-  /* Sombras refinadas */
-  --shadow-xs: 0 1px 2px rgba(13,27,46,.05);
-  --shadow-sm: 0 1px 3px rgba(13,27,46,.09), 0 1px 2px rgba(13,27,46,.05);
-  --shadow:    0 4px 10px rgba(13,27,46,.07), 0 2px 4px rgba(13,27,46,.04);
-  --shadow-md: 0 8px 20px rgba(13,27,46,.09), 0 4px 8px rgba(13,27,46,.05);
-  --shadow-lg: 0 20px 40px rgba(13,27,46,.13), 0 8px 16px rgba(13,27,46,.07);
+  /* Sombras refinadas com tom azulado */
+  --shadow-xs: 0 1px 2px rgba(13,27,46,.04);
+  --shadow-sm: 0 1px 2px rgba(13,27,46,.06), 0 1px 3px rgba(13,27,46,.05);
+  --shadow:    0 2px 4px rgba(13,27,46,.06), 0 4px 12px rgba(13,27,46,.06);
+  --shadow-md: 0 4px 8px rgba(13,27,46,.07), 0 12px 24px rgba(13,27,46,.08);
+  --shadow-lg: 0 8px 16px rgba(13,27,46,.10), 0 24px 48px rgba(13,27,46,.12);
+  --shadow-glow: 0 0 0 3px rgba(29,78,216,.12);
+
+  /* Espaçamento sistemático (8px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
 
   --radius-sm:  4px;
   --radius:     8px;
   --radius-md:  10px;
   --radius-lg:  14px;
   --radius-xl:  20px;
+  --radius-2xl: 24px;
   --radius-full: 9999px;
 
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  --t: 150ms cubic-bezier(.4,0,.2,1);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  --t: 180ms cubic-bezier(.4,0,.2,1);
+  --t-slow: 280ms cubic-bezier(.4,0,.2,1);
+
+  /* Safe area iOS */
+  --safe-top:    env(safe-area-inset-top, 0);
+  --safe-bottom: env(safe-area-inset-bottom, 0);
 }
 
-/* ---- DARK MODE ---- */
+/* ---- DARK MODE — unificado em body.dark-mode + [data-theme="dark"] ---- */
+body.dark-mode,
 [data-theme="dark"] {
-  --bg:             #0f1117;
-  --surface:        #1a1f2e;
-  --surface-2:      #222837;
-  --border:         #2d3548;
-  --border-strong:  #3d4a62;
+  --bg:             #0a1322;
+  --surface:        #0f1d33;
+  --surface-2:      #122340;
+  --surface-3:      #18294a;
+  --border:         #1e3558;
+  --border-strong:  #2a4878;
 
-  --text:           #e8edf5;
-  --text-secondary: #9aa8be;
-  --text-muted:     #6b7a94;
-  --text-disabled:  #3d4a62;
+  --text:           #e8f0fa;
+  --text-secondary: #a3b8d4;
+  --text-muted:     #6a85a8;
+  --text-disabled:  #2a4878;
 
-  --primary-light:  #1e2d4a;
-  --primary-50:     #172140;
-  --accent-light:   #2d1c1c;
-  --success-light:  #0f2318;
-  --success-border: #1a4030;
-  --warning-light:  #2a1f0a;
-  --warning-border: #4a3510;
-  --danger-light:   #2a1010;
-  --danger-border:  #4a1a1a;
-  --info-light:     #0a2030;
-  --purple-light:   #1a1030;
-  --orange-light:   #2a1808;
-  --teal-light:     #0a2020;
+  --primary-light:  #1c3360;
+  --primary-50:     #173050;
+  --accent-light:   #2d1818;
+  --success-light:  #0f2820;
+  --success-border: #1d4838;
+  --warning-light:  #2c2210;
+  --warning-border: #4a3712;
+  --danger-light:   #2c1414;
+  --danger-border:  #4a1f1f;
+  --info-light:     #0c243a;
+  --purple-light:   #1c1640;
+  --orange-light:   #2e1c0c;
+  --teal-light:     #0c2628;
+
+  --sb-bg:          #060e1a;
+  --sb-bg-2:        #0a1628;
+  --sb-hover:       #112038;
+  --sb-text:        #94b0cc;
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,.3);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
-  --shadow:    0 4px 10px rgba(0,0,0,.4);
-  --shadow-md: 0 8px 20px rgba(0,0,0,.5);
-  --shadow-lg: 0 20px 40px rgba(0,0,0,.6);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.25);
+  --shadow:    0 2px 4px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.35);
+  --shadow-md: 0 4px 8px rgba(0,0,0,.45), 0 12px 24px rgba(0,0,0,.4);
+  --shadow-lg: 0 8px 16px rgba(0,0,0,.5), 0 24px 48px rgba(0,0,0,.5);
 }
 
-[data-theme="dark"] .modal-overlay {
-  background: rgba(0,0,0,.7);
-}
-
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
 [data-theme="dark"] input,
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
@@ -124,17 +157,27 @@ html { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoot
   border-color: var(--border);
 }
 
-[data-theme="dark"] .tbl tbody tr:hover {
-  background: var(--surface-2);
-}
-
 body {
   font-family: var(--font);
   font-size: 13.5px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
+
+/* Scrollbars finos globais */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; border: 2px solid transparent; }
+
 
 /* ==========================================
    LAYOUT
@@ -142,20 +185,27 @@ body {
 .app-layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* ==========================================
-   SIDEBAR
+   SIDEBAR — premium dark navy
    ========================================== */
 .sidebar {
   width: var(--sb-width);
-  background: var(--sb-bg);
+  background: linear-gradient(180deg, var(--sb-bg) 0%, var(--sb-bg-2) 100%);
   display: flex; flex-direction: column;
   flex-shrink: 0;
   transition: width var(--t);
   overflow: hidden;
   z-index: 100;
   border-right: 1px solid rgba(255,255,255,.04);
+  position: relative;
+}
+.sidebar::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; right: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(29,78,216,.18) 30%, rgba(29,78,216,.18) 70%, transparent);
 }
 .sidebar-header {
-  padding: 18px 14px 14px;
+  padding: 18px 16px 14px;
   border-bottom: 1px solid var(--sb-border);
   flex-shrink: 0;
   display: flex; align-items: center;
@@ -166,15 +216,15 @@ body {
 }
 .brand-icon {
   width: 34px; height: 34px;
-  background: var(--primary);
+  background: var(--primary-grad);
   border-radius: var(--radius);
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(37,99,235,.4);
+  box-shadow: 0 2px 12px rgba(37,99,235,.5), inset 0 1px 0 rgba(255,255,255,.15);
 }
 .brand-text {
   font-size: 14px; font-weight: 700; color: #fff;
-  letter-spacing: -.2px; white-space: nowrap;
+  letter-spacing: -.3px; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -210,29 +260,39 @@ body {
 }
 
 .nav-link {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 9px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px;
   border-radius: var(--radius);
   color: var(--sb-text);
   text-decoration: none;
-  transition: background var(--t), color var(--t);
+  transition: background var(--t), color var(--t), transform var(--t);
   white-space: nowrap; overflow: hidden;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
   font-size: 13px; font-weight: 500;
+  position: relative;
 }
 .nav-link svg {
-  width: 16px; height: 16px;
+  width: 17px; height: 17px;
   stroke: currentColor; stroke-width: 1.8;
   stroke-linecap: round; stroke-linejoin: round;
-  fill: none; flex-shrink: 0; opacity: .65;
-  transition: opacity var(--t);
+  fill: none; flex-shrink: 0; opacity: .70;
+  transition: opacity var(--t), transform var(--t);
 }
-.nav-link:hover { background: var(--sb-hover); color: #e2e8f0; }
-.nav-link:hover svg { opacity: 1; }
+.nav-link:hover { background: var(--sb-hover); color: #e8f0fa; }
+.nav-link:hover svg { opacity: 1; transform: scale(1.05); }
 .nav-link.active {
-  background: var(--sb-active-bg);
+  background: linear-gradient(135deg, var(--sb-active-bg) 0%, #2563eb 100%);
   color: var(--sb-text-active);
-  box-shadow: 0 2px 12px rgba(29,78,216,.4);
+  box-shadow: 0 4px 14px rgba(29,78,216,.45), inset 0 1px 0 rgba(255,255,255,.1);
+  font-weight: 600;
+}
+.nav-link.active::before {
+  content: ''; position: absolute; left: -8px; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 18px;
+  background: #fff;
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px rgba(255,255,255,.5);
 }
 .nav-link.active svg { opacity: 1; }
 .nav-link span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1373,3 +1433,390 @@ body.dark-mode .kpi-meta-card { background: var(--surface); border-color: var(--
   color: #fff;
 }
 .btn-warning:hover { background: #d97706; border-color: #d97706; }
+
+/* ==========================================
+   DESIGN V3 — IMPROVEMENTS LAYER
+   Polimento adicional aplicado sobre o sistema base
+   ========================================== */
+
+/* ---- KPI CARDS — mais profundidade, micro-interações ---- */
+.kpi-card {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.kpi-card::before {
+  height: 4px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: linear-gradient(90deg, var(--kpi-color, var(--primary)) 0%, color-mix(in srgb, var(--kpi-color, var(--primary)) 70%, transparent) 100%);
+}
+.kpi-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+.kpi-value {
+  font-family: var(--font);
+  font-feature-settings: "tnum", "lnum";
+  background: linear-gradient(180deg, var(--text) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.kpi-icon {
+  font-size: 28px;
+  opacity: .12;
+  transition: opacity var(--t), transform var(--t);
+}
+.kpi-card:hover .kpi-icon { opacity: .25; transform: scale(1.1); }
+
+/* ---- CARDS — sombras e bordas refinadas ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.card:hover { box-shadow: var(--shadow); }
+
+/* ---- TABLES — sticky header, zebra striping, melhor hover ---- */
+.tbl thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--text-secondary);
+  backdrop-filter: blur(8px);
+}
+.tbl tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
+.tbl tbody tr:hover td {
+  background: var(--primary-light);
+  transition: background var(--t);
+}
+[data-theme="dark"] .tbl tbody tr:hover td,
+body.dark-mode .tbl tbody tr:hover td { background: var(--primary-50); }
+
+/* ---- BADGES — sombra suave ---- */
+.badge {
+  box-shadow: 0 1px 2px rgba(13,27,46,.04);
+  font-weight: 600;
+}
+
+/* ---- BUTTONS — interactions refinadas ---- */
+.btn {
+  letter-spacing: .1px;
+  user-select: none;
+}
+.btn-primary {
+  background: var(--primary-grad);
+  box-shadow: 0 2px 6px rgba(29,78,216,.30), inset 0 1px 0 rgba(255,255,255,.12);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  box-shadow: 0 4px 12px rgba(29,78,216,.40), inset 0 1px 0 rgba(255,255,255,.15);
+  transform: translateY(-1px);
+}
+.btn-primary:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(29,78,216,.30); }
+
+/* ---- FORM CONTROL — focus mais visível ---- */
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+.form-label {
+  font-size: 11px;
+  letter-spacing: .5px;
+}
+
+/* ---- MODAL — entrada animada, melhor profundidade ---- */
+.backdrop {
+  background: rgba(11,23,41,.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.backdrop.open { animation: backdropIn .18s ease; }
+@keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-box {
+  animation: modalIn .22s cubic-bezier(.34, 1.56, .64, 1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,.03);
+}
+@keyframes modalIn {
+  from { transform: translateY(18px) scale(.96); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+.modal-head {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 16px; letter-spacing: -.2px; }
+
+/* ---- TOP BAR — backdrop blur, mais polido ---- */
+.top-bar {
+  background: rgba(255,255,255,.85);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+}
+[data-theme="dark"] .top-bar,
+body.dark-mode .top-bar {
+  background: rgba(15,29,51,.85);
+}
+.page-title {
+  font-size: 17px;
+  letter-spacing: -.3px;
+  font-weight: 700;
+}
+
+/* ---- EMPTY STATE — mais convidativo ---- */
+.empty-state {
+  padding: 64px 24px;
+  background: linear-gradient(180deg, transparent, var(--surface-2));
+  border-radius: var(--radius-lg);
+}
+.empty-icon {
+  font-size: 56px;
+  opacity: .35;
+  margin-bottom: 16px;
+  display: inline-block;
+  animation: emptyBounce 2.4s ease-in-out infinite;
+}
+@keyframes emptyBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* ---- LOADING SKELETON ---- */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--bg) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s linear infinite;
+  border-radius: var(--radius);
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-row { height: 14px; margin-bottom: 8px; }
+.skeleton-card {
+  height: 100px;
+  border-radius: var(--radius-lg);
+  margin-bottom: 12px;
+}
+
+/* ---- KANBAN — refinamento ---- */
+.kanban-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: box-shadow var(--t), transform var(--t), border-color var(--t);
+}
+.kanban-card:hover {
+  border-color: var(--primary-50);
+  box-shadow: var(--shadow), 0 0 0 1px rgba(29,78,216,.06);
+}
+.kanban-col {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.kanban-col-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ==========================================
+   MOBILE BOTTOM NAVIGATION
+   Aparece automaticamente em telas ≤640px
+   Permite acesso rápido às páginas principais
+   ========================================== */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  background: rgba(255,255,255,.95);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border-top: 1px solid var(--border);
+  padding: 6px 4px calc(6px + var(--safe-bottom));
+  box-shadow: 0 -2px 16px rgba(13,27,46,.06);
+}
+.bottom-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.bottom-nav-item {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  transition: color var(--t), background var(--t);
+  background: none; border: none; cursor: pointer;
+  min-height: 50px;
+}
+.bottom-nav-item svg {
+  width: 22px; height: 22px;
+  stroke: currentColor; stroke-width: 2;
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform var(--t);
+}
+.bottom-nav-item.active {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+.bottom-nav-item.active svg { transform: scale(1.1); }
+.bottom-nav-item:active { transform: scale(.95); }
+[data-theme="dark"] .bottom-nav,
+body.dark-mode .bottom-nav {
+  background: rgba(10,19,34,.95);
+  border-top-color: var(--border);
+}
+
+@media (max-width: 640px) {
+  .bottom-nav { display: block; }
+  /* Empurra conteúdo para cima evitando overlay */
+  .page-content {
+    padding-bottom: calc(80px + var(--safe-bottom)) !important;
+  }
+  /* FAB sobe para não conflitar com bottom-nav */
+  .quick-capture-btn {
+    bottom: calc(76px + var(--safe-bottom));
+    right: 16px;
+    width: 48px; height: 48px;
+  }
+}
+
+/* ==========================================
+   MOBILE TABLE — card-based view
+   Em mobile, transforma tabela em cards verticais
+   Aplicar classe .tbl-mobile-cards no <table>
+   ========================================== */
+@media (max-width: 640px) {
+  .tbl.tbl-mobile-cards thead { display: none; }
+  .tbl.tbl-mobile-cards,
+  .tbl.tbl-mobile-cards tbody,
+  .tbl.tbl-mobile-cards tr,
+  .tbl.tbl-mobile-cards td { display: block; width: 100%; }
+  .tbl.tbl-mobile-cards tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 10px;
+    padding: 10px;
+    box-shadow: var(--shadow-xs);
+  }
+  .tbl.tbl-mobile-cards tr:hover td { background: transparent; }
+  .tbl.tbl-mobile-cards td {
+    padding: 4px 0;
+    border: none;
+    text-align: left;
+  }
+  .tbl.tbl-mobile-cards td:before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 2px;
+  }
+}
+
+/* ==========================================
+   FOCUS VISIBLE — acessibilidade
+   ========================================== */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+.btn:focus-visible, .nav-link:focus-visible, .form-control:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ==========================================
+   MOTION SAFE — respeita prefers-reduced-motion
+   ========================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================
+   MOBILE — refinamentos finais
+   ========================================== */
+@media (max-width: 640px) {
+  /* Top bar mais limpo */
+  .top-bar { height: calc(56px + var(--safe-top)); padding-top: var(--safe-top); }
+  .notif-btn { padding: 6px; }
+  #btnAddNew {
+    font-size: 0;
+    padding: 8px 10px;
+    min-width: 36px;
+    border-radius: 10px;
+  }
+  #btnAddNew::before {
+    content: '+';
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .dark-toggle { display: none; }
+
+  /* KPI cards com mais respiração */
+  .kpi-card { padding: 16px 14px 14px; min-height: 86px; }
+  .kpi-value { font-size: 22px; }
+  .kpi-label { font-size: 10.5px; }
+
+  /* Sec title menor */
+  .sec-title { font-size: 19px; }
+  .sec-actions .btn { font-size: 12.5px; padding: 8px 12px; min-height: 42px; }
+
+  /* Modais full-screen com handle */
+  .modal-box {
+    border-radius: 22px 22px 0 0;
+    max-height: 95vh;
+  }
+  .modal-box::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: var(--border-strong);
+    border-radius: 99px;
+    margin: 8px auto 0;
+  }
+  .modal-head { padding: 12px 16px 14px; }
+}
+
+/* ==========================================
+   TABLET (641–900px) — refinamentos
+   ========================================== */
+@media (min-width: 641px) and (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-value { font-size: 23px; }
+  .sec-title { font-size: 19px; }
+  .page-content { padding: 18px; }
+}
+
+/* ==========================================
+   DESKTOP LARGE (≥1400px) — aproveita mais espaço
+   ========================================== */
+@media (min-width: 1400px) {
+  .page-content { padding: 28px 32px; }
+  .kpi-value { font-size: 28px; }
+}

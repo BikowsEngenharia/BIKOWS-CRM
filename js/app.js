@@ -153,8 +153,8 @@ const App = (() => {
     if (!PAGES[page]) page = 'dashboard';
     _currentPage = page;
 
-    // Update active nav link
-    document.querySelectorAll('.nav-link').forEach(l => {
+    // Update active nav link (sidebar + bottom-nav mobile)
+    document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(l => {
       l.classList.toggle('active', l.dataset.page === page);
     });
 

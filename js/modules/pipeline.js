@@ -179,7 +179,7 @@ const Pipeline = (() => {
     const amanhaStr = amanha.toISOString().split('T')[0];
     DB.create('atividades', {
       titulo: `🧊 Follow-up automático — ${lead.titulo}`,
-      tipo: 'call',
+      tipo: 'ligacao',
       prioridade: 'alta',
       status: 'pendente',
       data: amanhaStr,

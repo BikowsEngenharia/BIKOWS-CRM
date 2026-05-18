@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bikows CRM</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=20260522">
   <!-- Supabase JS SDK — versão fixada para evitar breaking changes -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"
     onerror="document.getElementById('loadingText').innerHTML='Erro ao carregar dependências.<br><button onclick=\'location.reload()\' style=\'margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px\'>🔄 Recarregar</button>'"></script>
@@ -192,6 +192,32 @@
   </div>
 </div>
 
+<!-- BOTTOM NAVIGATION (mobile only) — 5 atalhos principais -->
+<nav class="bottom-nav" id="bottomNav" aria-label="Navegação principal mobile">
+  <div class="bottom-nav-grid">
+    <button class="bottom-nav-item" data-page="dashboard" onclick="App.navigate('dashboard')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>Início</span>
+    </button>
+    <button class="bottom-nav-item" data-page="pipeline" onclick="App.navigate('pipeline')">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+      <span>Pipeline</span>
+    </button>
+    <button class="bottom-nav-item" data-page="clientes" onclick="App.navigate('clientes')">
+      <svg viewBox="0 0 24 24"><path d="M3 21V5a2 2 0 012-2h14a2 2 0 012 2v16M7 10h4M7 14h4M13 10h4M13 14h4"/></svg>
+      <span>Clientes</span>
+    </button>
+    <button class="bottom-nav-item" data-page="propostas" onclick="App.navigate('propostas')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6"/></svg>
+      <span>Propostas</span>
+    </button>
+    <button class="bottom-nav-item" data-page="atividades" onclick="App.navigate('atividades')">
+      <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      <span>Tarefas</span>
+    </button>
+  </div>
+</nav>
+
 <!-- CAPTURA RÁPIDA — botão flutuante -->
 <button class="quick-capture-btn" onclick="App.quickCapture()" title="Captura Rápida (Q)">
   <span style="font-size:22px;line-height:1">⚡</span>
@@ -233,36 +259,36 @@
 </div><!-- /#appLayout -->
 
 <!-- SCRIPTS — v=20260518 para invalidar cache do browser -->
-<script src="js/supabase-client.js?v=20260521"></script>
-<script src="js/db.js?v=20260521"></script>
-<script src="js/auth.js?v=20260521"></script>
-<script src="js/utils.js?v=20260521"></script>
-<script src="js/charts.js?v=20260521"></script>
-<script src="js/modules/dashboard.js?v=20260521"></script>
-<script src="js/modules/pipeline.js?v=20260521"></script>
-<script src="js/modules/clientes.js?v=20260521"></script>
-<script src="js/modules/contatos.js?v=20260521"></script>
-<script src="js/modules/projetos.js?v=20260521"></script>
-<script src="js/modules/atividades.js?v=20260521"></script>
-<script src="js/modules/propostas.js?v=20260521"></script>
-<script src="js/modules/proposta_generator.js?v=20260521"></script>
-<script src="js/modules/financeiro.js?v=20260521"></script>
-<script src="js/modules/folha.js?v=20260521"></script>
-<script src="js/modules/calendario.js?v=20260521"></script>
+<script src="js/supabase-client.js?v=20260522"></script>
+<script src="js/db.js?v=20260522"></script>
+<script src="js/auth.js?v=20260522"></script>
+<script src="js/utils.js?v=20260522"></script>
+<script src="js/charts.js?v=20260522"></script>
+<script src="js/modules/dashboard.js?v=20260522"></script>
+<script src="js/modules/pipeline.js?v=20260522"></script>
+<script src="js/modules/clientes.js?v=20260522"></script>
+<script src="js/modules/contatos.js?v=20260522"></script>
+<script src="js/modules/projetos.js?v=20260522"></script>
+<script src="js/modules/atividades.js?v=20260522"></script>
+<script src="js/modules/propostas.js?v=20260522"></script>
+<script src="js/modules/proposta_generator.js?v=20260522"></script>
+<script src="js/modules/financeiro.js?v=20260522"></script>
+<script src="js/modules/folha.js?v=20260522"></script>
+<script src="js/modules/calendario.js?v=20260522"></script>
 <!-- Google Identity Services (OAuth 2.0 para Google Calendar) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js" async defer></script>
-<script src="js/modules/google-cal.js?v=20260521"></script>
-<script src="js/modules/licitacoes.js?v=20260518"></script>
-<script src="js/modules/marketing.js?v=20260521"></script>
-<script src="js/modules/trafego.js?v=20260521"></script>
-<script src="js/modules/metas.js?v=20260521"></script>
-<script src="js/modules/contratos.js?v=20260521"></script>
-<script src="js/modules/projeto-financeiro.js?v=20260521"></script>
-<script src="js/modules/relatorios.js?v=20260521"></script>
-<script src="js/modules/config.js?v=20260521"></script>
+<script src="js/modules/google-cal.js?v=20260522"></script>
+<script src="js/modules/licitacoes.js?v=20260522"></script>
+<script src="js/modules/marketing.js?v=20260522"></script>
+<script src="js/modules/trafego.js?v=20260522"></script>
+<script src="js/modules/metas.js?v=20260522"></script>
+<script src="js/modules/contratos.js?v=20260522"></script>
+<script src="js/modules/projeto-financeiro.js?v=20260522"></script>
+<script src="js/modules/relatorios.js?v=20260522"></script>
+<script src="js/modules/config.js?v=20260522"></script>
 <script src="js/modules/prospeccao.js?v=20260519"></script>
-<script src="js/notifications.js?v=20260521"></script>
-<script src="js/app.js?v=20260521"></script>
+<script src="js/notifications.js?v=20260522"></script>
+<script src="js/app.js?v=20260522"></script>
 </body>
 </html>

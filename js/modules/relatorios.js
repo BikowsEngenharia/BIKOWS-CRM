@@ -683,7 +683,7 @@ const Relatorios = (() => {
                   <td class="font-bold text-sm">${Utils.escHtml(p.titulo||p.ordemServico||'—')}</td>
                   <td><span class="badge badge-blue">${Utils.escHtml(p.tipoServico)}</span></td>
                   <td class="text-success">${Utils.formatCurrency(p.receita)}</td>
-                  <td class="font-bold text-success">${p.margemPct.toFixed(1)}%</td>
+                  <td class="font-bold text-success">${(Number(p.margemPct)||0).toFixed(1)}%</td>
                 </tr>`).join('')}
               </tbody>
             </table>
@@ -700,7 +700,7 @@ const Relatorios = (() => {
                   <td class="font-bold text-sm">${Utils.escHtml(p.titulo||p.ordemServico||'—')}</td>
                   <td><span class="badge badge-blue">${Utils.escHtml(p.tipoServico)}</span></td>
                   <td class="text-success">${Utils.formatCurrency(p.receita)}</td>
-                  <td class="font-bold ${p.margemPct < 30 ? 'text-danger' : 'text-warning'}">${p.margemPct.toFixed(1)}%</td>
+                  <td class="font-bold ${(p.margemPct||0) < 30 ? 'text-danger' : 'text-warning'}">${(Number(p.margemPct)||0).toFixed(1)}%</td>
                 </tr>`).join('')}
               </tbody>
             </table>

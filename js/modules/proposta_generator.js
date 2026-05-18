@@ -568,16 +568,57 @@ enerlab</textarea>
     // Salvar no localStorage para o viewer ler
     localStorage.setItem('crm_proposta_gerada', JSON.stringify(data));
 
-    // Salvar referência na proposta do CRM se vier de uma proposta existente
+    // === INTEGRAÇÃO CRM ===
+    const clienteSelId = document.getElementById('gpClienteSel')?.value || null;
+
+    // Calcular data de validade real
+    let validadeISO = null;
+    if (data.data) {
+      const d = new Date(data.data);
+      d.setDate(d.getDate() + (parseInt(data.validade) || 15));
+      validadeISO = d.toISOString().split('T')[0];
+    }
+
     if (propostaId) {
+      // Atualizar proposta existente com todos os dados do gerador
+      const existing = DB.get('propostas', propostaId);
       DB.update('propostas', propostaId, {
+        titulo: data.servicoSolicitado || existing?.titulo || '',
+        descricao: data.introTexto || existing?.descricao || '',
+        clienteId: clienteSelId || existing?.clienteId || null,
+        clienteNome: data.cliente.nome,
+        clienteCnpj: data.cliente.cnpj || existing?.clienteCnpj || '',
+        valor: data.valor,
+        validade: validadeISO || existing?.validade,
+        prazoEntrega: data.prazoEntrega || existing?.prazoEntrega || '',
+        formaPagamento: data.formaPagamento || existing?.formaPagamento || '',
         escopoGerado: data.escopoSections,
         cronogramaGerado: data.cronograma,
       });
+    } else {
+      // Criar nova proposta no CRM automaticamente
+      DB.create('propostas', {
+        numero: data.numero,
+        titulo: data.servicoSolicitado || 'Proposta comercial',
+        descricao: data.introTexto || '',
+        clienteId: clienteSelId || null,
+        clienteNome: data.cliente.nome,
+        clienteCnpj: data.cliente.cnpj || '',
+        valor: data.valor,
+        validade: validadeISO,
+        status: 'elaboracao',
+        prazoEntrega: data.prazoEntrega || '',
+        formaPagamento: data.formaPagamento || '',
+        escopoGerado: data.escopoSections,
+        cronogramaGerado: data.cronograma,
+        canvaLink: null,
+        origem: 'gerador-pdf',
+      });
     }
+    // === FIM INTEGRAÇÃO CRM ===
 
     Modal.close();
-    Toast.success('Proposta gerada! Abrindo visualizador...');
+    Toast.success('Proposta gerada e registrada no CRM!');
     setTimeout(() => window.open('proposta_viewer.html', '_blank'), 400);
   }
 

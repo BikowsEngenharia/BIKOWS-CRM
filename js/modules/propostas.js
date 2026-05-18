@@ -177,7 +177,7 @@ const Propostas = (() => {
                       title="Copiar número">📋</button>
                   </td>
                   <td><div class="font-bold" style="max-width:200px">${Utils.escHtml(p.titulo)}</div>${p.descricao ? `<div class="text-xs text-muted">${Utils.escHtml(Utils.truncate(p.descricao,50))}</div>` : ''}</td>
-                  <td class="text-sm">${Utils.escHtml(Utils.getClientName(p.clienteId))}</td>
+                  <td class="text-sm">${Utils.escHtml(Utils.getClientName(p.clienteId) !== '—' ? Utils.getClientName(p.clienteId) : (p.clienteNome || '—'))}</td>
                   <td class="font-bold text-primary">${Utils.formatCurrency(p.valor)}</td>
                   <td class="text-sm ${expirado ? 'text-danger' : 'text-muted'}">${Utils.formatDate(p.validade)}<br><span class="text-xs">${validadeLabel}</span></td>
                   <td class="text-sm">${Utils.escHtml(p.responsavel||'—')}</td>
@@ -186,6 +186,7 @@ const Propostas = (() => {
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.view('${p.id}')">Ver</button>
                       <button class="btn btn-xs btn-success" onclick="PropostaGenerator.open('${p.id}')" title="Gerar proposta PDF">🖨 Gerar</button>
+                      ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-xs btn-secondary" title="Abrir no Canva">🎨</a>` : ''}
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.openForm('${p.id}')">✏</button>
                       <button class="btn btn-xs btn-danger" onclick="Propostas.deleteProposta('${p.id}')">🗑</button>
                     </div>
@@ -230,7 +231,7 @@ const Propostas = (() => {
         </div>
 
         <div class="detail-grid mb-4">
-          <div class="detail-field"><div class="detail-label">Cliente</div><div class="detail-value">${Utils.escHtml(cliente?.nome||'—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Cliente</div><div class="detail-value">${Utils.escHtml(cliente?.nome || p.clienteNome || '—')}</div></div>
           <div class="detail-field"><div class="detail-label">Responsável</div><div class="detail-value">${Utils.escHtml(p.responsavel||'—')}</div></div>
           <div class="detail-field"><div class="detail-label">Valor da Proposta</div><div class="detail-value font-bold text-primary" style="font-size:18px">${Utils.formatCurrency(p.valor)}</div></div>
           <div class="detail-field"><div class="detail-label">Validade</div><div class="detail-value">${Utils.formatDate(p.validade)}</div></div>
@@ -257,6 +258,28 @@ const Propostas = (() => {
         </div>` : ''}
 
         ${p.observacoes ? `<div class="detail-field mb-3"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(p.observacoes)}</div></div>` : ''}
+
+        ${(p.prazoEntrega || p.formaPagamento) ? `
+        <div class="detail-grid mb-3">
+          ${p.prazoEntrega ? `<div class="detail-field"><div class="detail-label">Prazo de Entrega</div><div class="detail-value">${Utils.escHtml(p.prazoEntrega)}</div></div>` : ''}
+          ${p.formaPagamento ? `<div class="detail-field"><div class="detail-label">Forma de Pagamento</div><div class="detail-value">${Utils.escHtml(p.formaPagamento)}</div></div>` : ''}
+        </div>` : ''}
+
+        ${p.canvaLink ? `
+        <div class="detail-field mb-3" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+          <div class="detail-label mb-2">🎨 Proposta no Canva</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener"
+              style="display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;padding:8px 14px;border-radius:var(--radius);text-decoration:none;font-size:13px;font-weight:600">
+              🔗 Abrir no Canva
+            </a>
+            <button onclick="navigator.clipboard.writeText('${Utils.escHtml(p.canvaLink)}').then(()=>Toast.info('Link copiado!'))"
+              class="btn btn-sm btn-secondary">📋 Copiar link</button>
+          </div>
+        </div>` : ''}
+
+        ${(p.origem === 'gerador-pdf' || p.origem === 'gerador-canva') ? `
+        <div class="text-xs text-muted mb-3">Origem: ${p.origem === 'gerador-canva' ? '🎨 Gerado via Canva' : '📄 Gerado via PDF/HTML'}</div>` : ''}
 
         <!-- HISTÓRICO DE VERSÕES -->
         ${versoes.length > 0 ? `
@@ -288,6 +311,7 @@ const Propostas = (() => {
 
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
           <button class="btn btn-success btn-sm" onclick="Modal.close();PropostaGenerator.open('${id}')">🖨 Gerar PDF</button>
+          ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">🎨 Abrir no Canva</a>` : ''}
           ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Propostas.criarRecebivel('${id}')">💰 Criar Recebível</button>` : ''}
           <button class="btn btn-secondary btn-sm" onclick="Modal.close();Propostas.openForm('${id}')">✏ Editar / Nova Versão</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>

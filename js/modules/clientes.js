@@ -121,6 +121,7 @@ const Clientes = (() => {
                   <div class="tbl-actions">
                     <button class="btn btn-xs btn-secondary" onclick="Clientes.view('${c.id}')">Ver</button>
                     <button class="btn btn-xs btn-secondary" onclick="Clientes.openForm('${c.id}')">✏</button>
+                    <button class="btn btn-xs btn-secondary" id="btnPortal_${c.id}" onclick="Clientes.gerarLinkPortal('${c.id}')" title="Gerar link do portal do cliente">🔗 Portal</button>
                     <button class="btn btn-xs btn-danger" onclick="Clientes.deleteCliente('${c.id}')">🗑</button>
                   </div>
                 </td>
@@ -625,7 +626,106 @@ const Clientes = (() => {
     }
   }
 
-  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo };
+  /* ── Portal do Cliente ─────────────────────────────────────────────────── */
+
+  async function gerarLinkPortal(clienteId) {
+    const c = DB.get('clientes', clienteId);
+    if (!c) return;
+
+    const btn = document.getElementById(`btnPortal_${clienteId}`);
+    if (btn) { btn.textContent = '⏳ Gerando...'; btn.disabled = true; }
+
+    try {
+      // Criar token via Supabase
+      const { data, error } = await _supabase
+        .from('crm_portal_tokens')
+        .insert({
+          cliente_id: clienteId,
+          nome_cliente: c.nome,
+          email_cliente: c.email || '',
+          ativo: true,
+          expira_em: new Date(Date.now() + 365 * 86400000).toISOString(), // 1 ano
+        })
+        .select('token')
+        .single();
+
+      if (error || !data?.token) throw new Error(error?.message || 'Erro ao gerar token');
+
+      const link = `https://portal.bikows.com.br/?token=${data.token}`;
+
+      Modal.open({
+        title: '🔗 Link do Portal — ' + c.nome,
+        body: `
+          <div style="background:var(--success-light);border:1px solid var(--success-border);padding:16px;border-radius:var(--radius);margin-bottom:16px">
+            <div class="font-bold text-sm" style="color:var(--success);margin-bottom:8px">✅ Link gerado com sucesso!</div>
+            <div class="text-xs text-muted mb-2">Envie este link para ${Utils.escHtml(c.nome)}. Válido por 1 ano.</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" value="${Utils.escHtml(link)}" id="portalLink" readonly
+                style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:white">
+              <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${Utils.escHtml(link)}').then(()=>Toast.success('Link copiado!'))">📋 Copiar</button>
+            </div>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-field"><div class="detail-label">Cliente</div><div class="detail-value font-bold">${Utils.escHtml(c.nome)}</div></div>
+            <div class="detail-field"><div class="detail-label">Expira em</div><div class="detail-value">1 ano</div></div>
+          </div>
+          <div style="background:var(--bg);padding:12px;border-radius:var(--radius);margin-top:12px">
+            <div class="text-xs font-bold text-muted mb-1">📧 Sugestão de mensagem WhatsApp/e-mail:</div>
+            <div style="font-size:12px;line-height:1.6;color:var(--text)">
+              "Olá ${Utils.escHtml(c.nome)}! Criamos seu portal exclusivo Bikows onde você pode acompanhar projetos e aprovar propostas em tempo real. Acesse: ${Utils.escHtml(link)}"
+            </div>
+          </div>
+        `,
+      });
+    } catch (err) {
+      Toast.error('Erro ao gerar link: ' + err.message);
+    } finally {
+      if (btn) { btn.textContent = '🔗 Gerar Portal'; btn.disabled = false; }
+    }
+  }
+
+  async function verTokensPortal(clienteId) {
+    const c = DB.get('clientes', clienteId);
+    const { data: tokens } = await _supabase
+      .from('crm_portal_tokens')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('criado_em', { ascending: false });
+
+    if (!tokens?.length) { Toast.info('Nenhum link gerado ainda para este cliente.'); return; }
+
+    Modal.open({
+      title: `🔗 Links do Portal — ${c?.nome || ''}`,
+      body: `
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead><tr><th>Token</th><th>Criado em</th><th>Último acesso</th><th>Expira</th><th>Ativo</th><th>Ações</th></tr></thead>
+            <tbody>
+              ${tokens.map(t => `<tr>
+                <td style="font-family:monospace;font-size:11px">${t.token.substring(0,20)}...</td>
+                <td class="text-xs">${Utils.formatDate(t.criado_em?.split('T')[0])}</td>
+                <td class="text-xs">${t.ultimo_acesso ? Utils.formatDate(t.ultimo_acesso.split('T')[0]) : '—'}</td>
+                <td class="text-xs">${t.expira_em ? Utils.formatDate(t.expira_em.split('T')[0]) : '∞'}</td>
+                <td>${t.ativo ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
+                <td>
+                  <button class="btn btn-xs btn-secondary" onclick="navigator.clipboard.writeText('https://portal.bikows.com.br/?token=${t.token}').then(()=>Toast.success('Copiado!'))">📋</button>
+                  ${t.ativo ? `<button class="btn btn-xs btn-danger" onclick="Clientes.revogarToken('${t.id}')">Revogar</button>` : ''}
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      `,
+    });
+  }
+
+  async function revogarToken(tokenId) {
+    await _supabase.from('crm_portal_tokens').update({ ativo: false }).eq('id', tokenId);
+    Toast.success('Token revogado');
+    Modal.close();
+  }
+
+  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo, gerarLinkPortal, verTokensPortal, revogarToken };
 })();
 
 // Tab switcher helper

@@ -1080,10 +1080,27 @@ const Pipeline = (() => {
     } else {
       DB.create('leads', data);
       Toast.success('Lead criado');
+      // Notificar equipe via Telegram
+      _notificarEvento('lead_novo', {
+        titulo: data.titulo || data.cliente || '',
+        valor: data.valorEstimado || 0,
+        servico: data.servico || data.segmento || '',
+        responsavel: data.responsavel || '',
+      });
     }
     Modal.close();
     render();
     App.updateNotifBadge();
+  }
+
+  async function _notificarEvento(evento, dados) {
+    try {
+      await fetch('https://mxvwccyopzfewhvscrzj.supabase.co/functions/v1/crm-notificacoes-eventos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14dndjY3lvcHpmZXdodnNjcnpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MDI2OTYsImV4cCI6MjA5NDM3ODY5Nn0.zDPXwxt5UjY2NN1HMc1cVtPlKvAcOOlhh032Ls7MSMg' },
+        body: JSON.stringify({ evento, dados }),
+      });
+    } catch {}
   }
 
   function deleteLead(id) {

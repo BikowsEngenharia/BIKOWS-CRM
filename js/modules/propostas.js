@@ -307,6 +307,23 @@ const Propostas = (() => {
     Toast.success('Status atualizado');
     Modal.close();
     render();
+
+    // Notificar equipe em eventos importantes
+    const p = DB.get('propostas', id);
+    const cliente = p?.clienteId ? DB.get('clientes', p.clienteId) : null;
+    if (status === 'recusada' || status === 'reprovada') {
+      _notificarEventoProp('proposta_reprovada', { cliente: cliente?.nome || p?.clienteNome || '', numero: p?.numero || '', valor: p?.valor || 0, motivo: p?.motivoPerda || '' });
+    }
+  }
+
+  async function _notificarEventoProp(evento, dados) {
+    try {
+      await fetch('https://mxvwccyopzfewhvscrzj.supabase.co/functions/v1/crm-notificacoes-eventos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14dndjY3lvcHpmZXdodnNjcnpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MDI2OTYsImV4cCI6MjA5NDM3ODY5Nn0.zDPXwxt5UjY2NN1HMc1cVtPlKvAcOOlhh032Ls7MSMg' },
+        body: JSON.stringify({ evento, dados }),
+      });
+    } catch {}
   }
 
   function openForm(id = null) {

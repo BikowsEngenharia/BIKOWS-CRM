@@ -106,9 +106,12 @@ const Clientes = (() => {
               const cProj = projetos.filter(p => p.clienteId === c.id);
               const faturado = Utils.sum(cProj.filter(p => ['concluido','em_andamento'].includes(p.status)), 'valor');
               const npsStars = c.nps ? '⭐'.repeat(c.nps) : '';
+              const avatarHtml = c.avatar
+                ? `<img src="${c.avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;border:1px solid var(--border)">`
+                : `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:800;vertical-align:middle;margin-right:6px">${Utils.escHtml((c.nome||'?')[0].toUpperCase())}</span>`;
               return `<tr>
                 <td class="text-xs font-bold text-muted">${Utils.escHtml(c.codigoCliente||'—')}</td>
-                <td><div class="font-bold">${Utils.escHtml(c.nome)}</div><div class="text-xs text-muted">${npsStars} ${Utils.escHtml(c.email||'')}</div></td>
+                <td><div class="font-bold" style="display:flex;align-items:center">${avatarHtml}${Utils.escHtml(c.nome)}</div><div class="text-xs text-muted">${npsStars} ${Utils.escHtml(c.email||'')}</div></td>
                 <td class="text-sm text-muted">${Utils.escHtml(c.cnpj||'—')}</td>
                 <td>${c.segmento ? `<span class="badge badge-blue">${Utils.escHtml(c.segmento)}</span>` : '—'}</td>
                 <td>${c.porte ? `<span class="badge badge-gray">${Utils.escHtml(c.porte)}</span>` : '—'}</td>
@@ -161,7 +164,10 @@ const Clientes = (() => {
       size: 'modal-lg',
       body: `
         <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;padding:16px;background:var(--bg);border-radius:var(--radius)">
-          <div style="width:52px;height:52px;border-radius:var(--radius-full);background:var(--primary);color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${Utils.escHtml((c.nome||'?')[0].toUpperCase())}</div>
+          ${c.avatar
+            ? `<img src="${c.avatar}" style="width:52px;height:52px;border-radius:var(--radius-full);object-fit:cover;flex-shrink:0;border:2px solid var(--primary)">`
+            : `<div style="width:52px;height:52px;border-radius:var(--radius-full);background:var(--primary);color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${Utils.escHtml((c.nome||'?')[0].toUpperCase())}</div>`
+          }
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:8px">
               <div style="font-size:19px;font-weight:700">${Utils.escHtml(c.nome)}</div>
@@ -323,6 +329,33 @@ const Clientes = (() => {
     });
   }
 
+  function _previewAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { Toast.error('Arquivo muito grande (máx 5MB)'); return; }
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 200;
+        const scale = Math.min(MAX / img.width, MAX / img.height);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        const preview = document.getElementById('avatarPreview');
+        if (preview) preview.innerHTML = `<img src="${base64}" style="width:100%;height:100%;object-fit:cover">`;
+        // Store in hidden input
+        let hidden = document.getElementById('fAvatarData');
+        if (!hidden) { hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.id = 'fAvatarData'; document.getElementById('avatarPreview').parentNode.appendChild(hidden); }
+        hidden.value = base64;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function _nextCodigoCliente() {
     const total = DB.getAll('clientes').length + 1;
     return 'CLI-' + String(total).padStart(4, '0');
@@ -338,6 +371,20 @@ const Clientes = (() => {
       title: id ? 'Editar Cliente' : 'Novo Cliente',
       size: 'modal-lg',
       body: `
+        <!-- AVATAR UPLOAD -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+          <div id="avatarPreview" style="width:64px;height:64px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+            ${c?.avatar ? `<img src="${c.avatar}" style="width:100%;height:100%;object-fit:cover">` : `<span style="color:#fff;font-size:24px;font-weight:800">${Utils.escHtml((c?.nome||'?')[0].toUpperCase())}</span>`}
+          </div>
+          <div>
+            <label class="btn btn-xs btn-secondary" style="cursor:pointer">
+              📷 Foto/Logo
+              <input type="file" id="fAvatar" accept="image/*" style="display:none" onchange="Clientes._previewAvatar(event)">
+            </label>
+            ${c?.avatar ? `<button type="button" class="btn btn-xs btn-danger ml-2" onclick="document.getElementById('avatarPreview').innerHTML='<span style=\\'color:#fff;font-size:24px;font-weight:800\\'>${Utils.escHtml((c?.nome||'?')[0].toUpperCase())}</span>';document.getElementById('fAvatarData').value='__remove__'">Remover</button>` : ''}
+          </div>
+          <input type="hidden" id="fAvatarData" value="">
+        </div>
         <div class="form-row">
           <div class="form-group" style="flex:3">
             <label class="form-label">Razão Social / Nome *</label>
@@ -440,6 +487,12 @@ const Clientes = (() => {
       if (duplicado) { Toast.error(`Código ${codigoCliente} já está em uso por "${duplicado.nome}"`); return; }
     }
 
+    const avatarRaw = document.getElementById('fAvatarData')?.value || '';
+    const existingCliente = id ? DB.get('clientes', id) : null;
+    let avatar = existingCliente?.avatar || null;
+    if (avatarRaw === '__remove__') avatar = null;
+    else if (avatarRaw && avatarRaw.startsWith('data:')) avatar = avatarRaw;
+
     const data = {
       nome,
       codigoCliente,
@@ -455,6 +508,7 @@ const Clientes = (() => {
       engResponsavel: document.getElementById('fEngResponsavel').value,
       nps: Number(document.getElementById('fNps').value) || null,
       observacoes: document.getElementById('fObs').value,
+      avatar,
     };
     if (id) { DB.update('clientes', id, data); Toast.success('Cliente atualizado'); }
     else { DB.create('clientes', data); Toast.success('Cliente cadastrado'); }
@@ -725,7 +779,7 @@ const Clientes = (() => {
     Modal.close();
   }
 
-  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo, gerarLinkPortal, verTokensPortal, revogarToken };
+  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo, gerarLinkPortal, verTokensPortal, revogarToken, _previewAvatar };
 })();
 
 // Tab switcher helper

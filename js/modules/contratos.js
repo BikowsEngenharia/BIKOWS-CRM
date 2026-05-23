@@ -205,6 +205,7 @@ const Contratos = (() => {
         })()}
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
           ${status === 'vencido' || status === 'renovando' ? `<button class="btn btn-success btn-sm" onclick="Contratos.renovar('${id}')">🔄 Renovar Contrato</button>` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="Modal.close();Contratos.exportarPDF('${id}')">📄 Exportar PDF</button>
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Contratos.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
@@ -315,7 +316,11 @@ const Contratos = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Data de Início</label>
-            <input class="form-control" id="fcInicio" type="date" value="${c?.dataInicio||''}">
+            <input class="form-control" id="fcInicio" type="date" value="${c?.dataInicio||''}" oninput="Contratos._calcDataFimFromPrazo()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prazo (meses)</label>
+            <input class="form-control" id="fcPrazoMeses" type="number" min="1" max="120" value="${c?.prazoMeses||''}" placeholder="Ex: 12" oninput="Contratos._calcDataFimFromPrazo()">
           </div>
           <div class="form-group">
             <label class="form-label">Data de Vencimento</label>
@@ -335,6 +340,13 @@ const Contratos = (() => {
         <div class="form-group">
           <label class="form-label">Descrição / Escopo</label>
           <textarea class="form-control" id="fcDescricao" rows="3">${Utils.escHtml(c?.descricao||'')}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Proposta Vinculada</label>
+          <select class="form-control" id="fcPropostaId">
+            <option value="">— Nenhuma —</option>
+            ${DB.getAll('propostas').filter(p => p.status === 'aprovada' || p.id === c?.propostaId).map(p => `<option value="${p.id}" ${c?.propostaId===p.id?'selected':''}>${Utils.escHtml(p.numero||'—')} · ${Utils.escHtml(p.titulo||'')} (${Utils.formatCurrency(p.valor)})</option>`).join('')}
+          </select>
         </div>
         <div class="form-group">
           <label class="form-label">Projeto Vinculado</label>
@@ -367,12 +379,14 @@ const Contratos = (() => {
       valor,
       dataInicio:         document.getElementById('fcInicio').value,
       dataFim:            document.getElementById('fcFim').value,
+      prazoMeses:         Number(document.getElementById('fcPrazoMeses').value) || null,
       alertaVencimento:   Number(document.getElementById('fcAlerta').value) || 30,
       renovacaoAutomatica: document.getElementById('fcRenovacao').checked,
       status:             document.getElementById('fcStatus').value,
       descricao:          document.getElementById('fcDescricao').value,
       observacoes:        document.getElementById('fcObs').value,
       projetoId:          document.getElementById('fContratoProjetoId').value || null,
+      propostaId:         document.getElementById('fcPropostaId')?.value || null,
     };
 
     if (id) { DB.update('contratos', id, data); Toast.success('Contrato atualizado'); }
@@ -477,5 +491,233 @@ const Contratos = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo, drillDown };
+  /* ================================================
+     CRIAR CONTRATO A PARTIR DE PROPOSTA APROVADA
+  ================================================ */
+  function criarDePropostal(propostaId) {
+    const p = DB.get('propostas', propostaId);
+    if (!p) { Toast.error('Proposta não encontrada'); return; }
+    const cfg = DB.getConfig();
+    const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
+    const clientOpts = clientes.map(cl => `<option value="${cl.id}" ${p.clienteId===cl.id?'selected':''}>${Utils.escHtml(cl.nome)}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${p.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const statusOpts = Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${k==='ativo'?'selected':''}>${v.label}</option>`).join('');
+    const hoje = Utils.todayStr();
+
+    Modal.open({
+      title: `📝 Criar Contrato — ${Utils.escHtml(p.numero||p.titulo||'')}`,
+      size: 'modal-lg',
+      body: `
+        <div style="background:var(--success-light);border:1px solid var(--success-border);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:13px">
+          ✅ Criando contrato vinculado à proposta <strong>${Utils.escHtml(p.numero||p.titulo||'')}</strong> · ${Utils.formatCurrency(p.valor)}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Número do Contrato</label>
+          <input class="form-control" id="fContratoNumero" value="${Utils.escHtml(_nextNumeroContrato())}" style="font-family:var(--font-mono);font-weight:700">
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Status</label>
+            <select class="form-control" id="fcStatus">${statusOpts}</select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Objeto do Contrato *</label>
+          <input class="form-control" id="fcObjeto" value="${Utils.escHtml(p.titulo||'')}" placeholder="Objeto do contrato">
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label class="form-label">Cliente *</label>
+            <select class="form-control" id="fcCliente"><option value="">Selecionar</option>${clientOpts}</select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Responsável</label>
+            <select class="form-control" id="fcResp"><option value="">—</option>${respOpts}</select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tipo de Serviço</label>
+            <select class="form-control" id="fcServico">
+              <option value="">—</option>
+              ${cfg.servicos.map(s => `<option value="${s}">${s}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor Total (R$) *</label>
+            <input class="form-control" id="fcValor" type="number" step="0.01" value="${p.valor||''}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data de Início</label>
+            <input class="form-control" id="fcInicio" type="date" value="${hoje}" oninput="Contratos._calcDataFimFromPrazo()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prazo (meses)</label>
+            <input class="form-control" id="fcPrazoMeses" type="number" min="1" max="120" placeholder="Ex: 12" oninput="Contratos._calcDataFimFromPrazo()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Vencimento</label>
+            <input class="form-control" id="fcFim" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Alerta antes (dias)</label>
+            <input class="form-control" id="fcAlerta" type="number" value="30" min="0" max="180">
+          </div>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="fcRenovacao">
+            <span class="form-label" style="margin:0">🔄 Renovação automática</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descrição / Escopo</label>
+          <textarea class="form-control" id="fcDescricao" rows="3">${Utils.escHtml(p.descricao||p.observacoes||'')}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Observações</label>
+          <textarea class="form-control" id="fcObs" rows="2"></textarea>
+        </div>
+        <input type="hidden" id="fcPropostaId" value="${propostaId}">
+      `,
+      saveCb: () => {
+        const objeto = document.getElementById('fcObjeto').value.trim();
+        if (!objeto) { Toast.error('Objeto obrigatório'); return; }
+        const valor = Number(document.getElementById('fcValor').value);
+        if (!valor) { Toast.error('Valor obrigatório'); return; }
+        const data = {
+          numero:             document.getElementById('fContratoNumero').value.trim(),
+          objeto,
+          clienteId:          document.getElementById('fcCliente').value,
+          responsavel:        document.getElementById('fcResp').value,
+          tipoServico:        document.getElementById('fcServico').value,
+          valor,
+          dataInicio:         document.getElementById('fcInicio').value,
+          dataFim:            document.getElementById('fcFim').value,
+          prazoMeses:         Number(document.getElementById('fcPrazoMeses').value) || null,
+          alertaVencimento:   Number(document.getElementById('fcAlerta').value) || 30,
+          renovacaoAutomatica: document.getElementById('fcRenovacao').checked,
+          status:             document.getElementById('fcStatus').value,
+          descricao:          document.getElementById('fcDescricao').value,
+          observacoes:        document.getElementById('fcObs').value,
+          propostaId:         document.getElementById('fcPropostaId').value || null,
+        };
+        DB.create('contratos', data);
+        Toast.success('Contrato criado a partir da proposta!');
+        Modal.close();
+        App.navigate('contratos');
+      },
+    });
+  }
+
+  function _calcDataFimFromPrazo() {
+    const inicio = document.getElementById('fcInicio')?.value;
+    const meses = Number(document.getElementById('fcPrazoMeses')?.value);
+    if (!inicio || !meses) return;
+    const d = new Date(inicio);
+    d.setMonth(d.getMonth() + meses);
+    const fimEl = document.getElementById('fcFim');
+    if (fimEl) fimEl.value = d.toISOString().split('T')[0];
+  }
+
+  /* ================================================
+     PDF DE CONTRATO
+  ================================================ */
+  function exportarPDF(id) {
+    const c = DB.get('contratos', id);
+    if (!c) return;
+    const cfg = DB.getConfig();
+    const cliente = Utils.getClientName(c.clienteId);
+    const status = _autoStatus(c);
+
+    // Criar área de impressão temporária
+    let area = document.getElementById('contratoImpressao');
+    if (!area) {
+      area = document.createElement('div');
+      area.id = 'contratoImpressao';
+      document.body.appendChild(area);
+    }
+
+    area.innerHTML = `
+      <div style="font-family:'Inter',sans-serif;max-width:780px;margin:0 auto;padding:40px;color:#1e293b">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #1d4ed8">
+          <div>
+            <div style="font-size:24px;font-weight:800;color:#1d4ed8">${Utils.escHtml(cfg.empresa||'Empresa')}</div>
+            ${cfg.cnpj ? `<div style="font-size:12px;color:#64748b">CNPJ: ${Utils.escHtml(cfg.cnpj)}</div>` : ''}
+            ${cfg.cidade ? `<div style="font-size:12px;color:#64748b">${Utils.escHtml(cfg.cidade)}${cfg.estado?'/'+cfg.estado:''}</div>` : ''}
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b">Contrato de Prestação de Serviços</div>
+            <div style="font-size:18px;font-weight:800;color:#1d4ed8;font-family:monospace">${Utils.escHtml(c.numero||'—')}</div>
+            <div style="font-size:11px;color:#64748b">Status: ${STATUS[status]?.label||status}</div>
+          </div>
+        </div>
+
+        <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;color:#1e293b">OBJETO DO CONTRATO</h2>
+        <p style="font-size:14px;line-height:1.7;color:#334155;margin-bottom:24px">${Utils.escHtml(c.objeto||'')}</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+          <div style="background:#f8fafc;border-radius:8px;padding:14px;border-left:3px solid #1d4ed8">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:4px">CONTRATANTE</div>
+            <div style="font-size:14px;font-weight:600">${Utils.escHtml(cliente)}</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:8px;padding:14px;border-left:3px solid #1d4ed8">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:4px">CONTRATADA</div>
+            <div style="font-size:14px;font-weight:600">${Utils.escHtml(cfg.empresa||'—')}</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
+          <div style="background:#f8fafc;border-radius:8px;padding:12px">
+            <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">VALOR TOTAL</div>
+            <div style="font-size:16px;font-weight:800;color:#1d4ed8">${Utils.formatCurrency(c.valor||0)}</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:8px;padding:12px">
+            <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">VIGÊNCIA</div>
+            <div style="font-size:13px;font-weight:600">${Utils.formatDate(c.dataInicio)} a ${Utils.formatDate(c.dataFim)}</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:8px;padding:12px">
+            <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">RESPONSÁVEL</div>
+            <div style="font-size:13px;font-weight:600">${Utils.escHtml(c.responsavel||'—')}</div>
+          </div>
+        </div>
+
+        ${c.descricao ? `
+        <h3 style="font-size:14px;font-weight:700;margin:0 0 10px;color:#1e293b">ESCOPO / DESCRIÇÃO</h3>
+        <p style="font-size:13px;line-height:1.7;color:#334155;margin-bottom:24px;white-space:pre-wrap">${Utils.escHtml(c.descricao)}</p>
+        ` : ''}
+
+        ${c.observacoes ? `
+        <h3 style="font-size:14px;font-weight:700;margin:0 0 10px;color:#1e293b">OBSERVAÇÕES</h3>
+        <p style="font-size:13px;line-height:1.7;color:#334155;margin-bottom:24px;white-space:pre-wrap">${Utils.escHtml(c.observacoes)}</p>
+        ` : ''}
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:60px">
+          <div style="border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:12px;color:#64748b">
+            <div style="margin-bottom:30px"></div>
+            Assinatura do Contratante<br>${Utils.escHtml(cliente)}
+          </div>
+          <div style="border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:12px;color:#64748b">
+            <div style="margin-bottom:30px"></div>
+            Assinatura da Contratada<br>${Utils.escHtml(cfg.empresa||'')}
+          </div>
+        </div>
+
+        <div style="text-align:center;font-size:10px;color:#94a3b8;margin-top:32px;border-top:1px solid #e2e8f0;padding-top:12px">
+          Gerado em ${new Date().toLocaleDateString('pt-BR')} · ${Utils.escHtml(cfg.empresa||'')} — Bikows CRM
+        </div>
+      </div>
+    `;
+
+    // Mostrar área de impressão — o @media print oculta o appLayout automaticamente
+    area.style.display = 'block';
+    requestAnimationFrame(() => {
+      window.print();
+      area.style.display = 'none';
+    });
+  }
+
+  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo, drillDown, criarDePropostal, _calcDataFimFromPrazo, exportarPDF };
 })();

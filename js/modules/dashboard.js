@@ -24,6 +24,56 @@ const Dashboard = (() => {
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
+  function _filtrarPeriodoAnterior(lista, campo) {
+    if (_periodo === 'tudo') return [];
+    const hoje = new Date();
+    let inicioAtual, fimAnterior, inicioAnterior;
+    if (_periodo === 'mes') {
+      inicioAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      fimAnterior = new Date(inicioAtual.getTime() - 1);
+      inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1);
+    } else if (_periodo === 'trimestre') {
+      const q = Math.floor(hoje.getMonth() / 3);
+      inicioAtual = new Date(hoje.getFullYear(), q * 3, 1);
+      fimAnterior = new Date(inicioAtual.getTime() - 1);
+      inicioAnterior = new Date(fimAnterior.getFullYear(), Math.floor(fimAnterior.getMonth() / 3) * 3, 1);
+    } else if (_periodo === 'semestre') {
+      const s = hoje.getMonth() < 6 ? 0 : 6;
+      inicioAtual = new Date(hoje.getFullYear(), s, 1);
+      fimAnterior = new Date(inicioAtual.getTime() - 1);
+      inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth() < 6 ? 0 : 6, 1);
+    } else if (_periodo === 'ano') {
+      inicioAtual = new Date(hoje.getFullYear(), 0, 1);
+      fimAnterior = new Date(inicioAtual.getTime() - 1);
+      inicioAnterior = new Date(fimAnterior.getFullYear(), 0, 1);
+    }
+    const inicioStr = inicioAnterior.toISOString().split('T')[0];
+    const fimStr = fimAnterior.toISOString().split('T')[0];
+    return lista.filter(item => {
+      const d = (item[campo] || item.createdAt || '').slice(0, 10);
+      return d >= inicioStr && d <= fimStr;
+    });
+  }
+
+  function _trendHtml(atual, anterior, isPercent = false) {
+    if (_periodo === 'tudo' || anterior === 0 && atual === 0) return '';
+    let diff, label;
+    if (isPercent) {
+      diff = atual - anterior;
+      label = diff >= 0 ? `↑ +${diff.toFixed(0)}pp` : `↓ ${diff.toFixed(0)}pp`;
+    } else if (anterior === 0) {
+      label = atual > 0 ? '↑ novo' : '—';
+      diff = atual;
+    } else {
+      diff = ((atual - anterior) / anterior) * 100;
+      label = diff >= 0 ? `↑ +${diff.toFixed(0)}%` : `↓ ${diff.toFixed(0)}%`;
+    }
+    const color = diff >= 0 ? '#10b981' : '#ef4444';
+    return `<div class="kpi-trend" style="color:${color}">
+      ${label} <span style="color:var(--text-muted);font-weight:400">vs período anterior</span>
+    </div>`;
+  }
+
   function setPeriodo(p) {
     _periodo = p;
     render();
@@ -52,6 +102,14 @@ const Dashboard = (() => {
     const receitaFechada = Utils.sum(ganhos, 'valorFechado');
     const taxaConversao = (leadsFiltrados.length > 0) ? ((ganhos.length / leadsFiltrados.length) * 100).toFixed(0) : 0;
 
+    // Período anterior para comparativo
+    const leadsAnt = _filtrarPeriodoAnterior(leads, 'dataEntrada');
+    const ativosAnt = leadsAnt.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const ganhosAnt = leadsAnt.filter(l => l.status === 'fechado_ganho');
+    const totalPipelineAnt = Utils.sum(ativosAnt, 'valorEstimado');
+    const receitaFechadaAnt = Utils.sum(ganhosAnt, 'valorFechado');
+    const taxaConversaoAnt = leadsAnt.length > 0 ? (ganhosAnt.length / leadsAnt.length) * 100 : 0;
+
     const pendentes = atividadesFiltradas.filter(a => a.status === 'pendente');
     const atrasadas = pendentes.filter(a => Utils.isOverdue(a.data));
     const projetosAtivos = projetosFiltrados.filter(p => p.status === 'em_andamento');
@@ -65,6 +123,15 @@ const Dashboard = (() => {
           if (Utils.isOverdue(p.vencimento)) totalReceberVencido += p.valor;
           else totalReceberAVencer += p.valor;
         }
+      });
+    });
+    const totalReceberAtual = totalReceberAVencer + totalReceberVencido;
+    // A receber do período anterior — baseado em recebiveis criados naquele período
+    const recebiveisAnt = _filtrarPeriodoAnterior(recebiveis, 'createdAt');
+    let totalReceberAnt = 0;
+    recebiveisAnt.forEach(r => {
+      (r.parcelas || []).forEach(p => {
+        if (p.status !== 'recebido') totalReceberAnt += (p.valor || 0);
       });
     });
 
@@ -117,24 +184,28 @@ const Dashboard = (() => {
           <div class="kpi-label">Pipeline Ativo <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="kpi-sub">${ativos.length} oportunidades abertas</div>
+          ${_trendHtml(totalPipeline, totalPipelineAnt)}
           <div class="kpi-icon">💼</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" onclick="Dashboard.drillDown('leads_ganhos')">
           <div class="kpi-label">Receita Fechada <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${Utils.formatCurrency(receitaFechada)}</div>
           <div class="kpi-sub">${ganhos.length} negócios ganhos</div>
+          ${_trendHtml(receitaFechada, receitaFechadaAnt)}
           <div class="kpi-icon">🏆</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#f59e0b;cursor:pointer" onclick="Dashboard.drillDown('receber_avencer')">
           <div class="kpi-label">A Receber</div>
-          <div class="kpi-value">${Utils.formatCurrency(totalReceberAVencer + totalReceberVencido)}</div>
+          <div class="kpi-value">${Utils.formatCurrency(totalReceberAtual)}</div>
           <div class="kpi-sub ${totalReceberVencido > 0 ? 'text-danger' : ''}">${totalReceberVencido > 0 ? `⚠ ${Utils.formatCurrency(totalReceberVencido)} vencido` : 'Em dia'}</div>
+          ${_trendHtml(totalReceberAtual, totalReceberAnt)}
           <div class="kpi-icon">💰</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#8b5cf6;cursor:pointer" onclick="Dashboard.drillDown('leads_novos')">
           <div class="kpi-label">Taxa de Conversão <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${taxaConversao}%</div>
           <div class="kpi-sub">${ganhos.length} ganhos / ${perdidos.length} perdidos</div>
+          ${_trendHtml(Number(taxaConversao), taxaConversaoAnt, true)}
           <div class="kpi-icon">📈</div>
         </div>
       </div>

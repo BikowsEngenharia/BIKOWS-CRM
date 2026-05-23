@@ -313,6 +313,7 @@ const Propostas = (() => {
           <button class="btn btn-success btn-sm" onclick="Modal.close();PropostaGenerator.open('${id}')">🖨 Gerar PDF</button>
           ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">🎨 Abrir no Canva</a>` : ''}
           ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Propostas.criarRecebivel('${id}')">💰 Criar Recebível</button>` : ''}
+          ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Contratos.criarDePropostal('${id}')">📝 Criar Contrato</button>` : ''}
           <button class="btn btn-secondary btn-sm" onclick="Modal.close();Propostas.openForm('${id}')">✏ Editar / Nova Versão</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>

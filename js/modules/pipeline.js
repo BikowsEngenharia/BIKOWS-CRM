@@ -221,6 +221,11 @@ const Pipeline = (() => {
           <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Ver somente licitações">🏛 Licitações</button>
           <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
           <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
+          <button class="btn btn-secondary" onclick="Pipeline.downloadCSVTemplate()" title="Baixar modelo CSV de leads">📋 Modelo CSV</button>
+          <label class="btn btn-secondary" title="Importar leads via CSV">
+            📥 CSV
+            <input type="file" accept=".csv" style="display:none" onchange="Pipeline.importCSV(event)">
+          </label>
           <button class="btn btn-primary" onclick="Pipeline.openForm()">+ Novo Lead</button>
         </div>
       </div>
@@ -1113,6 +1118,78 @@ const Pipeline = (() => {
     });
   }
 
+  function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    event.target.value = '';
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const lines = e.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 2) { Toast.error('CSV vazio ou sem dados'); return; }
+        const headers = lines[0].split(';').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+        const idx = (col) => headers.indexOf(col);
+
+        let created = 0, skipped = 0;
+        lines.slice(1).forEach(line => {
+          const cols = line.split(';').map(c => c.trim().replace(/^["']|["']$/g, ''));
+          const titulo = cols[idx('titulo')] || '';
+          if (!titulo) { skipped++; return; }
+
+          // Buscar ou criar cliente
+          const clienteNome = cols[idx('clientenome')] || cols[idx('cliente')] || cols[idx('clientenome')] || '';
+          let clienteId = null;
+          if (clienteNome) {
+            const existente = DB.getAll('clientes').find(c => c.nome?.toLowerCase() === clienteNome.toLowerCase());
+            if (existente) {
+              clienteId = existente.id;
+            } else {
+              const segmento = cols[idx('segmento')] || '';
+              clienteId = DB.create('clientes', { nome: clienteNome, segmento, ativo: true });
+            }
+          }
+
+          const statusRaw = cols[idx('status')] || 'lead_identificado';
+          const statusVal = STAGES.find(s => s.key === statusRaw) ? statusRaw : 'lead_identificado';
+
+          DB.create('leads', {
+            titulo,
+            clienteId,
+            clienteNome: clienteNome,
+            segmento: cols[idx('segmento')] || '',
+            valorEstimado: Number(cols[idx('valorestimado')]) || 0,
+            status: statusVal,
+            responsavel: cols[idx('responsavel')] || '',
+            origemLead: cols[idx('origemlead')] || '',
+            decisor: cols[idx('decisor')] || '',
+            observacoes: cols[idx('observacoes')] || '',
+            dataEntrada: Utils.todayStr(),
+          });
+          created++;
+        });
+
+        Toast.success(`${created} lead(s) importado(s)!${skipped ? ` (${skipped} linha(s) ignorada(s))` : ''}`);
+        render();
+        App.updateNotifBadge();
+      } catch (err) {
+        Toast.error('Erro ao processar CSV: ' + err.message);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  function downloadCSVTemplate() {
+    const header = 'titulo;clienteNome;segmento;valorEstimado;status;responsavel;origemLead;decisor;observacoes';
+    const example = 'Adequação NR-12 — Frigorífico Exemplo;Frigorífico Exemplo Ltda;Alimentos;85000;lead_identificado;João Silva;Indicação;Maria Costa (Diretora);Lead quente — visita técnica agendada';
+    const blob = new Blob([header + '\n' + example], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'modelo-leads.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    Toast.success('Modelo CSV baixado!');
+  }
+
   function addNew() { openForm(); }
 
   /* ---- Drill-down dos KPI cards ---- */
@@ -1319,5 +1396,6 @@ const Pipeline = (() => {
     setFilter, clearFilters, setPeriodo,
     drillDown,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
+    importCSV, downloadCSVTemplate,
   };
 })();

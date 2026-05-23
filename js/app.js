@@ -293,11 +293,24 @@ const App = (() => {
       body: `
         ${followups.length > 0 ? `
           <div class="detail-label mb-2">Follow-ups Vencidos (${followups.length})</div>
-          ${followups.map(l => `<div class="followup-item urgent mb-2">
-            <div style="flex:1"><div class="font-bold text-sm">${Utils.escHtml(Utils.getClientName(l.clienteId))}</div>
-            <div class="text-xs">${Utils.escHtml(l.titulo)} · ${Utils.escHtml(l.proximaAcao||'')}</div></div>
-            <span class="badge badge-red">${Math.abs(Utils.daysUntil(l.dataProximaAcao))}d atraso</span>
-          </div>`).join('')}
+          ${followups.map(l => {
+            const telefone = l.contato || (() => {
+              const contatos = DB.getAll('contatos').filter(ct => ct.clienteId === l.clienteId);
+              const principal = contatos.find(ct => ct.principal) || contatos[0];
+              return principal?.telefone || '';
+            })();
+            const clienteNome = Utils.getClientName(l.clienteId) || l.clienteNome || '';
+            const msgWpp = `Olá ${clienteNome}, tudo bem? Passando para verificar o andamento da proposta de ${l.titulo}. Podemos conversar?`.replace(/['"]/g, '');
+            const wppBtn = telefone
+              ? `<button class="btn btn-xs btn-success ml-2" onclick="Utils.openWhatsApp('${Utils.escHtml(telefone)}', '${Utils.escHtml(msgWpp)}')" title="WhatsApp">📱 WhatsApp</button>`
+              : '';
+            return `<div class="followup-item urgent mb-2" style="flex-wrap:wrap;gap:6px">
+              <div style="flex:1"><div class="font-bold text-sm">${Utils.escHtml(clienteNome)}</div>
+              <div class="text-xs">${Utils.escHtml(l.titulo)} · ${Utils.escHtml(l.proximaAcao||'')}</div></div>
+              <span class="badge badge-red">${Math.abs(Utils.daysUntil(l.dataProximaAcao))}d atraso</span>
+              ${wppBtn}
+            </div>`;
+          }).join('')}
         ` : ''}
 
         ${atrasadas.length > 0 ? `

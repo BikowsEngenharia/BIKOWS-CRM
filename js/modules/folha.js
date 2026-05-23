@@ -140,14 +140,43 @@ const Folha = (() => {
     `;
   }
 
+  function _previewAvatarFunc(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { Toast.error('Arquivo muito grande (máx 5MB)'); return; }
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 200;
+        const scale = Math.min(MAX / img.width, MAX / img.height);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        const preview = document.getElementById('avatarPreviewFunc');
+        if (preview) preview.innerHTML = `<img src="${base64}" style="width:100%;height:100%;object-fit:cover">`;
+        let hidden = document.getElementById('ffAvatarData');
+        if (!hidden) { hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.id = 'ffAvatarData'; preview.parentNode.appendChild(hidden); }
+        hidden.value = base64;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function funcCard(f) {
     const calc = calcFolhaFuncionario(f);
     const ini = (f.nome || '?').charAt(0).toUpperCase();
     const cores = ['#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2'];
     const cor = cores[(f.nome || '').charCodeAt(0) % cores.length];
+    const avatarContent = f.avatar
+      ? `<img src="${f.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:var(--radius-full)">`
+      : ini;
     return `
       <div class="func-card">
-        <div class="func-avatar" style="background:${cor}">${ini}</div>
+        <div class="func-avatar" style="background:${f.avatar ? 'transparent' : cor};overflow:hidden">${avatarContent}</div>
         <div class="func-info">
           <div class="func-name">${Utils.escHtml(f.nome)}</div>
           <div class="func-role">${Utils.escHtml(f.cargo || '—')}</div>
@@ -438,6 +467,20 @@ const Folha = (() => {
       title: id ? 'Editar Funcionário' : 'Novo Funcionário',
       size: 'modal-lg',
       body: `
+        <!-- AVATAR UPLOAD -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+          <div id="avatarPreviewFunc" style="width:64px;height:64px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+            ${f?.avatar ? `<img src="${f.avatar}" style="width:100%;height:100%;object-fit:cover">` : `<span style="color:#fff;font-size:24px;font-weight:800">${Utils.escHtml((f?.nome||'?')[0].toUpperCase())}</span>`}
+          </div>
+          <div>
+            <label class="btn btn-xs btn-secondary" style="cursor:pointer">
+              📷 Foto
+              <input type="file" id="ffAvatar" accept="image/*" style="display:none" onchange="Folha._previewAvatarFunc(event)">
+            </label>
+            ${f?.avatar ? `<button type="button" class="btn btn-xs btn-danger ml-2" onclick="document.getElementById('avatarPreviewFunc').innerHTML='<span style=\\'color:#fff;font-size:24px;font-weight:800\\'>${Utils.escHtml((f?.nome||'?')[0].toUpperCase())}</span>';document.getElementById('ffAvatarData').value='__remove__'">Remover</button>` : ''}
+          </div>
+          <input type="hidden" id="ffAvatarData" value="">
+        </div>
         <div class="form-row">
           <div class="form-group" style="flex:2">
             <label class="form-label">Nome Completo *</label>
@@ -522,6 +565,13 @@ const Folha = (() => {
     if (!nome) { Toast.error('Nome obrigatório'); return; }
     if (!cargo) { Toast.error('Cargo obrigatório'); return; }
     if (!sal) { Toast.error('Salário obrigatório'); return; }
+
+    const avatarRaw = document.getElementById('ffAvatarData')?.value || '';
+    const existingFunc = id ? DB.get('funcionarios', id) : null;
+    let avatar = existingFunc?.avatar || null;
+    if (avatarRaw === '__remove__') avatar = null;
+    else if (avatarRaw && avatarRaw.startsWith('data:')) avatar = avatarRaw;
+
     const data = {
       nome, cargo,
       cpf: document.getElementById('ffCpf').value.trim(),
@@ -537,6 +587,7 @@ const Folha = (() => {
       agencia: document.getElementById('ffAg').value.trim(),
       conta: document.getElementById('ffConta').value.trim(),
       outrosAdicionais: Number(document.getElementById('ffOutros').value) || 0,
+      avatar,
       ativo: true,
     };
     if (id) { DB.update('funcionarios', id, data); Toast.success('Funcionário atualizado'); }
@@ -708,6 +759,6 @@ const Folha = (() => {
     openFormFunc, saveFunc, verFunc, deleteFunc, toggleAtivo,
     gerarFolha, marcarPago, marcarTodosPagos, excluirFolha,
     verHolerite, setHoleirteFunc, setHoleitreRef,
-    addNew,
+    addNew, _previewAvatarFunc,
   };
 })();

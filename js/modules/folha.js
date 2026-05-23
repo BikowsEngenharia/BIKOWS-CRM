@@ -158,7 +158,11 @@ const Folha = (() => {
         <div class="func-actions">
           <button class="btn btn-xs btn-secondary" onclick="Folha.verFunc('${f.id}')">Ver</button>
           <button class="btn btn-xs btn-secondary" onclick="Folha.openFormFunc('${f.id}')">✏</button>
-          <button class="btn btn-xs btn-danger" onclick="Folha.deleteFunc('${f.id}')">🗑</button>
+          ${f.ativo !== false
+            ? `<button class="btn btn-xs btn-warning" onclick="Folha.toggleAtivo('${f.id}', false)" title="Desligar — mantém histórico">Desligar</button>`
+            : `<button class="btn btn-xs btn-success" onclick="Folha.toggleAtivo('${f.id}', true)" title="Reativar funcionário">Reativar</button>`
+          }
+          <button class="btn btn-xs btn-danger" onclick="Folha.deleteFunc('${f.id}')" title="Excluir permanentemente do sistema">🗑</button>
         </div>
       </div>
     `;
@@ -580,11 +584,38 @@ const Folha = (() => {
 
   function deleteFunc(id) {
     const f = DB.get('funcionarios', id);
-    Utils.confirmDelete(f?.nome || 'este funcionário', () => {
-      DB.update('funcionarios', id, { ativo: false });
-      Toast.success('Funcionário desligado');
-      render();
-    });
+    if (!f) return;
+    Confirm.show(
+      'Excluir Funcionário Permanentemente',
+      `Deseja excluir <strong>${Utils.escHtml(f.nome)}</strong> permanentemente?<br><br>` +
+      `<span style="color:var(--danger);font-size:12px">⚠ Isso também removerá todos os registros de folha deste funcionário. Esta ação não pode ser desfeita.</span>`,
+      () => {
+        // Excluir registros de folha associados
+        DB.getAll('folha')
+          .filter(r => r.funcionarioId === id)
+          .forEach(r => DB.remove('folha', r.id));
+        // Excluir o funcionário permanentemente
+        DB.remove('funcionarios', id);
+        Toast.success('Funcionário excluído permanentemente');
+        render();
+      }
+    );
+  }
+
+  function toggleAtivo(id, ativo) {
+    const f = DB.get('funcionarios', id);
+    if (!f) return;
+    Confirm.show(
+      ativo ? 'Reativar Funcionário' : 'Desligar Funcionário',
+      ativo
+        ? `Deseja reativar <strong>${Utils.escHtml(f.nome)}</strong>? Ele voltará a aparecer na folha de pagamento.`
+        : `Deseja desligar <strong>${Utils.escHtml(f.nome)}</strong>? Ele não aparecerá nas próximas folhas de pagamento, mas seus dados serão mantidos.`,
+      () => {
+        DB.update('funcionarios', id, { ativo });
+        Toast.success(ativo ? 'Funcionário reativado' : 'Funcionário desligado');
+        render();
+      }
+    );
   }
 
   /* =========================================================
@@ -674,7 +705,7 @@ const Folha = (() => {
 
   return {
     render, setTab, setMes, setMesEIrParaFolha,
-    openFormFunc, saveFunc, verFunc, deleteFunc,
+    openFormFunc, saveFunc, verFunc, deleteFunc, toggleAtivo,
     gerarFolha, marcarPago, marcarTodosPagos, excluirFolha,
     verHolerite, setHoleirteFunc, setHoleitreRef,
     addNew,

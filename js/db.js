@@ -37,8 +37,12 @@ const DB = (() => {
   function _saveLocalBackup(table) {
     try {
       const data = _cache[table];
-      if (data && data.length > 0) {
+      if (!data) return;
+      if (data.length > 0) {
         localStorage.setItem('crm_cache_' + table, JSON.stringify(data));
+      } else {
+        // Array vazio = todos os itens foram excluídos — limpar backup para não restaurar dados antigos
+        localStorage.removeItem('crm_cache_' + table);
       }
     } catch (e) { /* silencioso — quota excedida etc */ }
   }
@@ -251,9 +255,42 @@ const DB = (() => {
   /* ====================================================
      DADOS DE EXEMPLO — semeados somente se BD estiver vazio
      ==================================================== */
+
+  // Flag persistente: evita re-semeadura mesmo após excluir todos os dados
+  const _SEED_KEY = 'crm_bk_seeded_v1';
+
+  function _isSeeded() {
+    // Verificar localStorage primeiro (rápido, mesmo dispositivo)
+    if (localStorage.getItem(_SEED_KEY) === '1') return true;
+    // Verificar flag no config do Supabase (persistente entre dispositivos)
+    if (_cache.config?.sampleDataInitialized === true) return true;
+    return false;
+  }
+
+  function _markSeeded() {
+    localStorage.setItem(_SEED_KEY, '1');
+    // Persistir no Supabase config para sincronizar todos os dispositivos
+    const cfg = { ...(getConfig()), sampleDataInitialized: true };
+    _cache.config = cfg;
+    _supabase.from('config')
+      .upsert({ id: 'singleton', data: cfg })
+      .catch(e => console.warn('[DB] markSeeded config error:', e));
+  }
+
   async function initSampleData() {
-    // Aguarda o cache estar populado
-    if (_cache.clientes.length > 0) return;
+    // Nunca re-semeia: flag persistente entre dispositivos via Supabase config
+    if (_isSeeded()) return;
+    // Dados reais já existem neste dispositivo — marcar e sair sem semear
+    if (_cache.clientes.length > 0) {
+      _markSeeded();
+      return;
+    }
+    // Verificar mais entidades para garantir que não é apenas clientes vazios
+    const totalRegistros = ENTITIES.reduce((s, e) => s + (_cache[e]?.length || 0), 0);
+    if (totalRegistros > 0) {
+      _markSeeded();
+      return;
+    }
 
     /* ---- Clientes ---- */
     const c1 = create('clientes', { nome: 'Frigorífico Bela Vista', cnpj: '12.345.678/0001-90', segmento: 'Alimentos', porte: 'Grande', cidade: 'Londrina', estado: 'PR', email: 'contato@belavista.com.br', telefone: '(43) 3333-1234', ativo: true });
@@ -399,6 +436,9 @@ const DB = (() => {
       observacoes: 'Contrato assinado. Execução prevista em 12 parcelas mensais de R$ 4.983.',
       checklist: {}, notas: 'GANHAMOS! Contrato assinado em ' + d(-50) + '.',
     });
+
+    // Marcar como semeado para nunca re-executar em nenhum dispositivo
+    _markSeeded();
   }
 
   /* ====================================================

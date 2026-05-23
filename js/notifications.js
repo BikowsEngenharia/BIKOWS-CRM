@@ -1,11 +1,11 @@
-/* ==========================================
-   notifications.js — Gerenciador de lembretes e alertas
+﻿/* ==========================================
+   notifications.js â€” Gerenciador de lembretes e alertas
    ========================================== */
 const Notifications = (() => {
 
   const NOTIF_KEY = 'crm_notif_sent'; // sessionStorage key para evitar duplicatas
 
-  /* ---- Preferências padrão ---- */
+  /* ---- PreferÃªncias padrÃ£o ---- */
   function _defaultPrefs() {
     return {
       browser:  true,
@@ -35,7 +35,7 @@ const Notifications = (() => {
     DB.saveConfig({ ...cfg, notificacoes: prefs });
   }
 
-  /* ---- Inicialização ---- */
+  /* ---- InicializaÃ§Ã£o ---- */
   async function init() {
     _registerSW();
     await _requestPermission();
@@ -52,7 +52,7 @@ const Notifications = (() => {
       .catch(err => console.warn('[SW] Erro:', err));
   }
 
-  /* ---- Permissão de notificação ---- */
+  /* ---- PermissÃ£o de notificaÃ§Ã£o ---- */
   async function _requestPermission() {
     if (!('Notification' in window)) return false;
     if (Notification.permission === 'granted') return true;
@@ -63,19 +63,19 @@ const Notifications = (() => {
 
   async function requestPermission() {
     const granted = await _requestPermission();
-    if (granted) Toast.success('Notificações do navegador ativadas!');
-    else Toast.error('Permissão de notificação negada pelo navegador.');
+    if (granted) Toast.success('NotificaÃ§Ãµes do navegador ativadas!');
+    else Toast.error('PermissÃ£o de notificaÃ§Ã£o negada pelo navegador.');
     return granted;
   }
 
-  /* ---- Verificação periódica ---- */
+  /* ---- VerificaÃ§Ã£o periÃ³dica ---- */
   function _startPeriodicCheck() {
     // Verifica a cada 30 minutos
     setInterval(() => _checkAll(), 30 * 60 * 1000);
   }
 
   /* ====================================================
-     VERIFICAÇÕES
+     VERIFICAÃ‡Ã•ES
      ==================================================== */
   function _checkAll() {
     const prefs = getPrefs();
@@ -92,7 +92,7 @@ const Notifications = (() => {
 
     if (items.length === 0) return;
 
-    // Evita re-notificar os mesmos itens na mesma sessão
+    // Evita re-notificar os mesmos itens na mesma sessÃ£o
     const sent = JSON.parse(sessionStorage.getItem(NOTIF_KEY) || '[]');
     const novos = items.filter(i => !sent.includes(i.tag));
 
@@ -107,12 +107,12 @@ const Notifications = (() => {
       setTimeout(() => {
         const msg = novos.length === 1
           ? novos[0].body
-          : `${novos.length} lembretes pendentes — clique em 🔔 para ver`;
-        Toast.warning('🔔 ' + msg, 6000);
+          : `${novos.length} lembretes pendentes â€” clique em ðŸ”” para ver`;
+        Toast.warning('ðŸ”” ' + msg, 6000);
       }, 1500);
     }
 
-    // Marca como enviados na sessão
+    // Marca como enviados na sessÃ£o
     sessionStorage.setItem(NOTIF_KEY, JSON.stringify([...sent, ...novos.map(i => i.tag)]));
 
     // Email (se configurado)
@@ -140,8 +140,8 @@ const Notifications = (() => {
         const label = d < 0 ? `${Math.abs(d)}d atrasada` : d === 0 ? 'hoje' : `em ${d}d`;
         return {
           tag: 'atv_' + a.id,
-          title: '📋 Atividade — ' + label,
-          body: a.titulo + (a.responsavel ? ' · ' + a.responsavel : ''),
+          title: 'ðŸ“‹ Atividade â€” ' + label,
+          body: a.titulo + (a.responsavel ? ' Â· ' + a.responsavel : ''),
         };
       });
   }
@@ -160,8 +160,8 @@ const Notifications = (() => {
         const label = d < 0 ? `${Math.abs(d)}d atrasado` : d === 0 ? 'hoje' : `em ${d}d`;
         return {
           tag: 'lead_' + l.id,
-          title: '💼 Follow-up — ' + label,
-          body: l.titulo + ' · ' + (l.proximaAcao || 'Verificar pipeline'),
+          title: 'ðŸ’¼ Follow-up â€” ' + label,
+          body: l.titulo + ' Â· ' + (l.proximaAcao || 'Verificar pipeline'),
         };
       });
   }
@@ -179,8 +179,8 @@ const Notifications = (() => {
           const cli = DB.get('clientes', r.clienteId);
           items.push({
             tag: 'parc_' + p.id,
-            title: '💰 Parcela — ' + label,
-            body: (cli?.nome || 'Cliente') + ' · ' + Utils.formatCurrency(p.valor),
+            title: 'ðŸ’° Parcela â€” ' + label,
+            body: (cli?.nome || 'Cliente') + ' Â· ' + Utils.formatCurrency(p.valor),
           });
         }
       });
@@ -188,7 +188,7 @@ const Notifications = (() => {
     return items;
   }
 
-  /* ---- Licitações ---- */
+  /* ---- LicitaÃ§Ãµes ---- */
   function _checkLicitacoes(prefs) {
     const ant = prefs.antecedencia?.licitacoes ?? 3;
     return DB.getAll('licitacoes')
@@ -202,8 +202,8 @@ const Notifications = (() => {
         const label = d === 0 ? 'HOJE' : `em ${d}d`;
         return {
           tag: 'lic_' + l.id,
-          title: '🏛 Licitação abre ' + label,
-          body: (l.numero || '—') + ' · ' + Utils.truncate(l.orgao || '', 40),
+          title: 'ðŸ› LicitaÃ§Ã£o abre ' + label,
+          body: (l.numero || 'â€”') + ' Â· ' + Utils.truncate(l.orgao || '', 40),
         };
       });
   }
@@ -222,8 +222,8 @@ const Notifications = (() => {
         const label = d < 0 ? `${Math.abs(d)}d vencida` : d === 0 ? 'vence hoje' : `vence em ${d}d`;
         return {
           tag: 'cp_' + c.id,
-          title: '💸 Conta a pagar — ' + label,
-          body: c.fornecedor + ' · ' + Utils.formatCurrency(c.valor),
+          title: 'ðŸ’¸ Conta a pagar â€” ' + label,
+          body: c.fornecedor + ' Â· ' + Utils.formatCurrency(c.valor),
         };
       });
   }
@@ -234,8 +234,8 @@ const Notifications = (() => {
       .filter(p => p.status === 'em_andamento' && (!p.art?.numero))
       .map(p => ({
         tag: 'art_' + p.id,
-        title: '📜 Projeto sem ART registrada',
-        body: (p.ordemServico ? p.ordemServico + ' — ' : '') + p.titulo + ' · ' + (Utils.getClientName(p.clienteId) || ''),
+        title: 'ðŸ“œ Projeto sem ART registrada',
+        body: (p.ordemServico ? p.ordemServico + ' â€” ' : '') + p.titulo + ' Â· ' + (Utils.getClientName(p.clienteId) || ''),
       }));
   }
 
@@ -253,25 +253,25 @@ const Notifications = (() => {
         const label = d === 0 ? 'hoje' : `em ${d}d`;
         return {
           tag: 'mkt_' + p.id,
-          title: '📢 Post agendado — ' + label,
-          body: (p.canal || '') + ' · ' + Utils.truncate(p.titulo || '', 50),
+          title: 'ðŸ“¢ Post agendado â€” ' + label,
+          body: (p.canal || '') + ' Â· ' + Utils.truncate(p.titulo || '', 50),
         };
       });
   }
 
-  /* ---- CPL de Tráfego Pago acima da meta ---- */
+  /* ---- CPL de TrÃ¡fego Pago acima da meta ---- */
   function _checkCPLTrafico(prefs) {
     try {
       const mesAtual = new Date().toISOString().slice(0, 7);
 
-      // Buscar meta do mês
+      // Buscar meta do mÃªs
       const metas = DB.getAll('trafego_metas');
       const meta = metas.find(m => m.mes === mesAtual);
       if (!meta?.metaCPL) return []; // sem meta definida, sem alerta
 
       // Calcular CPL atual
       const leads = DB.getAll('leads').filter(l => {
-        if (l.origemLead !== 'Tráfego Pago') return false;
+        if (l.origemLead !== 'TrÃ¡fego Pago') return false;
         const d = l.dataEntrada || (l.createdAt || '').split('T')[0];
         return d && d.startsWith(mesAtual);
       });
@@ -294,13 +294,13 @@ const Notifications = (() => {
       const pct = Math.round((cplAtual / metaCPL - 1) * 100);
       return [{
         tag: 'cpl_' + mesAtual,
-        title: '⚠ CPL acima da meta — Google Ads',
-        body: `CPL atual: ${Utils.formatCurrency(cplAtual)} · Meta: ${Utils.formatCurrency(metaCPL)} · ${pct}% acima`,
+        title: 'âš  CPL acima da meta â€” Google Ads',
+        body: `CPL atual: ${Utils.formatCurrency(cplAtual)} Â· Meta: ${Utils.formatCurrency(metaCPL)} Â· ${pct}% acima`,
       }];
     } catch (e) { return []; }
   }
 
-  /* ---- Notificação no navegador ---- */
+  /* ---- NotificaÃ§Ã£o no navegador ---- */
   function _notifyBrowser(item) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     try {
@@ -323,7 +323,7 @@ const Notifications = (() => {
     if (hoje.getDay() !== 1) return; // 1 = segunda-feira
 
     const WEEKLY_KEY = 'crm_weekly_' + hoje.toISOString().split('T')[0];
-    if (sessionStorage.getItem(WEEKLY_KEY)) return; // já mostrou hoje
+    if (sessionStorage.getItem(WEEKLY_KEY)) return; // jÃ¡ mostrou hoje
 
     sessionStorage.setItem(WEEKLY_KEY, '1');
 
@@ -368,27 +368,27 @@ const Notifications = (() => {
     const totalPipeline = Utils.sum(ativos, 'valorEstimado');
 
     const linhas = [
-      ativsAtrasadas.length > 0 ? `⚠ **${ativsAtrasadas.length}** atividade(s) atrasada(s)` : null,
-      followupsAtrasados.length > 0 ? `⚠ **${followupsAtrasados.length}** follow-up(s) em atraso` : null,
-      parcelasVencidas > 0 ? `💸 **${parcelasVencidas}** parcela(s) vencida(s) a receber` : null,
-      ativsHojeOuMais.length > 0 ? `📋 **${ativsHojeOuMais.length}** atividade(s) para essa semana` : null,
-      followupsSemana.length > 0 ? `💼 **${followupsSemana.length}** follow-up(s) essa semana` : null,
-      parcelasVencendoSemana > 0 ? `💰 **${parcelasVencendoSemana}** parcela(s) vencendo essa semana` : null,
-      contasVencendoSemana > 0 ? `💸 **${contasVencendoSemana}** conta(s) a pagar essa semana` : null,
-      projetosAtrasados.length > 0 ? `🔴 **${projetosAtrasados.length}** projeto(s) atrasado(s)` : null,
-      `💼 Pipeline total: **${Utils.formatCurrency(totalPipeline)}** (${ativos.length} leads)`,
+      ativsAtrasadas.length > 0 ? `âš  **${ativsAtrasadas.length}** atividade(s) atrasada(s)` : null,
+      followupsAtrasados.length > 0 ? `âš  **${followupsAtrasados.length}** follow-up(s) em atraso` : null,
+      parcelasVencidas > 0 ? `ðŸ’¸ **${parcelasVencidas}** parcela(s) vencida(s) a receber` : null,
+      ativsHojeOuMais.length > 0 ? `ðŸ“‹ **${ativsHojeOuMais.length}** atividade(s) para essa semana` : null,
+      followupsSemana.length > 0 ? `ðŸ’¼ **${followupsSemana.length}** follow-up(s) essa semana` : null,
+      parcelasVencendoSemana > 0 ? `ðŸ’° **${parcelasVencendoSemana}** parcela(s) vencendo essa semana` : null,
+      contasVencendoSemana > 0 ? `ðŸ’¸ **${contasVencendoSemana}** conta(s) a pagar essa semana` : null,
+      projetosAtrasados.length > 0 ? `ðŸ”´ **${projetosAtrasados.length}** projeto(s) atrasado(s)` : null,
+      `ðŸ’¼ Pipeline total: **${Utils.formatCurrency(totalPipeline)}** (${ativos.length} leads)`,
     ].filter(Boolean);
 
     if (linhas.length === 0) return;
 
-    Toast.info(`📅 <strong>Bom começo de semana!</strong><br>${linhas.slice(0,4).map(l => l.replace(/\*\*/g, '')).join(' · ')}`, 10000);
+    Toast.show(`ðŸ“… <strong>Bom comeÃ§o de semana!</strong><br>${linhas.slice(0,4).map(l => l.replace(/\*\*/g, '')).join(' Â· ')}`, 10000);
 
     // Browser notification
     const prefs = getPrefs();
     if (prefs.browser) {
       _notifyBrowser({
         tag: 'weekly_summary',
-        title: '📅 Resumo da Semana — Bikows CRM',
+        title: 'ðŸ“… Resumo da Semana â€” Bikows CRM',
         body: linhas.slice(0,3).map(l => l.replace(/\*\*/g, '')).join(' | '),
       });
     }
@@ -397,7 +397,7 @@ const Notifications = (() => {
     if (prefs.email && prefs.emailDest) {
       _sendEmailDigest(linhas.map((l, i) => ({
         tag: 'weekly_' + i,
-        title: '📅 Resumo Semanal',
+        title: 'ðŸ“… Resumo Semanal',
         body: l.replace(/\*\*/g, ''),
       })), prefs);
     }
@@ -407,7 +407,7 @@ const Notifications = (() => {
   async function _sendEmailDigest(items, prefs) {
     if (!prefs.emailDest) return;
     try {
-      // Dispara o digest urgente — a edge function re-consulta o banco e envia
+      // Dispara o digest urgente â€” a edge function re-consulta o banco e envia
       await _supabase.functions.invoke('crm-notifications', {
         body: { tipo: 'urgent' },
       });
@@ -424,19 +424,19 @@ const Notifications = (() => {
       });
       if (error) throw error;
       if (data?.ok === false && data?.reason === 'sem_alertas') {
-        Toast.success('✅ E-mail de teste enviado! (sem alertas hoje, chegará vazio)');
+        Toast.success('âœ… E-mail de teste enviado! (sem alertas hoje, chegarÃ¡ vazio)');
       } else if (data?.ok) {
-        Toast.success('✅ E-mail enviado com sucesso para ' + (data.to || 'destinatário'));
+        Toast.success('âœ… E-mail enviado com sucesso para ' + (data.to || 'destinatÃ¡rio'));
       } else {
-        Toast.error('❌ Erro ao enviar: ' + (data?.resend?.message || 'verifique a API key'));
+        Toast.error('âŒ Erro ao enviar: ' + (data?.resend?.message || 'verifique a API key'));
       }
     } catch (e) {
-      Toast.error('❌ Erro: ' + e.message);
+      Toast.error('âŒ Erro: ' + e.message);
     }
   }
 
   /* ====================================================
-     API PÚBLICA
+     API PÃšBLICA
      ==================================================== */
   return {
     init,

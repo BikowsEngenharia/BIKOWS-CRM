@@ -1,5 +1,5 @@
-﻿/* ==========================================
-   DASHBOARD â€” VisÃ£o geral com KPIs e grÃ¡ficos
+/* ==========================================
+   DASHBOARD — Visão geral com KPIs e gráficos
    ========================================== */
 const Dashboard = (() => {
 
@@ -60,17 +60,17 @@ const Dashboard = (() => {
     let diff, label;
     if (isPercent) {
       diff = atual - anterior;
-      label = diff >= 0 ? `â†‘ +${diff.toFixed(0)}pp` : `â†“ ${diff.toFixed(0)}pp`;
+      label = diff >= 0 ? `↑ +${diff.toFixed(0)}pp` : `↓ ${diff.toFixed(0)}pp`;
     } else if (anterior === 0) {
-      label = atual > 0 ? 'â†‘ novo' : 'â€”';
+      label = atual > 0 ? '↑ novo' : '—';
       diff = atual;
     } else {
       diff = ((atual - anterior) / anterior) * 100;
-      label = diff >= 0 ? `â†‘ +${diff.toFixed(0)}%` : `â†“ ${diff.toFixed(0)}%`;
+      label = diff >= 0 ? `↑ +${diff.toFixed(0)}%` : `↓ ${diff.toFixed(0)}%`;
     }
     const color = diff >= 0 ? '#10b981' : '#ef4444';
     return `<div class="kpi-trend" style="color:${color}">
-      ${label} <span style="color:var(--text-muted);font-weight:400">vs perÃ­odo anterior</span>
+      ${label} <span style="color:var(--text-muted);font-weight:400">vs período anterior</span>
     </div>`;
   }
 
@@ -87,12 +87,12 @@ const Dashboard = (() => {
     const recebiveis = DB.getAll('recebiveis');
     const contasPagar = DB.getAll('contaspagar');
 
-    // Dados filtrados por perÃ­odo
+    // Dados filtrados por período
     const leadsFiltrados = _filtrarPorPeriodo(leads, 'dataEntrada');
     const projetosFiltrados = _filtrarPorPeriodo(projetos, 'dataInicio');
     const atividadesFiltradas = _filtrarPorPeriodo(atividades, 'data');
 
-    const periodoLabels = { mes: 'Este MÃªs', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
     const periodoLabel = periodoLabels[_periodo] || '';
 
     const ativos = leadsFiltrados.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
@@ -102,7 +102,7 @@ const Dashboard = (() => {
     const receitaFechada = Utils.sum(ganhos, 'valorFechado');
     const taxaConversao = (leadsFiltrados.length > 0) ? ((ganhos.length / leadsFiltrados.length) * 100).toFixed(0) : 0;
 
-    // PerÃ­odo anterior para comparativo
+    // Período anterior para comparativo
     const leadsAnt = _filtrarPeriodoAnterior(leads, 'dataEntrada');
     const ativosAnt = leadsAnt.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
     const ganhosAnt = leadsAnt.filter(l => l.status === 'fechado_ganho');
@@ -114,7 +114,7 @@ const Dashboard = (() => {
     const atrasadas = pendentes.filter(a => Utils.isOverdue(a.data));
     const projetosAtivos = projetosFiltrados.filter(p => p.status === 'em_andamento');
 
-    // Calcular recebÃ­veis: a vencer e vencidos
+    // Calcular recebíveis: a vencer e vencidos
     let totalReceberAVencer = 0, totalReceberVencido = 0, totalRecebido = 0;
     recebiveis.forEach(r => {
       (r.parcelas || []).forEach(p => {
@@ -126,7 +126,7 @@ const Dashboard = (() => {
       });
     });
     const totalReceberAtual = totalReceberAVencer + totalReceberVencido;
-    // A receber do perÃ­odo anterior â€” baseado em recebiveis criados naquele perÃ­odo
+    // A receber do período anterior — baseado em recebiveis criados naquele período
     const recebiveisAnt = _filtrarPeriodoAnterior(recebiveis, 'createdAt');
     let totalReceberAnt = 0;
     recebiveisAnt.forEach(r => {
@@ -135,7 +135,7 @@ const Dashboard = (() => {
       });
     });
 
-    // LicitaÃ§Ãµes
+    // Licitações
     const licitacoes = DB.getAll('licitacoes');
     const licsAtivas = licitacoes.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
     const licsUrgentes = licsAtivas.filter(l => { const d = Utils.daysUntil(l.dataAbertura); return d != null && d >= 0 && d <= 7; }).length;
@@ -148,14 +148,14 @@ const Dashboard = (() => {
     const origemCount = {};
     leads.filter(l => l.origemLead).forEach(l => { origemCount[l.origemLead] = (origemCount[l.origemLead]||0) + 1; });
     const origemEntries = Object.entries(origemCount).sort((a,b) => b[1]-a[1]);
-    const canalPrincipal = origemEntries[0]?.[0] || 'â€”';
+    const canalPrincipal = origemEntries[0]?.[0] || '—';
     const canalPrincipalQtd = origemEntries[0]?.[1] || 0;
     const canalPrincipalPct = leads.length > 0 ? Math.round(canalPrincipalQtd/leads.length*100) : 0;
 
-    // NPS mÃ©dio dos projetos
+    // NPS médio dos projetos
     const projsComNps = projetos.filter(p => p.npsCliente);
     const npsMedia = projsComNps.length > 0 ? (projsComNps.reduce((s,p) => s + p.npsCliente, 0) / projsComNps.length).toFixed(1) : null;
-    const npsDisplay = npsMedia ? 'â­ ' + npsMedia : 'â€”';
+    const npsDisplay = npsMedia ? '⭐ ' + npsMedia : '—';
     const npsCount = projsComNps.length;
 
     document.getElementById('pageContent').innerHTML = `
@@ -165,7 +165,7 @@ const Dashboard = (() => {
           <span class="text-muted text-sm">${new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</span>
           <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
             ${[
-              { k:'mes',       l:'Este MÃªs' },
+              { k:'mes',       l:'Este Mês' },
               { k:'trimestre', l:'Trimestre' },
               { k:'semestre',  l:'Semestre' },
               { k:'ano',       l:'Este Ano' },
@@ -175,7 +175,7 @@ const Dashboard = (() => {
         </div>
       </div>
 
-      <!-- FAÃ‡A ISSO HOJE -->
+      <!-- FAÇA ISSO HOJE -->
       ${_renderFacaIssoHoje(atividades, leads, contasPagar, recebiveis)}
 
       <!-- KPIs -->
@@ -185,60 +185,60 @@ const Dashboard = (() => {
           <div class="kpi-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="kpi-sub">${ativos.length} oportunidades abertas</div>
           ${_trendHtml(totalPipeline, totalPipelineAnt)}
-          <div class="kpi-icon">ðŸ’¼</div>
+          <div class="kpi-icon">💼</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" onclick="Dashboard.drillDown('leads_ganhos')">
           <div class="kpi-label">Receita Fechada <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${Utils.formatCurrency(receitaFechada)}</div>
-          <div class="kpi-sub">${ganhos.length} negÃ³cios ganhos</div>
+          <div class="kpi-sub">${ganhos.length} negócios ganhos</div>
           ${_trendHtml(receitaFechada, receitaFechadaAnt)}
-          <div class="kpi-icon">ðŸ†</div>
+          <div class="kpi-icon">🏆</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#f59e0b;cursor:pointer" onclick="Dashboard.drillDown('receber_avencer')">
           <div class="kpi-label">A Receber</div>
           <div class="kpi-value">${Utils.formatCurrency(totalReceberAtual)}</div>
-          <div class="kpi-sub ${totalReceberVencido > 0 ? 'text-danger' : ''}">${totalReceberVencido > 0 ? `âš  ${Utils.formatCurrency(totalReceberVencido)} vencido` : 'Em dia'}</div>
+          <div class="kpi-sub ${totalReceberVencido > 0 ? 'text-danger' : ''}">${totalReceberVencido > 0 ? `⚠ ${Utils.formatCurrency(totalReceberVencido)} vencido` : 'Em dia'}</div>
           ${_trendHtml(totalReceberAtual, totalReceberAnt)}
-          <div class="kpi-icon">ðŸ’°</div>
+          <div class="kpi-icon">💰</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#8b5cf6;cursor:pointer" onclick="Dashboard.drillDown('leads_novos')">
-          <div class="kpi-label">Taxa de ConversÃ£o <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
+          <div class="kpi-label">Taxa de Conversão <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
           <div class="kpi-value">${taxaConversao}%</div>
           <div class="kpi-sub">${ganhos.length} ganhos / ${perdidos.length} perdidos</div>
           ${_trendHtml(Number(taxaConversao), taxaConversaoAnt, true)}
-          <div class="kpi-icon">ðŸ“ˆ</div>
+          <div class="kpi-icon">📈</div>
         </div>
       </div>
 
-      <!-- KPIs SECUNDÃRIOS -->
+      <!-- KPIs SECUNDÁRIOS -->
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
-        <!-- LicitaÃ§Ãµes em andamento -->
+        <!-- Licitações em andamento -->
         <div class="kpi-card" style="--kpi-color:#0f766e;cursor:pointer" onclick="Dashboard.drillDown('licitacoes_urgentes')">
-          <div class="kpi-label">LicitaÃ§Ãµes em Disputa</div>
+          <div class="kpi-label">Licitações em Disputa</div>
           <div class="kpi-value">${licsAtivas.length}</div>
-          <div class="kpi-sub ${licsUrgentes > 0 ? 'text-danger' : ''}">${licsUrgentes > 0 ? `âš  ${licsUrgentes} abrindo em â‰¤7 dias` : Utils.formatCurrency(valorLics) + ' em disputa'}</div>
-          <div class="kpi-icon">ðŸ›</div>
+          <div class="kpi-sub ${licsUrgentes > 0 ? 'text-danger' : ''}">${licsUrgentes > 0 ? `⚠ ${licsUrgentes} abrindo em ≤7 dias` : Utils.formatCurrency(valorLics) + ' em disputa'}</div>
+          <div class="kpi-icon">🏛</div>
         </div>
         <!-- ARTs pendentes -->
         <div class="kpi-card" style="--kpi-color:${artSemNumero > 0 ? '#ef4444' : '#10b981'}">
           <div class="kpi-label">ARTs Pendentes</div>
           <div class="kpi-value">${artSemNumero}</div>
-          <div class="kpi-sub">${artSemNumero > 0 ? 'Projetos em andamento sem ART' : 'âœ… Todos os projetos com ART'}</div>
-          <div class="kpi-icon">ðŸ“œ</div>
+          <div class="kpi-sub">${artSemNumero > 0 ? 'Projetos em andamento sem ART' : '✅ Todos os projetos com ART'}</div>
+          <div class="kpi-icon">📜</div>
         </div>
         <!-- Canal principal de leads -->
         <div class="kpi-card" style="--kpi-color:#6366f1">
           <div class="kpi-label">Principal Canal</div>
           <div class="kpi-value" style="font-size:16px">${canalPrincipal}</div>
-          <div class="kpi-sub">${canalPrincipalQtd} leads Â· ${canalPrincipalPct}% do total</div>
-          <div class="kpi-icon">ðŸ“¡</div>
+          <div class="kpi-sub">${canalPrincipalQtd} leads · ${canalPrincipalPct}% do total</div>
+          <div class="kpi-icon">📡</div>
         </div>
-        <!-- NPS mÃ©dio -->
+        <!-- NPS médio -->
         <div class="kpi-card" style="--kpi-color:#f59e0b">
-          <div class="kpi-label">NPS MÃ©dio (serviÃ§os)</div>
+          <div class="kpi-label">NPS Médio (serviços)</div>
           <div class="kpi-value">${npsDisplay}</div>
-          <div class="kpi-sub">${npsCount} avaliaÃ§Ãµes recebidas</div>
-          <div class="kpi-icon">â­</div>
+          <div class="kpi-sub">${npsCount} avaliações recebidas</div>
+          <div class="kpi-icon">⭐</div>
         </div>
       </div>
 
@@ -246,7 +246,7 @@ const Dashboard = (() => {
       <div class="grid-2 mb-4">
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Pipeline por EstÃ¡gio</div>
+            <div class="card-title">Pipeline por Estágio</div>
           </div>
           <div class="card-body">
             <div id="chartFunnel"></div>
@@ -266,7 +266,7 @@ const Dashboard = (() => {
       <div class="grid-2 mb-4">
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Receita por MÃªs</div>
+            <div class="card-title">Receita por Mês</div>
           </div>
           <div class="card-body">
             <div id="chartReceita"></div>
@@ -316,7 +316,7 @@ const Dashboard = (() => {
         </div>
         <div class="card">
           <div class="card-header">
-            <div class="card-title">ARTs â€” Status</div>
+            <div class="card-title">ARTs — Status</div>
           </div>
           <div class="card-body">
             ${(() => {
@@ -348,7 +348,7 @@ const Dashboard = (() => {
         </div>
       </div>
 
-      <!-- LicitaÃ§Ãµes Urgentes -->
+      <!-- Licitações Urgentes -->
       ${_renderLicitacoesUrgentes(licsAtivas)}
 
       <!-- Alertas de Contratos e Laudos Vencendo -->
@@ -362,7 +362,7 @@ const Dashboard = (() => {
       <div id="dashMetasKpi"></div>
     `;
 
-    // Renderizar grÃ¡ficos
+    // Renderizar gráficos
     const statusOrder = ['lead_identificado','primeiro_contato','qualificacao','proposta_elaboracao','proposta_enviada','negociacao'];
     Charts.funnel({
       containerId: 'chartFunnel',
@@ -380,7 +380,7 @@ const Dashboard = (() => {
       size: 160,
     });
 
-    // Receita Ãºltimos 6 meses â€” usa lanÃ§amentos reais (receitas recebidas)
+    // Receita últimos 6 meses — usa lançamentos reais (receitas recebidas)
     const lancamentos = DB.getAll('lancamentos');
     const lancamentosFiltrados = _filtrarPorPeriodo(lancamentos, 'data');
     const monthData = [];
@@ -401,7 +401,7 @@ const Dashboard = (() => {
       size: 160,
     });
 
-    // GrÃ¡fico de origem dos leads (filtrado)
+    // Gráfico de origem dos leads (filtrado)
     const origemCountFiltrado = {};
     leadsFiltrados.filter(l => l.origemLead).forEach(l => { origemCountFiltrado[l.origemLead] = (origemCountFiltrado[l.origemLead]||0) + 1; });
     const origemData = Object.entries(origemCountFiltrado).map(([k,v]) => ({ label: k, value: v }));
@@ -438,8 +438,8 @@ const Dashboard = (() => {
 
       return `<div class="card mb-4" style="border-left:4px solid #f59e0b">
         <div class="card-header">
-          <div class="card-title" style="color:#f59e0b">âš  Alertas de Contratos e Laudos</div>
-          <button class="btn btn-xs btn-secondary" onclick="App.navigate('contratos')">Ver contratos â†’</button>
+          <div class="card-title" style="color:#f59e0b">⚠ Alertas de Contratos e Laudos</div>
+          <button class="btn btn-xs btn-secondary" onclick="App.navigate('contratos')">Ver contratos →</button>
         </div>
         <div class="card-body" style="padding:0 16px 16px">
           <div id="dashAlertasContratos">
@@ -454,9 +454,9 @@ const Dashboard = (() => {
 
   function _filtrarAlertasContratos(dias) {
     _alertaContratosDias = dias;
-    // Re-renderiza sÃ³ o widget de alertas
+    // Re-renderiza só o widget de alertas
     const container = document.getElementById('dashAlertasContratos');
-    if (!container) { Toast.show(`Filtro: contratos que vencem em atÃ© ${dias} dias`); return; }
+    if (!container) { Toast.show(`Filtro: contratos que vencem em até ${dias} dias`); return; }
     container.innerHTML = _renderAlertasContratosFiltrado(dias);
   }
 
@@ -483,39 +483,39 @@ const Dashboard = (() => {
       </div>`;
 
       if (laudos.length === 0 && vencendo.length === 0) {
-        return html + `<div class="text-sm text-muted" style="text-align:center;padding:16px">Nenhum alerta para os prÃ³ximos ${dias} dias.</div>`;
+        return html + `<div class="text-sm text-muted" style="text-align:center;padding:16px">Nenhum alerta para os próximos ${dias} dias.</div>`;
       }
 
       if (laudos.length > 0) {
-        html += `<div class="font-bold text-sm mb-2" style="color:#ef4444">ðŸ“‹ Laudos / Certificados Vencendo (${laudos.length})</div>`;
+        html += `<div class="font-bold text-sm mb-2" style="color:#ef4444">📋 Laudos / Certificados Vencendo (${laudos.length})</div>`;
         html += laudos.map(c => {
           const d = Utils.daysUntil(c.validadeLaudo);
           const cor = d == null ? '#94a3b8' : d < 0 ? '#ef4444' : d <= 30 ? '#ef4444' : '#f59e0b';
-          const label = d == null ? 'â€”' : d < 0 ? `Vencido hÃ¡ ${Math.abs(d)}d` : d === 0 ? 'Vence HOJE' : `${d} dias`;
+          const label = d == null ? '—' : d < 0 ? `Vencido há ${Math.abs(d)}d` : d === 0 ? 'Vence HOJE' : `${d} dias`;
           return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
             <div style="flex:1">
               <div class="font-bold text-sm">${Utils.escHtml(Utils.getClientName(c.clienteId))}</div>
-              <div class="text-xs text-muted">${Utils.escHtml(c.tipoLaudo || c.objeto || 'â€”')} Â· ${Utils.escHtml(c.numero||'')}</div>
+              <div class="text-xs text-muted">${Utils.escHtml(c.tipoLaudo || c.objeto || '—')} · ${Utils.escHtml(c.numero||'')}</div>
             </div>
             <span style="font-size:12px;font-weight:700;color:${cor}">${label}</span>
-            <button class="btn btn-xs btn-warning" onclick="Contratos.criarLeadRenovacaoLaudo('${c.id}')">ðŸ“‹ Lead</button>
+            <button class="btn btn-xs btn-warning" onclick="Contratos.criarLeadRenovacaoLaudo('${c.id}')">📋 Lead</button>
           </div>`;
         }).join('');
       }
 
       if (vencendo.length > 0) {
-        html += `<div class="font-bold text-sm mb-2 mt-3" style="color:#f59e0b">ðŸ“„ Contratos Vencendo em ${dias} Dias (${vencendo.length})</div>`;
+        html += `<div class="font-bold text-sm mb-2 mt-3" style="color:#f59e0b">📄 Contratos Vencendo em ${dias} Dias (${vencendo.length})</div>`;
         html += vencendo.map(c => {
           const d = Utils.daysUntil(c.dataFim);
           const cor = d == null ? '#94a3b8' : d < 0 ? '#ef4444' : d <= 30 ? '#ef4444' : d <= 60 ? '#f59e0b' : '#10b981';
-          const label = d == null ? 'â€”' : d < 0 ? `Vencido hÃ¡ ${Math.abs(d)}d` : d === 0 ? 'Vence HOJE' : `${d} dias`;
+          const label = d == null ? '—' : d < 0 ? `Vencido há ${Math.abs(d)}d` : d === 0 ? 'Vence HOJE' : `${d} dias`;
           return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
             <div style="flex:1">
               <div class="font-bold text-sm">${Utils.escHtml(Utils.getClientName(c.clienteId))}</div>
-              <div class="text-xs text-muted">${Utils.escHtml(c.objeto||'â€”')} Â· ${Utils.formatCurrency(c.valor)}</div>
+              <div class="text-xs text-muted">${Utils.escHtml(c.objeto||'—')} · ${Utils.formatCurrency(c.valor)}</div>
             </div>
             <span style="font-size:12px;font-weight:700;color:${cor}">${label}</span>
-            <button class="btn btn-xs btn-secondary" onclick="Contratos.criarLeadRenovacaoContrato('${c.id}');this.disabled=true;this.textContent='âœ“'">ðŸ”„ Renovar</button>
+            <button class="btn btn-xs btn-secondary" onclick="Contratos.criarLeadRenovacaoContrato('${c.id}');this.disabled=true;this.textContent='✓'">🔄 Renovar</button>
           </div>`;
         }).join('');
       }
@@ -524,22 +524,22 @@ const Dashboard = (() => {
   }
 
   /* ================================================
-     WIDGET: TRÃFEGO PAGO (Google Ads)
+     WIDGET: TRÁFEGO PAGO (Google Ads)
      ================================================ */
   function _renderTrafegoWidget() {
     try {
       const mesAtual = new Date().toISOString().slice(0, 7);
 
-      // Leads de trÃ¡fego pago do mÃªs
+      // Leads de tráfego pago do mês
       const leadsTrafico = DB.getAll('leads').filter(l => {
-        if (l.origemLead !== 'TrÃ¡fego Pago') return false;
+        if (l.origemLead !== 'Tráfego Pago') return false;
         const d = l.dataEntrada || (l.createdAt||'').split('T')[0];
         return d && d.startsWith(mesAtual);
       });
 
       if (leadsTrafico.length === 0 && DB.getAll('trafego_campanhas').length === 0) return '';
 
-      // Investimento do mÃªs
+      // Investimento do mês
       const campanhas = DB.getAll('trafego_campanhas');
       const investido = campanhas.filter(c => {
         const ini = (c.dataInicio||'').slice(0,7);
@@ -552,7 +552,7 @@ const Dashboard = (() => {
       const receita = Utils.sum(ganhos, 'valorFechado');
       const roi = investido > 0 && receita > 0 ? ((receita - investido) / investido * 100).toFixed(0) : null;
 
-      // Meta do mÃªs
+      // Meta do mês
       const meta = DB.getAll('trafego_metas').find(m => m.mes === mesAtual);
       const metaCPL = meta?.metaCPL || null;
       const cplOk = cpl && metaCPL ? cpl <= metaCPL : true;
@@ -562,14 +562,14 @@ const Dashboard = (() => {
       return `
         <div class="card mb-4" style="border-left:4px solid #ef4444">
           <div class="card-header">
-            <div class="card-title" style="color:#ef4444">ðŸŽ¯ Google Ads â€” ${mesLabel}</div>
-            <button class="btn btn-xs btn-secondary" onclick="App.navigate('trafego')">Ver detalhes â†’</button>
+            <div class="card-title" style="color:#ef4444">🎯 Google Ads — ${mesLabel}</div>
+            <button class="btn btn-xs btn-secondary" onclick="App.navigate('trafego')">Ver detalhes →</button>
           </div>
           <div class="card-body" style="padding:14px 18px">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
               <div style="text-align:center">
                 <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Investido</div>
-                <div style="font-size:20px;font-weight:800;color:var(--text)">${investido > 0 ? Utils.formatCurrency(investido) : 'â€”'}</div>
+                <div style="font-size:20px;font-weight:800;color:var(--text)">${investido > 0 ? Utils.formatCurrency(investido) : '—'}</div>
               </div>
               <div style="text-align:center">
                 <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Leads</div>
@@ -578,12 +578,12 @@ const Dashboard = (() => {
               </div>
               <div style="text-align:center">
                 <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">CPL</div>
-                <div style="font-size:20px;font-weight:800;color:${cplOk ? '#10b981' : '#ef4444'}">${cpl ? Utils.formatCurrency(cpl) : 'â€”'}</div>
+                <div style="font-size:20px;font-weight:800;color:${cplOk ? '#10b981' : '#ef4444'}">${cpl ? Utils.formatCurrency(cpl) : '—'}</div>
                 ${metaCPL ? `<div style="font-size:10px;color:var(--text-muted)">meta: ${Utils.formatCurrency(metaCPL)}</div>` : ''}
               </div>
               <div style="text-align:center">
                 <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">ROI</div>
-                <div style="font-size:20px;font-weight:800;color:${roi > 0 ? '#10b981' : roi < 0 ? '#ef4444' : 'var(--text)'}">${roi !== null ? roi + '%' : 'â€”'}</div>
+                <div style="font-size:20px;font-weight:800;color:${roi > 0 ? '#10b981' : roi < 0 ? '#ef4444' : 'var(--text)'}">${roi !== null ? roi + '%' : '—'}</div>
                 ${receita > 0 ? `<div style="font-size:10px;color:var(--text-muted)">${Utils.formatCurrency(receita)} receita</div>` : ''}
               </div>
             </div>
@@ -593,7 +593,7 @@ const Dashboard = (() => {
   }
 
   /* ================================================
-     WIDGET: LICITAÃ‡Ã•ES COM ABERTURA PRÃ“XIMA
+     WIDGET: LICITAÇÕES COM ABERTURA PRÓXIMA
      ================================================ */
   function _renderLicitacoesUrgentes(licsAtivas) {
     const urgentes = licsAtivas
@@ -603,24 +603,24 @@ const Dashboard = (() => {
     return `
       <div class="card mb-4" style="border-left:4px solid #0f766e">
         <div class="card-header">
-          <div class="card-title" style="color:#0f766e">ðŸ› LicitaÃ§Ãµes com Abertura PrÃ³xima</div>
-          <button class="btn btn-xs btn-secondary" onclick="App.navigate('licitacoes')">Ver todas â†’</button>
+          <div class="card-title" style="color:#0f766e">🏛 Licitações com Abertura Próxima</div>
+          <button class="btn btn-xs btn-secondary" onclick="App.navigate('licitacoes')">Ver todas →</button>
         </div>
         <div class="card-body" style="padding:0">
           <table class="tbl">
-            <thead><tr><th>Processo</th><th>Ã“rgÃ£o</th><th>Modalidade</th><th>Abertura</th><th>Valor Est.</th><th>Status</th></tr></thead>
+            <thead><tr><th>Processo</th><th>Órgão</th><th>Modalidade</th><th>Abertura</th><th>Valor Est.</th><th>Status</th></tr></thead>
             <tbody>
               ${urgentes.map(l => {
                 const dias = Utils.daysUntil(l.dataAbertura);
                 const cor = dias < 0 ? '#ef4444' : dias <= 3 ? '#f97316' : dias <= 7 ? '#f59e0b' : '#0f766e';
-                const label = dias < 0 ? `Encerrado ${Math.abs(dias)}d` : dias === 0 ? 'âš  HOJE' : `${dias}d restantes`;
+                const label = dias < 0 ? `Encerrado ${Math.abs(dias)}d` : dias === 0 ? '⚠ HOJE' : `${dias}d restantes`;
                 return `<tr>
-                  <td class="font-bold text-sm" style="color:var(--primary)">${Utils.escHtml(l.numero||'â€”')}</td>
-                  <td class="text-sm">${Utils.escHtml(l.orgao||'â€”')}</td>
-                  <td class="text-xs">${Utils.escHtml(l.modalidade||'â€”')}</td>
+                  <td class="font-bold text-sm" style="color:var(--primary)">${Utils.escHtml(l.numero||'—')}</td>
+                  <td class="text-sm">${Utils.escHtml(l.orgao||'—')}</td>
+                  <td class="text-xs">${Utils.escHtml(l.modalidade||'—')}</td>
                   <td><div class="font-bold" style="font-size:12px;color:${cor}">${Utils.formatDate(l.dataAbertura)}</div><div style="font-size:11px;color:${cor}">${label}</div></td>
-                  <td class="text-sm">${l.valorEstimado ? Utils.formatCurrency(l.valorEstimado) : 'â€”'}</td>
-                  <td class="text-xs">${l.status||'â€”'}</td>
+                  <td class="text-sm">${l.valorEstimado ? Utils.formatCurrency(l.valorEstimado) : '—'}</td>
+                  <td class="text-xs">${l.status||'—'}</td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -630,7 +630,7 @@ const Dashboard = (() => {
   }
 
   /* ================================================
-     WIDGET: FAÃ‡A ISSO HOJE
+     WIDGET: FAÇA ISSO HOJE
      ================================================ */
   function _renderFacaIssoHoje(atividades, leads, contasPagar, recebiveis) {
     const hoje = Utils.todayStr();
@@ -641,7 +641,7 @@ const Dashboard = (() => {
       .filter(a => a.status === 'pendente' && a.data === hoje)
       .forEach(a => items.push({
         prioridade: 1,
-        icone: Utils.ATIV_TIPO[a.tipo]?.icon || 'ðŸ“Œ',
+        icone: Utils.ATIV_TIPO[a.tipo]?.icon || '📌',
         cor: '#1a56db',
         titulo: a.titulo,
         subtitulo: Utils.getClientName(a.clienteId) || '',
@@ -660,10 +660,10 @@ const Dashboard = (() => {
         const diasAtraso = Math.round((new Date(hoje) - new Date(a.data)) / 86400000);
         items.push({
           prioridade: 0,
-          icone: 'âš ',
+          icone: '⚠',
           cor: '#ef4444',
           titulo: a.titulo,
-          subtitulo: `Atrasada ${diasAtraso}d â€” ${Utils.getClientName(a.clienteId)||''}`,
+          subtitulo: `Atrasada ${diasAtraso}d — ${Utils.getClientName(a.clienteId)||''}`,
           hora: '',
           tipo: 'atraso',
           id: a.id,
@@ -680,7 +680,7 @@ const Dashboard = (() => {
         const diasAtraso = Math.round((new Date(hoje) - new Date(l.dataProximaAcao)) / 86400000);
         items.push({
           prioridade: l.dataProximaAcao < hoje ? 0 : 1,
-          icone: 'ðŸ’¼',
+          icone: '💼',
           cor: diasAtraso > 0 ? '#f59e0b' : '#8b5cf6',
           titulo: `Follow-up: ${l.titulo}`,
           subtitulo: diasAtraso > 0 ? `Atrasado ${diasAtraso}d` : 'Para hoje',
@@ -700,9 +700,9 @@ const Dashboard = (() => {
         const vencida = c.vencimento < hoje;
         items.push({
           prioridade: vencida ? 0 : 1,
-          icone: 'ðŸ’¸',
+          icone: '💸',
           cor: vencida ? '#ef4444' : '#f59e0b',
-          titulo: `${c.fornecedor} â€” ${Utils.formatCurrency(c.valor)}`,
+          titulo: `${c.fornecedor} — ${Utils.formatCurrency(c.valor)}`,
           subtitulo: vencida ? `Vencida em ${Utils.formatDate(c.vencimento)}` : 'Vence hoje',
           hora: '',
           tipo: 'conta',
@@ -717,9 +717,9 @@ const Dashboard = (() => {
         const cli = DB.get('clientes', r.clienteId);
         items.push({
           prioridade: 1,
-          icone: 'ðŸ’°',
+          icone: '💰',
           cor: '#10b981',
-          titulo: `Receber: ${cli?.nome || 'Cliente'} â€” ${Utils.formatCurrency(p.valor)}`,
+          titulo: `Receber: ${cli?.nome || 'Cliente'} — ${Utils.formatCurrency(p.valor)}`,
           subtitulo: 'Parcela vence hoje',
           hora: '',
           tipo: 'recebivel',
@@ -737,7 +737,7 @@ const Dashboard = (() => {
     if (top5.length === 0) {
       return `<div class="card mb-4" style="border-left:4px solid var(--success)">
         <div class="card-body" style="display:flex;align-items:center;gap:12px;padding:16px">
-          <span style="font-size:28px">ðŸŽ‰</span>
+          <span style="font-size:28px">🎉</span>
           <div>
             <div class="font-bold">Dia limpo!</div>
             <div class="text-sm text-muted">Nenhuma tarefa urgente para hoje. Bom momento para trabalhar no pipeline.</div>
@@ -748,7 +748,7 @@ const Dashboard = (() => {
 
     return `<div class="card mb-4" style="border-left:4px solid var(--primary)">
       <div class="card-header">
-        <div class="card-title">âš¡ FaÃ§a isso hoje</div>
+        <div class="card-title">⚡ Faça isso hoje</div>
         <span class="badge badge-blue">${top5.length} item${top5.length > 1 ? 's' : ''}</span>
       </div>
       <div class="card-body" style="padding:0">
@@ -774,7 +774,7 @@ const Dashboard = (() => {
 
     const ano = new Date().getFullYear();
     const qi = Math.floor(new Date().getMonth() / 3);
-    const TRIMESTRES = ['Q1 (Janâ€“Mar)', 'Q2 (Abrâ€“Jun)', 'Q3 (Julâ€“Set)', 'Q4 (Outâ€“Dez)'];
+    const TRIMESTRES = ['Q1 (Jan–Mar)', 'Q2 (Abr–Jun)', 'Q3 (Jul–Set)', 'Q4 (Out–Dez)'];
     const meta = DB.getAll('metas').find(m => m.ano === ano && m.trimestre === qi);
     if (!meta || !meta.receita) { el.innerHTML = ''; return; }
 
@@ -791,12 +791,12 @@ const Dashboard = (() => {
     el.innerHTML = `
       <div style="margin-top:24px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <h3 style="font-size:14px;font-weight:700;color:var(--text);margin:0;">ðŸŽ¯ Metas do Trimestre â€” ${TRIMESTRES[qi]}</h3>
-          <button class="btn btn-xs btn-ghost" onclick="App.navigate('metas')">Ver tudo â†’</button>
+          <h3 style="font-size:14px;font-weight:700;color:var(--text);margin:0;">🎯 Metas do Trimestre — ${TRIMESTRES[qi]}</h3>
+          <button class="btn btn-xs btn-ghost" onclick="App.navigate('metas')">Ver tudo →</button>
         </div>
         <div class="card" style="padding:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <span style="font-size:13px;font-weight:600;color:var(--text);">ðŸ’° Faturamento</span>
+            <span style="font-size:13px;font-weight:600;color:var(--text);">💰 Faturamento</span>
             <span style="font-size:13px;font-weight:700;color:${color};">${pct}%</span>
           </div>
           <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:6px;">
@@ -811,16 +811,16 @@ const Dashboard = (() => {
   }
 
   function renderAtividades(list) {
-    if (!list.length) return '<div class="empty-state" style="padding:30px"><div class="empty-icon">âœ…</div><div class="empty-sub">Nenhuma atividade pendente</div></div>';
+    if (!list.length) return '<div class="empty-state" style="padding:30px"><div class="empty-icon">✅</div><div class="empty-sub">Nenhuma atividade pendente</div></div>';
     return list.map(a => {
-      const tipo = Utils.ATIV_TIPO[a.tipo] || { icon: 'ðŸ“Œ', bg: '#f1f5f9' };
+      const tipo = Utils.ATIV_TIPO[a.tipo] || { icon: '📌', bg: '#f1f5f9' };
       const client = Utils.getClientName(a.clienteId);
       const alert = Utils.dateAlert(a.data, a.status);
       return `<div class="activity-item">
         <div class="activity-icon" style="background:${tipo.bg}">${tipo.icon}</div>
         <div class="activity-content">
           <div class="activity-title">${Utils.escHtml(a.titulo)}</div>
-          <div class="activity-sub">${Utils.escHtml(client)} Â· ${Utils.formatDate(a.data)} ${a.hora || ''} ${alert}</div>
+          <div class="activity-sub">${Utils.escHtml(client)} · ${Utils.formatDate(a.data)} ${a.hora || ''} ${alert}</div>
         </div>
         <div class="activity-time text-xs text-muted">${a.responsavel || ''}</div>
       </div>`;
@@ -828,7 +828,7 @@ const Dashboard = (() => {
   }
 
   function renderProjetos(list) {
-    if (!list.length) return '<div class="empty-state" style="padding:30px"><div class="empty-icon">ðŸ“‹</div><div class="empty-sub">Nenhum projeto em andamento</div></div>';
+    if (!list.length) return '<div class="empty-state" style="padding:30px"><div class="empty-icon">📋</div><div class="empty-sub">Nenhum projeto em andamento</div></div>';
     return list.map(p => {
       const etapas = p.etapas || [];
       const totalPct = etapas.length ? Math.round(etapas.reduce((s,e) => s + (e.pct||0), 0) / etapas.length) : 0;
@@ -840,7 +840,7 @@ const Dashboard = (() => {
           <span class="text-xs text-muted">${totalPct}%</span>
         </div>
         <div class="progress mb-1"><div class="progress-fill" style="width:${totalPct}%"></div></div>
-        <div class="text-xs text-muted">${Utils.escHtml(Utils.getClientName(p.clienteId))} Â· ${diasStr}</div>
+        <div class="text-xs text-muted">${Utils.escHtml(Utils.getClientName(p.clienteId))} · ${diasStr}</div>
       </div>`;
     }).join('');
   }
@@ -853,7 +853,7 @@ const Dashboard = (() => {
     const items = [...vencidos.map(l => ({ ...l, urgente: true })), ...hoje].slice(0, 5);
     return `<div class="card mb-4">
       <div class="card-header">
-        <div class="card-title">âš  AÃ§Ãµes de Follow-up NecessÃ¡rias</div>
+        <div class="card-title">⚠ Ações de Follow-up Necessárias</div>
         <span class="badge badge-red">${vencidos.length + hoje.length}</span>
       </div>
       <div class="card-body">
@@ -863,7 +863,7 @@ const Dashboard = (() => {
           return `<div class="followup-item ${l.urgente ? 'urgent' : ''}">
             <div style="flex:1">
               <div class="font-bold text-sm">${Utils.escHtml(Utils.getClientName(l.clienteId))}</div>
-              <div class="text-xs text-muted">${Utils.escHtml(l.titulo)} Â· ${Utils.escHtml(l.proximaAcao || '')}</div>
+              <div class="text-xs text-muted">${Utils.escHtml(l.titulo)} · ${Utils.escHtml(l.proximaAcao || '')}</div>
             </div>
             <span class="badge ${l.urgente ? 'badge-red' : 'badge-yellow'}">${label}</span>
             <button class="btn btn-xs btn-primary" onclick="App.navigate('pipeline')">Ver Pipeline</button>
@@ -874,50 +874,50 @@ const Dashboard = (() => {
   }
 
   /* ================================================
-     DRILL-DOWN â€” Modal com lista de itens do KPI
+     DRILL-DOWN — Modal com lista de itens do KPI
      ================================================ */
   function drillDown(tipo) {
     const hoje = new Date().toISOString().split('T')[0];
     const configs = {
       'leads_ativos': {
-        title: 'ðŸ’¼ Leads Ativos',
+        title: '💼 Leads Ativos',
         get items() { return DB.getAll('leads').filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status)); },
-        cols: ['Lead','Etapa','Valor','ResponsÃ¡vel'],
-        row: l => [Utils.escHtml(l.titulo||'â€”'), Utils.escHtml(l.status||'â€”'), Utils.formatCurrency(l.valorEstimado||0), Utils.escHtml(l.responsavel||'â€”')],
+        cols: ['Lead','Etapa','Valor','Responsável'],
+        row: l => [Utils.escHtml(l.titulo||'—'), Utils.escHtml(l.status||'—'), Utils.formatCurrency(l.valorEstimado||0), Utils.escHtml(l.responsavel||'—')],
         action: l => `onclick="App.navigate('pipeline');Modal.close()"`,
       },
       'leads_ganhos': {
-        title: 'ðŸ† Leads Ganhos',
+        title: '🏆 Leads Ganhos',
         get items() { return DB.getAll('leads').filter(l => l.status === 'fechado_ganho'); },
-        cols: ['Lead','Valor Fechado','ResponsÃ¡vel'],
-        row: l => [Utils.escHtml(l.titulo||'â€”'), Utils.formatCurrency(l.valorFechado||0), Utils.escHtml(l.responsavel||'â€”')],
+        cols: ['Lead','Valor Fechado','Responsável'],
+        row: l => [Utils.escHtml(l.titulo||'—'), Utils.formatCurrency(l.valorFechado||0), Utils.escHtml(l.responsavel||'—')],
         action: l => `onclick="App.navigate('pipeline');Modal.close()"`,
       },
       'leads_novos': {
-        title: 'ðŸ”µ Leads do PerÃ­odo',
+        title: '🔵 Leads do Período',
         get items() {
           return _filtrarPorPeriodo(DB.getAll('leads'), 'dataEntrada');
         },
-        cols: ['Lead','Origem','Data','ResponsÃ¡vel'],
-        row: l => [Utils.escHtml(l.titulo||'â€”'), Utils.escHtml(l.origemLead||'â€”'), Utils.formatDate(l.dataEntrada||''), Utils.escHtml(l.responsavel||'â€”')],
+        cols: ['Lead','Origem','Data','Responsável'],
+        row: l => [Utils.escHtml(l.titulo||'—'), Utils.escHtml(l.origemLead||'—'), Utils.formatDate(l.dataEntrada||''), Utils.escHtml(l.responsavel||'—')],
         action: l => `onclick="App.navigate('pipeline');Modal.close()"`,
       },
       'atividades_atrasadas': {
-        title: 'âš  Atividades Atrasadas',
+        title: '⚠ Atividades Atrasadas',
         get items() { return DB.getAll('atividades').filter(a => a.status === 'pendente' && a.data && a.data < hoje); },
-        cols: ['Atividade','Tipo','Data','ResponsÃ¡vel'],
-        row: a => [Utils.escHtml(a.titulo||'â€”'), Utils.escHtml(a.tipo||'â€”'), Utils.formatDate(a.data||''), Utils.escHtml(a.responsavel||'â€”')],
+        cols: ['Atividade','Tipo','Data','Responsável'],
+        row: a => [Utils.escHtml(a.titulo||'—'), Utils.escHtml(a.tipo||'—'), Utils.formatDate(a.data||''), Utils.escHtml(a.responsavel||'—')],
         action: a => `onclick="App.navigate('atividades');Modal.close()"`,
       },
       'projetos_ativos': {
-        title: 'ðŸ“‹ Projetos em Andamento',
+        title: '📋 Projetos em Andamento',
         get items() { return DB.getAll('projetos').filter(p => p.status === 'em_andamento'); },
-        cols: ['Projeto','Cliente','Prazo','ResponsÃ¡vel'],
-        row: p => [Utils.escHtml(p.titulo||'â€”'), Utils.escHtml(Utils.getClientName(p.clienteId)||'â€”'), Utils.formatDate(p.prazo||''), Utils.escHtml(p.responsavel||'â€”')],
+        cols: ['Projeto','Cliente','Prazo','Responsável'],
+        row: p => [Utils.escHtml(p.titulo||'—'), Utils.escHtml(Utils.getClientName(p.clienteId)||'—'), Utils.formatDate(p.prazo||''), Utils.escHtml(p.responsavel||'—')],
         action: p => `onclick="App.navigate('projetos');Modal.close()"`,
       },
       'receber_avencer': {
-        title: 'ðŸ’° RecebÃ­veis a Vencer',
+        title: '💰 Recebíveis a Vencer',
         get items() {
           const list = [];
           DB.getAll('recebiveis').forEach(r => {
@@ -930,11 +930,11 @@ const Dashboard = (() => {
           return list;
         },
         cols: ['Cliente','Valor','Vencimento'],
-        row: p => [Utils.escHtml(Utils.getClientName(p._clienteId)||'â€”'), Utils.formatCurrency(p.valor||0), Utils.formatDate(p.vencimento||'')],
+        row: p => [Utils.escHtml(Utils.getClientName(p._clienteId)||'—'), Utils.formatCurrency(p.valor||0), Utils.formatDate(p.vencimento||'')],
         action: p => `onclick="App.navigate('financeiro');Modal.close()"`,
       },
       'receber_vencido': {
-        title: 'ðŸ”´ RecebÃ­veis Vencidos',
+        title: '🔴 Recebíveis Vencidos',
         get items() {
           const list = [];
           DB.getAll('recebiveis').forEach(r => {
@@ -947,11 +947,11 @@ const Dashboard = (() => {
           return list;
         },
         cols: ['Cliente','Valor','Vencimento'],
-        row: p => [Utils.escHtml(Utils.getClientName(p._clienteId)||'â€”'), `<span style="color:#ef4444;font-weight:700">${Utils.formatCurrency(p.valor||0)}</span>`, `<span style="color:#ef4444">${Utils.formatDate(p.vencimento||'')}</span>`],
+        row: p => [Utils.escHtml(Utils.getClientName(p._clienteId)||'—'), `<span style="color:#ef4444;font-weight:700">${Utils.formatCurrency(p.valor||0)}</span>`, `<span style="color:#ef4444">${Utils.formatDate(p.vencimento||'')}</span>`],
         action: p => `onclick="App.navigate('financeiro');Modal.close()"`,
       },
       'licitacoes_urgentes': {
-        title: 'ðŸ› LicitaÃ§Ãµes â€” Abertura em â‰¤7 dias',
+        title: '🏛 Licitações — Abertura em ≤7 dias',
         get items() {
           return DB.getAll('licitacoes').filter(l => {
             if (['ganhou','perdeu','deserta','cancelada'].includes(l.status)) return false;
@@ -959,22 +959,22 @@ const Dashboard = (() => {
             return d != null && d >= 0 && d <= 7;
           });
         },
-        cols: ['Objeto','Ã“rgÃ£o','Data Abertura','Valor'],
-        row: l => [Utils.escHtml(l.objeto||l.numero||'â€”'), Utils.escHtml(l.orgao||'â€”'), Utils.formatDate(l.dataAbertura||''), Utils.formatCurrency(l.valorEstimado||0)],
+        cols: ['Objeto','Órgão','Data Abertura','Valor'],
+        row: l => [Utils.escHtml(l.objeto||l.numero||'—'), Utils.escHtml(l.orgao||'—'), Utils.formatDate(l.dataAbertura||''), Utils.formatCurrency(l.valorEstimado||0)],
         action: l => `onclick="App.navigate('licitacoes');Modal.close()"`,
       },
       'contas_pagar': {
-        title: 'ðŸ’¸ Contas a Pagar',
+        title: '💸 Contas a Pagar',
         get items() { return DB.getAll('contaspagar').filter(c => c.status === 'pendente'); },
-        cols: ['DescriÃ§Ã£o','Valor','Vencimento'],
-        row: c => [Utils.escHtml(c.fornecedor||c.descricao||'â€”'), Utils.formatCurrency(c.valor||0), Utils.formatDate(c.vencimento||'')],
+        cols: ['Descrição','Valor','Vencimento'],
+        row: c => [Utils.escHtml(c.fornecedor||c.descricao||'—'), Utils.formatCurrency(c.valor||0), Utils.formatDate(c.vencimento||'')],
         action: c => `onclick="App.navigate('financeiro');Modal.close()"`,
       },
     };
     const cfg = configs[tipo]; if (!cfg) return;
     const items = cfg.items;
     Modal.open({
-      title: `${cfg.title} â€” ${items.length} registro(s)`,
+      title: `${cfg.title} — ${items.length} registro(s)`,
       body: `
         <div style="max-height:55vh;overflow-y:auto">
           <table style="width:100%;border-collapse:collapse;font-size:13px">

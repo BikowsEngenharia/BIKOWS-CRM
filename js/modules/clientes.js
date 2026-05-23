@@ -1,5 +1,5 @@
-﻿/* ==========================================
-   CLIENTES â€” GestÃ£o de empresas
+/* ==========================================
+   CLIENTES — Gestão de empresas
    ========================================== */
 const Clientes = (() => {
 
@@ -36,7 +36,7 @@ const Clientes = (() => {
     const clientes = DB.getAll('clientes');
     const leads = DB.getAll('leads');
     const projetos = DB.getAll('projetos');
-    const periodoLabels = { mes: 'Este MÃªs', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
     const novosPeriodo = _filtrarPorPeriodo(clientes, 'createdAt').length;
 
     let list = clientes;
@@ -56,10 +56,10 @@ const Clientes = (() => {
             ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Clientes.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
           </div>
           <label class="btn btn-secondary" style="cursor:pointer" title="Importar CSV com colunas: nome, cnpj, segmento, porte, cidade, estado, email, telefone">
-            ðŸ“¥ Importar CSV
+            📥 Importar CSV
             <input type="file" accept=".csv,.txt" style="display:none" onchange="Clientes.importCSV(event)">
           </label>
-          <button class="btn btn-secondary" onclick="Clientes.downloadCSVTemplate()">ðŸ“‹ Modelo CSV</button>
+          <button class="btn btn-secondary" onclick="Clientes.downloadCSVTemplate()">📋 Modelo CSV</button>
           <button class="btn btn-primary" onclick="Clientes.openForm()">+ Novo Cliente</button>
         </div>
       </div>
@@ -83,7 +83,7 @@ const Clientes = (() => {
             </select>
             <select class="filter-select" onchange="Clientes.setFilter('porte',this.value)">
               <option value="">Todos os portes</option>
-              ${['Pequeno','MÃ©dio','Grande'].map(p => `<option value="${p}" ${_filter.porte===p?'selected':''}>${p}</option>`).join('')}
+              ${['Pequeno','Médio','Grande'].map(p => `<option value="${p}" ${_filter.porte===p?'selected':''}>${p}</option>`).join('')}
             </select>
             <select class="filter-select" onchange="Clientes.setFilter('ativo',this.value)">
               <option value="">Todos</option>
@@ -97,35 +97,35 @@ const Clientes = (() => {
           ${list.length === 0 ? emptyState() : `
           <table class="tbl">
             <thead><tr>
-              <th>CÃ³digo</th><th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Porte</th>
-              <th>Cidade/UF</th><th>Leads</th><th>OS</th><th>Faturado</th><th>Status</th><th>AÃ§Ãµes</th>
+              <th>Código</th><th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Porte</th>
+              <th>Cidade/UF</th><th>Leads</th><th>OS</th><th>Faturado</th><th>Status</th><th>Ações</th>
             </tr></thead>
             <tbody>
             ${list.map(c => {
               const cLeads = leads.filter(l => l.clienteId === c.id).length;
               const cProj = projetos.filter(p => p.clienteId === c.id);
               const faturado = Utils.sum(cProj.filter(p => ['concluido','em_andamento'].includes(p.status)), 'valor');
-              const npsStars = c.nps ? 'â­'.repeat(c.nps) : '';
+              const npsStars = c.nps ? '⭐'.repeat(c.nps) : '';
               const avatarHtml = c.avatar
                 ? `<img src="${c.avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;border:1px solid var(--border)">`
                 : `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:800;vertical-align:middle;margin-right:6px">${Utils.escHtml((c.nome||'?')[0].toUpperCase())}</span>`;
               return `<tr>
-                <td class="text-xs font-bold text-muted">${Utils.escHtml(c.codigoCliente||'â€”')}</td>
+                <td class="text-xs font-bold text-muted">${Utils.escHtml(c.codigoCliente||'—')}</td>
                 <td><div class="font-bold" style="display:flex;align-items:center">${avatarHtml}${Utils.escHtml(c.nome)}</div><div class="text-xs text-muted">${npsStars} ${Utils.escHtml(c.email||'')}</div></td>
-                <td class="text-sm text-muted">${Utils.escHtml(c.cnpj||'â€”')}</td>
-                <td>${c.segmento ? `<span class="badge badge-blue">${Utils.escHtml(c.segmento)}</span>` : 'â€”'}</td>
-                <td>${c.porte ? `<span class="badge badge-gray">${Utils.escHtml(c.porte)}</span>` : 'â€”'}</td>
-                <td class="text-sm">${Utils.escHtml([c.cidade, c.estado].filter(Boolean).join('/'))||'â€”'}</td>
+                <td class="text-sm text-muted">${Utils.escHtml(c.cnpj||'—')}</td>
+                <td>${c.segmento ? `<span class="badge badge-blue">${Utils.escHtml(c.segmento)}</span>` : '—'}</td>
+                <td>${c.porte ? `<span class="badge badge-gray">${Utils.escHtml(c.porte)}</span>` : '—'}</td>
+                <td class="text-sm">${Utils.escHtml([c.cidade, c.estado].filter(Boolean).join('/'))||'—'}</td>
                 <td><span class="badge badge-purple">${cLeads}</span></td>
                 <td><span class="badge badge-blue">${cProj.length}</span></td>
-                <td class="text-sm font-bold ${faturado>0?'text-primary':''}">${faturado>0?Utils.formatCurrency(faturado):'â€”'}</td>
+                <td class="text-sm font-bold ${faturado>0?'text-primary':''}">${faturado>0?Utils.formatCurrency(faturado):'—'}</td>
                 <td>${c.ativo !== false ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
                 <td>
                   <div class="tbl-actions">
                     <button class="btn btn-xs btn-secondary" onclick="Clientes.view('${c.id}')">Ver</button>
-                    <button class="btn btn-xs btn-secondary" onclick="Clientes.openForm('${c.id}')">âœ</button>
-                    <button class="btn btn-xs btn-secondary" id="btnPortal_${c.id}" onclick="Clientes.gerarLinkPortal('${c.id}')" title="Gerar link do portal do cliente">ðŸ”— Portal</button>
-                    <button class="btn btn-xs btn-danger" onclick="Clientes.deleteCliente('${c.id}')">ðŸ—‘</button>
+                    <button class="btn btn-xs btn-secondary" onclick="Clientes.openForm('${c.id}')">✏</button>
+                    <button class="btn btn-xs btn-secondary" id="btnPortal_${c.id}" onclick="Clientes.gerarLinkPortal('${c.id}')" title="Gerar link do portal do cliente">🔗 Portal</button>
+                    <button class="btn btn-xs btn-danger" onclick="Clientes.deleteCliente('${c.id}')">🗑</button>
                   </div>
                 </td>
               </tr>`;
@@ -138,7 +138,7 @@ const Clientes = (() => {
   }
 
   function emptyState() {
-    return `<div class="empty-state"><div class="empty-icon">ðŸ¢</div><div class="empty-title">Nenhum cliente encontrado</div><div class="empty-sub">Cadastre seu primeiro cliente para comeÃ§ar</div><button class="btn btn-primary mt-4" onclick="Clientes.openForm()">+ Cadastrar Cliente</button></div>`;
+    return `<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">Nenhum cliente encontrado</div><div class="empty-sub">Cadastre seu primeiro cliente para começar</div><button class="btn btn-primary mt-4" onclick="Clientes.openForm()">+ Cadastrar Cliente</button></div>`;
   }
 
   function setFilter(key, val) {
@@ -173,8 +173,8 @@ const Clientes = (() => {
               <div style="font-size:19px;font-weight:700">${Utils.escHtml(c.nome)}</div>
               ${c.codigoCliente ? `<span style="font-size:11px;background:var(--primary);color:#fff;padding:2px 8px;border-radius:99px;font-weight:700">${Utils.escHtml(c.codigoCliente)}</span>` : ''}
             </div>
-            <div class="text-sm text-muted">${c.segmento?`<span class="badge badge-blue">${c.segmento}</span> Â· `:''} ${Utils.escHtml(c.porte||'')} ${c.cidade?'Â· '+c.cidade+'/'+c.estado:''}${c.nps ? ` Â· ${'â­'.repeat(c.nps)}` : ''}</div>
-            <div class="text-xs text-muted mt-1">CNPJ: ${Utils.escHtml(c.cnpj||'â€”')} Â· ${Utils.escHtml(c.email||'â€”')} Â· ${Utils.escHtml(c.telefone||'â€”')}${c.engResponsavel?` Â· Resp: ${Utils.escHtml(c.engResponsavel)}`:''}</div>
+            <div class="text-sm text-muted">${c.segmento?`<span class="badge badge-blue">${c.segmento}</span> · `:''} ${Utils.escHtml(c.porte||'')} ${c.cidade?'· '+c.cidade+'/'+c.estado:''}${c.nps ? ` · ${'⭐'.repeat(c.nps)}` : ''}</div>
+            <div class="text-xs text-muted mt-1">CNPJ: ${Utils.escHtml(c.cnpj||'—')} · ${Utils.escHtml(c.email||'—')} · ${Utils.escHtml(c.telefone||'—')}${c.engResponsavel?` · Resp: ${Utils.escHtml(c.engResponsavel)}`:''}</div>
           </div>
           <div>${c.ativo!==false?'<span class="badge badge-green">Ativo</span>':'<span class="badge badge-gray">Inativo</span>'}</div>
         </div>
@@ -189,20 +189,20 @@ const Clientes = (() => {
         </div>
 
         <div class="tabs mb-3">
-          <button class="tab-btn active" onclick="switchTab(this,'tabHistorico360')">ðŸ“‹ HistÃ³rico de ServiÃ§os (${projetos.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabLeads360')">ðŸ’¼ Pipeline (${leads.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabPropostas360')">ðŸ“„ Propostas (${propostas.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabReceber360')">ðŸ’° Financeiro (${recebiveis.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">âœ… Atividades (${atividades.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">ðŸ‘¤ Contatos (${contatos.length})</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabTimeline360')">ðŸ• InteraÃ§Ãµes</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabAudit360')">ðŸ“œ AlteraÃ§Ãµes</button>
+          <button class="tab-btn active" onclick="switchTab(this,'tabHistorico360')">📋 Histórico de Serviços (${projetos.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabLeads360')">💼 Pipeline (${leads.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabPropostas360')">📄 Propostas (${propostas.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabReceber360')">💰 Financeiro (${recebiveis.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">✅ Atividades (${atividades.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">👤 Contatos (${contatos.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabTimeline360')">🕐 Interações</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabAudit360')">📜 Alterações</button>
         </div>
 
-        <!-- HISTÃ“RICO DE SERVIÃ‡OS -->
+        <!-- HISTÓRICO DE SERVIÇOS -->
         <div id="tabHistorico360">
           ${(() => {
-            if (!projetos.length) return '<div class="text-sm text-muted p-3">Nenhum serviÃ§o realizado ainda.</div>';
+            if (!projetos.length) return '<div class="text-sm text-muted p-3">Nenhum serviço realizado ainda.</div>';
             const concluidos = projetos.filter(p => p.status === 'concluido');
             const emAndamento = projetos.filter(p => p.status === 'em_andamento');
             const totalFaturado = Utils.sum(projetos, 'valor');
@@ -210,11 +210,11 @@ const Clientes = (() => {
             return `
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
                 <div style="background:var(--bg);padding:10px;border-radius:var(--radius);text-align:center;border-left:3px solid var(--primary)">
-                  <div class="text-xs text-muted">Total ServiÃ§os</div>
+                  <div class="text-xs text-muted">Total Serviços</div>
                   <div class="font-bold" style="font-size:18px">${projetos.length}</div>
                 </div>
                 <div style="background:var(--bg);padding:10px;border-radius:var(--radius);text-align:center;border-left:3px solid #10b981">
-                  <div class="text-xs text-muted">ConcluÃ­dos</div>
+                  <div class="text-xs text-muted">Concluídos</div>
                   <div class="font-bold" style="color:#10b981;font-size:18px">${concluidos.length}</div>
                 </div>
                 <div style="background:var(--bg);padding:10px;border-radius:var(--radius);text-align:center;border-left:3px solid #3b82f6">
@@ -228,26 +228,26 @@ const Clientes = (() => {
               </div>
               <table class="tbl">
                 <thead><tr>
-                  <th>OS</th><th>CÃ³digo</th><th>ServiÃ§o</th><th>Valor</th>
-                  <th>ART</th><th>InÃ­cio</th><th>ConclusÃ£o</th><th>NPS</th><th>Status</th><th></th>
+                  <th>OS</th><th>Código</th><th>Serviço</th><th>Valor</th>
+                  <th>ART</th><th>Início</th><th>Conclusão</th><th>NPS</th><th>Status</th><th></th>
                 </tr></thead>
                 <tbody>
                   ${[...projetos].sort((a,b)=>(b.dataInicio||'').localeCompare(a.dataInicio||'')).map(p => {
                     const artOk = p.art?.numero;
                     const artBadge = artOk
-                      ? `<span class="badge badge-green text-xs" title="ART ${p.art.numero}">âœ… ${Utils.escHtml(p.art.numero)}</span>`
+                      ? `<span class="badge badge-green text-xs" title="ART ${p.art.numero}">✅ ${Utils.escHtml(p.art.numero)}</span>`
                       : (p.status === 'em_andamento'
-                          ? `<span class="badge badge-red text-xs">âš  Pendente</span>`
-                          : `<span class="badge badge-gray text-xs">â€”</span>`);
-                    const npsProj = p.npsCliente ? 'â­'.repeat(p.npsCliente) : 'â€”';
+                          ? `<span class="badge badge-red text-xs">⚠ Pendente</span>`
+                          : `<span class="badge badge-gray text-xs">—</span>`);
+                    const npsProj = p.npsCliente ? '⭐'.repeat(p.npsCliente) : '—';
                     return `<tr>
-                      <td class="text-xs font-bold text-muted">${Utils.escHtml(p.ordemServico||'â€”')}</td>
-                      <td class="text-xs text-muted">${Utils.escHtml(p.codigo||'â€”')}</td>
+                      <td class="text-xs font-bold text-muted">${Utils.escHtml(p.ordemServico||'—')}</td>
+                      <td class="text-xs text-muted">${Utils.escHtml(p.codigo||'—')}</td>
                       <td class="font-bold text-sm">${Utils.escHtml(p.titulo)}</td>
                       <td class="font-bold text-primary">${Utils.formatCurrency(p.valor)}</td>
                       <td>${artBadge}</td>
                       <td class="text-xs text-muted">${Utils.formatDate(p.dataInicio)}</td>
-                      <td class="text-xs text-muted">${p.status==='concluido'?Utils.formatDate(p.prazo):'â€”'}</td>
+                      <td class="text-xs text-muted">${p.status==='concluido'?Utils.formatDate(p.prazo):'—'}</td>
                       <td class="text-xs">${npsProj}</td>
                       <td>${Utils.projBadge(p.status)}</td>
                       <td><button class="btn btn-xs btn-secondary" onclick="Modal.close();Projetos.view('${p.id}')">Ver</button></td>
@@ -259,13 +259,13 @@ const Clientes = (() => {
         </div>
 
         <div id="tabLeads360" class="hidden">
-          ${leads.length ? `<table class="tbl"><thead><tr><th>TÃ­tulo</th><th>Status</th><th>Valor</th><th>ResponsÃ¡vel</th><th>PrÃ³xima AÃ§Ã£o</th></tr></thead><tbody>
-            ${leads.map(l=>`<tr><td class="font-bold text-sm">${Utils.escHtml(l.titulo)}</td><td>${Utils.leadBadge(l.status)}</td><td class="font-bold text-primary">${Utils.formatCurrency(l.valorEstimado)}</td><td class="text-sm">${Utils.escHtml(l.responsavel||'â€”')}</td><td class="text-xs ${Utils.isOverdue(l.dataProximaAcao)?'text-danger':''}">${Utils.formatDate(l.dataProximaAcao)}</td></tr>`).join('')}
+          ${leads.length ? `<table class="tbl"><thead><tr><th>Título</th><th>Status</th><th>Valor</th><th>Responsável</th><th>Próxima Ação</th></tr></thead><tbody>
+            ${leads.map(l=>`<tr><td class="font-bold text-sm">${Utils.escHtml(l.titulo)}</td><td>${Utils.leadBadge(l.status)}</td><td class="font-bold text-primary">${Utils.formatCurrency(l.valorEstimado)}</td><td class="text-sm">${Utils.escHtml(l.responsavel||'—')}</td><td class="text-xs ${Utils.isOverdue(l.dataProximaAcao)?'text-danger':''}">${Utils.formatDate(l.dataProximaAcao)}</td></tr>`).join('')}
           </tbody></table>` : '<div class="text-sm text-muted p-3">Nenhum lead</div>'}
         </div>
         <div id="tabPropostas360" class="hidden">
-          ${propostas.length ? `<table class="tbl"><thead><tr><th>NÂº</th><th>TÃ­tulo</th><th>Valor</th><th>Validade</th><th>Status</th></tr></thead><tbody>
-            ${propostas.map(p=>`<tr><td class="text-xs font-bold text-muted">${Utils.escHtml(p.numero||'â€”')}</td><td class="font-bold text-sm">${Utils.escHtml(p.titulo)}</td><td class="font-bold text-primary">${Utils.formatCurrency(p.valor)}</td><td class="text-sm">${Utils.formatDate(p.validade)}</td><td>${Utils.propBadge(p.status)}</td></tr>`).join('')}
+          ${propostas.length ? `<table class="tbl"><thead><tr><th>Nº</th><th>Título</th><th>Valor</th><th>Validade</th><th>Status</th></tr></thead><tbody>
+            ${propostas.map(p=>`<tr><td class="text-xs font-bold text-muted">${Utils.escHtml(p.numero||'—')}</td><td class="font-bold text-sm">${Utils.escHtml(p.titulo)}</td><td class="font-bold text-primary">${Utils.formatCurrency(p.valor)}</td><td class="text-sm">${Utils.formatDate(p.validade)}</td><td>${Utils.propBadge(p.status)}</td></tr>`).join('')}
           </tbody></table>` : '<div class="text-sm text-muted p-3">Nenhuma proposta</div>'}
         </div>
         <div id="tabReceber360" class="hidden">
@@ -273,18 +273,18 @@ const Clientes = (() => {
             const tot=(r.parcelas||[]).reduce((s,p)=>s+p.valor,0);
             const rcb=(r.parcelas||[]).filter(p=>p.status==='recebido').reduce((s,p)=>s+p.valor,0);
             return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-              <div class="flex items-center justify-between"><span class="font-bold text-sm">${Utils.escHtml(r.descricao||'â€”')}</span><span class="font-bold text-primary">${Utils.formatCurrency(r.valorTotal||tot)}</span></div>
+              <div class="flex items-center justify-between"><span class="font-bold text-sm">${Utils.escHtml(r.descricao||'—')}</span><span class="font-bold text-primary">${Utils.formatCurrency(r.valorTotal||tot)}</span></div>
               <div class="progress mt-1" style="height:4px"><div class="progress-fill" style="width:${tot>0?(rcb/tot*100).toFixed(0):0}%;background:var(--success)"></div></div>
-              <div class="text-xs text-muted mt-1">${(r.parcelas||[]).length} parcela(s) Â· Recebido: ${Utils.formatCurrency(rcb)}</div>
+              <div class="text-xs text-muted mt-1">${(r.parcelas||[]).length} parcela(s) · Recebido: ${Utils.formatCurrency(rcb)}</div>
             </div>`;
-          }).join('') : '<div class="text-sm text-muted p-3">Nenhum recebÃ­vel</div>'}
+          }).join('') : '<div class="text-sm text-muted p-3">Nenhum recebível</div>'}
         </div>
         <div id="tabAtiv360" class="hidden">
           ${atividades.length ? atividades.slice(0,10).map(a=>{
-            const tipo=Utils.ATIV_TIPO[a.tipo]||{icon:'ðŸ“Œ',bg:'#f1f5f9'};
+            const tipo=Utils.ATIV_TIPO[a.tipo]||{icon:'📌',bg:'#f1f5f9'};
             return `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:center">
               <div style="width:28px;height:28px;border-radius:50%;background:${tipo.bg};display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">${tipo.icon}</div>
-              <div style="flex:1"><div class="font-bold text-sm">${Utils.escHtml(a.titulo)}</div><div class="text-xs text-muted">${Utils.formatDate(a.data)} ${a.hora?'Â· '+a.hora:''} Â· ${Utils.escHtml(a.responsavel||'â€”')}</div></div>
+              <div style="flex:1"><div class="font-bold text-sm">${Utils.escHtml(a.titulo)}</div><div class="text-xs text-muted">${Utils.formatDate(a.data)} ${a.hora?'· '+a.hora:''} · ${Utils.escHtml(a.responsavel||'—')}</div></div>
               ${Utils.activBadge(a.status)}
             </div>`;
           }).join('') : '<div class="text-sm text-muted p-3">Nenhuma atividade</div>'}
@@ -292,27 +292,27 @@ const Clientes = (() => {
         <div id="tabContatos360" class="hidden">
           ${contatos.length ? contatos.map(ct=>`<div style="padding:10px 0;border-bottom:1px solid var(--border)">
             <div class="font-bold text-sm">${Utils.escHtml(ct.nome)}${ct.principal?' <span class="badge badge-blue">Principal</span>':''}</div>
-            <div class="text-xs text-muted">${Utils.escHtml(ct.cargo||'')}${ct.email?' Â· '+Utils.escHtml(ct.email):''}${ct.telefone?' Â· '+Utils.escHtml(ct.telefone):''}</div>
+            <div class="text-xs text-muted">${Utils.escHtml(ct.cargo||'')}${ct.email?' · '+Utils.escHtml(ct.email):''}${ct.telefone?' · '+Utils.escHtml(ct.telefone):''}</div>
           </div>`).join('') : '<div class="text-sm text-muted p-3">Nenhum contato</div>'}
         </div>
 
-        <!-- TIMELINE DE INTERAÃ‡Ã•ES -->
+        <!-- TIMELINE DE INTERAÇÕES -->
         <div id="tabTimeline360" class="hidden">
           ${(() => {
             const contratos360 = DB.getAll('contratos').filter(ct => ct.clienteId === id);
             const eventos = [];
-            leads.forEach(l => eventos.push({ data: l.criadoEm || l.dataProximaAcao || '', tipo: 'Lead', icone: 'ðŸ’¼', cor: '#3b82f6', titulo: l.titulo || 'Lead sem tÃ­tulo', detalhe: l.status || '' }));
-            projetos.forEach(p => eventos.push({ data: p.criadoEm || p.dataInicio || '', tipo: 'Projeto', icone: 'ðŸ”§', cor: '#10b981', titulo: p.titulo || 'Projeto sem tÃ­tulo', detalhe: [p.status, p.ordemServico ? 'OS: ' + p.ordemServico : ''].filter(Boolean).join(' Â· ') }));
-            contratos360.forEach(ct => eventos.push({ data: ct.criadoEm || ct.dataInicio || '', tipo: 'Contrato', icone: 'ðŸ“‹', cor: '#8b5cf6', titulo: ct.numero || 'Contrato', detalhe: [ct.status, ct.valor ? Utils.formatCurrency(ct.valor) : ''].filter(Boolean).join(' Â· ') }));
-            propostas.forEach(p => eventos.push({ data: p.criadoEm || p.data || '', tipo: 'Proposta', icone: 'ðŸ“„', cor: '#f59e0b', titulo: p.numero || p.titulo || 'Proposta', detalhe: [p.status, p.valor ? Utils.formatCurrency(p.valor) : ''].filter(Boolean).join(' Â· ') }));
-            atividades.forEach(a => eventos.push({ data: a.data || a.criadoEm || '', tipo: 'Atividade', icone: 'ðŸ“Œ', cor: '#64748b', titulo: a.titulo || 'Atividade', detalhe: [a.tipo, a.status].filter(Boolean).join(' Â· ') }));
+            leads.forEach(l => eventos.push({ data: l.criadoEm || l.dataProximaAcao || '', tipo: 'Lead', icone: '💼', cor: '#3b82f6', titulo: l.titulo || 'Lead sem título', detalhe: l.status || '' }));
+            projetos.forEach(p => eventos.push({ data: p.criadoEm || p.dataInicio || '', tipo: 'Projeto', icone: '🔧', cor: '#10b981', titulo: p.titulo || 'Projeto sem título', detalhe: [p.status, p.ordemServico ? 'OS: ' + p.ordemServico : ''].filter(Boolean).join(' · ') }));
+            contratos360.forEach(ct => eventos.push({ data: ct.criadoEm || ct.dataInicio || '', tipo: 'Contrato', icone: '📋', cor: '#8b5cf6', titulo: ct.numero || 'Contrato', detalhe: [ct.status, ct.valor ? Utils.formatCurrency(ct.valor) : ''].filter(Boolean).join(' · ') }));
+            propostas.forEach(p => eventos.push({ data: p.criadoEm || p.data || '', tipo: 'Proposta', icone: '📄', cor: '#f59e0b', titulo: p.numero || p.titulo || 'Proposta', detalhe: [p.status, p.valor ? Utils.formatCurrency(p.valor) : ''].filter(Boolean).join(' · ') }));
+            atividades.forEach(a => eventos.push({ data: a.data || a.criadoEm || '', tipo: 'Atividade', icone: '📌', cor: '#64748b', titulo: a.titulo || 'Atividade', detalhe: [a.tipo, a.status].filter(Boolean).join(' · ') }));
             eventos.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
-            if (!eventos.length) return '<div class="text-sm text-muted p-3">Nenhuma interaÃ§Ã£o registrada ainda.</div>';
+            if (!eventos.length) return '<div class="text-sm text-muted p-3">Nenhuma interação registrada ainda.</div>';
             return `<div style="position:relative;padding-left:24px;border-left:2px solid var(--border);margin:8px 0">
               ${eventos.map(ev => `
               <div style="position:relative;margin-bottom:16px">
                 <div style="position:absolute;left:-29px;width:14px;height:14px;border-radius:50%;background:${ev.cor};border:2px solid var(--surface)"></div>
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">${ev.data ? Utils.formatDate(ev.data) : 'â€”'} Â· ${Utils.escHtml(ev.tipo)}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">${ev.data ? Utils.formatDate(ev.data) : '—'} · ${Utils.escHtml(ev.tipo)}</div>
                 <div style="font-weight:600;font-size:13px">${ev.icone} ${Utils.escHtml(ev.titulo)}</div>
                 ${ev.detalhe ? `<div style="font-size:12px;color:var(--text-secondary)">${Utils.escHtml(ev.detalhe)}</div>` : ''}
               </div>`).join('')}
@@ -324,15 +324,15 @@ const Clientes = (() => {
         <div id="tabAudit360" class="hidden">
           ${(() => {
             const logs = DB.getAuditLog ? DB.getAuditLog().filter(l => l.recordId === id).slice(0, 30) : [];
-            if (!logs.length) return '<div class="text-sm text-muted p-3">Nenhuma alteraÃ§Ã£o registrada no log de auditoria.</div>';
-            const actionIcon = { create: 'âž•', update: 'âœ', delete: 'ðŸ—‘' };
+            if (!logs.length) return '<div class="text-sm text-muted p-3">Nenhuma alteração registrada no log de auditoria.</div>';
+            const actionIcon = { create: '➕', update: '✏', delete: '🗑' };
             return `<div style="max-height:300px;overflow-y:auto">
               ${logs.map(l => `
                 <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start">
-                  <div style="font-size:16px;flex-shrink:0">${actionIcon[l.action]||'ðŸ“Œ'}</div>
+                  <div style="font-size:16px;flex-shrink:0">${actionIcon[l.action]||'📌'}</div>
                   <div style="flex:1">
                     <div class="text-sm font-bold">${Utils.escHtml(l.action === 'create' ? 'Registro criado' : l.action === 'update' ? 'Registro atualizado' : 'Registro removido')}</div>
-                    <div class="text-xs text-muted">${l.timestamp ? Utils.formatDate(l.timestamp.split('T')[0]) + ' ' + (l.timestamp.split('T')[1]||'').substring(0,5) : 'â€”'} Â· ${Utils.escHtml(l.user || 'Sistema')}</div>
+                    <div class="text-xs text-muted">${l.timestamp ? Utils.formatDate(l.timestamp.split('T')[0]) + ' ' + (l.timestamp.split('T')[1]||'').substring(0,5) : '—'} · ${Utils.escHtml(l.user || 'Sistema')}</div>
                     ${l.changes && Object.keys(l.changes).length ? `<div class="text-xs text-muted mt-1">${Object.entries(l.changes).map(([k,v]) => `<span style="background:var(--bg);border-radius:4px;padding:1px 5px;margin:1px">${k}: ${Utils.escHtml(String(v||'').substring(0,50))}</span>`).join(' ')}</div>` : ''}
                   </div>
                 </div>`).join('')}
@@ -340,10 +340,10 @@ const Clientes = (() => {
           })()}
         </div>
 
-        ${c.observacoes ? `<div class="detail-field mt-4"><div class="detail-label">ObservaÃ§Ãµes</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(c.observacoes)}</div></div>` : ''}
+        ${c.observacoes ? `<div class="detail-field mt-4"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(c.observacoes)}</div></div>` : ''}
 
         <div class="mt-4 flex gap-2">
-          <button class="btn btn-primary btn-sm" onclick="Modal.close();Clientes.openForm('${id}')">âœ Editar</button>
+          <button class="btn btn-primary btn-sm" onclick="Modal.close();Clientes.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
       `,
@@ -353,7 +353,7 @@ const Clientes = (() => {
   function _previewAvatar(event) {
     const file = event.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { Toast.error('Arquivo muito grande (mÃ¡x 5MB)'); return; }
+    if (file.size > 5 * 1024 * 1024) { Toast.error('Arquivo muito grande (máx 5MB)'); return; }
     const img = new Image();
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -399,7 +399,7 @@ const Clientes = (() => {
           </div>
           <div>
             <label class="btn btn-xs btn-secondary" style="cursor:pointer">
-              ðŸ“· Foto/Logo
+              📷 Foto/Logo
               <input type="file" id="fAvatar" accept="image/*" style="display:none" onchange="Clientes._previewAvatar(event)">
             </label>
             ${c?.avatar ? `<button type="button" class="btn btn-xs btn-danger ml-2" onclick="document.getElementById('avatarPreview').innerHTML='<span style=\\'color:#fff;font-size:24px;font-weight:800\\'>${Utils.escHtml((c?.nome||'?')[0].toUpperCase())}</span>';document.getElementById('fAvatarData').value='__remove__'">Remover</button>` : ''}
@@ -408,13 +408,13 @@ const Clientes = (() => {
         </div>
         <div class="form-row">
           <div class="form-group" style="flex:3">
-            <label class="form-label">RazÃ£o Social / Nome *</label>
+            <label class="form-label">Razão Social / Nome *</label>
             <input class="form-control" id="fNome" value="${Utils.escHtml(c?.nome||'')}" placeholder="Nome da empresa">
           </div>
           <div class="form-group">
-            <label class="form-label">CÃ³digo Interno</label>
+            <label class="form-label">Código Interno</label>
             <input class="form-control" id="fCodigoCliente" value="${Utils.escHtml(codSuggest)}" placeholder="CLI-0001">
-            <div class="text-xs text-muted mt-1">CÃ³digo Ãºnico do cliente no sistema</div>
+            <div class="text-xs text-muted mt-1">Código único do cliente no sistema</div>
           </div>
           <div class="form-group">
             <label class="form-label">CNPJ / CPF</label>
@@ -422,7 +422,7 @@ const Clientes = (() => {
               <div style="flex:1">
                 <input class="form-control" id="fCnpj" value="${Utils.escHtml(c?.cnpj||'')}" placeholder="XX.XXX.XXX/XXXX-XX" maxlength="18" oninput="Utils.autoFormatCNPJ(this)">
               </div>
-              <button type="button" class="btn btn-secondary btn-sm" id="btnBuscarCnpj" onclick="Clientes.buscarCNPJ()" style="white-space:nowrap;flex-shrink:0">ðŸ” Buscar CNPJ</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnBuscarCnpj" onclick="Clientes.buscarCNPJ()" style="white-space:nowrap;flex-shrink:0">🔍 Buscar CNPJ</button>
             </div>
           </div>
         </div>
@@ -436,7 +436,7 @@ const Clientes = (() => {
           <div class="form-group">
             <label class="form-label">Porte</label>
             <select class="form-control" id="fPorte">
-              ${['Pequeno','MÃ©dio','Grande'].map(p => `<option value="${p}" ${c?.porte===p?'selected':''}>${p}</option>`).join('')}
+              ${['Pequeno','Médio','Grande'].map(p => `<option value="${p}" ${c?.porte===p?'selected':''}>${p}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
@@ -476,19 +476,19 @@ const Clientes = (() => {
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Engenheiro de Conta / ResponsÃ¡vel</label>
-            <input class="form-control" id="fEngResponsavel" value="${Utils.escHtml(c?.engResponsavel||'')}" placeholder="ResponsÃ¡vel pelo relacionamento">
+            <label class="form-label">Engenheiro de Conta / Responsável</label>
+            <input class="form-control" id="fEngResponsavel" value="${Utils.escHtml(c?.engResponsavel||'')}" placeholder="Responsável pelo relacionamento">
           </div>
           <div class="form-group">
-            <label class="form-label">NPS / SatisfaÃ§Ã£o Geral</label>
+            <label class="form-label">NPS / Satisfação Geral</label>
             <select class="form-control" id="fNps">
-              <option value="">NÃ£o avaliado</option>
-              ${[5,4,3,2,1].map(n => `<option value="${n}" ${c?.nps==n?'selected':''}>${'â­'.repeat(n)} â€” ${['','Muito insatisfeito','Insatisfeito','Neutro','Satisfeito','Muito satisfeito'][n]}</option>`).join('')}
+              <option value="">Não avaliado</option>
+              ${[5,4,3,2,1].map(n => `<option value="${n}" ${c?.nps==n?'selected':''}>${'⭐'.repeat(n)} — ${['','Muito insatisfeito','Insatisfeito','Neutro','Satisfeito','Muito satisfeito'][n]}</option>`).join('')}
             </select>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">ObservaÃ§Ãµes</label>
+          <label class="form-label">Observações</label>
           <textarea class="form-control" id="fObs" rows="3">${Utils.escHtml(c?.observacoes||'')}</textarea>
         </div>
       `,
@@ -498,14 +498,14 @@ const Clientes = (() => {
 
   function saveCliente(id) {
     const nome = document.getElementById('fNome').value.trim();
-    if (!nome) { Toast.error('Nome obrigatÃ³rio'); return; }
+    if (!nome) { Toast.error('Nome obrigatório'); return; }
     const cnpj = document.getElementById('fCnpj').value.trim();
     const codigoCliente = document.getElementById('fCodigoCliente').value.trim();
 
-    // Verifica duplicidade do cÃ³digo
+    // Verifica duplicidade do código
     if (codigoCliente) {
       const duplicado = DB.getAll('clientes').find(c => c.codigoCliente === codigoCliente && c.id !== id);
-      if (duplicado) { Toast.error(`CÃ³digo ${codigoCliente} jÃ¡ estÃ¡ em uso por "${duplicado.nome}"`); return; }
+      if (duplicado) { Toast.error(`Código ${codigoCliente} já está em uso por "${duplicado.nome}"`); return; }
     }
 
     const avatarRaw = document.getElementById('fAvatarData')?.value || '';
@@ -564,12 +564,12 @@ const Clientes = (() => {
           const cols = line.split(';').map(c => c.trim().replace(/^["']|["']$/g,''));
           const nome = cols[idx('nome')] || '';
           if (!nome) { skipped++; return; }
-          const npsRaw = cols[idx('nps')] || cols[idx('nps / satisfaÃ§Ã£o geral')] || '';
+          const npsRaw = cols[idx('nps')] || cols[idx('nps / satisfação geral')] || '';
           DB.create('clientes', {
             nome,
             cnpj:           cols[idx('cnpj')] || '',
             segmento:       cols[idx('segmento')] || '',
-            porte:          cols[idx('porte')] || 'MÃ©dio',
+            porte:          cols[idx('porte')] || 'Médio',
             cidade:         cols[idx('cidade')] || '',
             estado:         cols[idx('estado')] || '',
             email:          cols[idx('email')] || '',
@@ -594,7 +594,7 @@ const Clientes = (() => {
 
   function downloadCSVTemplate() {
     const header = 'nome;cnpj;segmento;porte;cidade;estado;email;telefone;site;observacoes;codigo cliente;eng responsavel;nps';
-    const example = 'Empresa Exemplo Ltda;12.345.678/0001-90;Alimentos;MÃ©dio;Londrina;PR;contato@empresa.com;(43) 99999-1234;www.empresa.com;ObservaÃ§Ã£o opcional;CLI-0001;JoÃ£o da Silva;5';
+    const example = 'Empresa Exemplo Ltda;12.345.678/0001-90;Alimentos;Médio;Londrina;PR;contato@empresa.com;(43) 99999-1234;www.empresa.com;Observação opcional;CLI-0001;João da Silva;5';
     const blob = new Blob([header + '\n' + example], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -612,7 +612,7 @@ const Clientes = (() => {
     if (!input || !btn) return;
 
     const raw  = input.value.replace(/\D/g, '');
-    if (raw.length !== 14) { Toast.error('CNPJ deve ter 14 dÃ­gitos'); return; }
+    if (raw.length !== 14) { Toast.error('CNPJ deve ter 14 dígitos'); return; }
 
     const original = btn.textContent;
     btn.textContent = 'Buscando...';
@@ -620,10 +620,10 @@ const Clientes = (() => {
 
     try {
       const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${raw}`);
-      if (!res.ok) throw new Error(res.status === 404 ? 'CNPJ nÃ£o encontrado' : `Erro ${res.status} na consulta`);
+      if (!res.ok) throw new Error(res.status === 404 ? 'CNPJ não encontrado' : `Erro ${res.status} na consulta`);
       const d = await res.json();
 
-      // Nome / RazÃ£o Social
+      // Nome / Razão Social
       const fNome = document.getElementById('fNome');
       if (fNome && d.razao_social) fNome.value = d.razao_social;
 
@@ -631,24 +631,24 @@ const Clientes = (() => {
       const fNomeFantasia = document.getElementById('fNomeFantasia');
       if (fNomeFantasia && d.nome_fantasia) fNomeFantasia.value = d.nome_fantasia;
 
-      // Segmento â€” tenta mapear CNAE para os segmentos disponÃ­veis
+      // Segmento — tenta mapear CNAE para os segmentos disponíveis
       const fSegmento = document.getElementById('fSegmento');
       if (fSegmento && d.cnae_fiscal_descricao) {
         const cnae = d.cnae_fiscal_descricao.toLowerCase();
         const opts = [...fSegmento.options].map(o => ({ val: o.value, lbl: o.value.toLowerCase() }));
         const mapa = [
-          { kws: ['aliment','bebid','agric','pecuÃ¡r'], seg: 'Alimentos' },
-          { kws: ['metal','ferrament','caldeiraria','estrutura metÃ¡l','soldagem','usinag'], seg: 'Metalurgia' },
-          { kws: ['automaÃ§Ã£o','automaÃ§Ã£o industrial','eletr','instrumentaÃ§Ã£o'], seg: 'AutomaÃ§Ã£o' },
-          { kws: ['construÃ§Ã£o','obra','engenharia civil','arquitet'], seg: 'ConstruÃ§Ã£o Civil' },
-          { kws: ['quÃ­m','petroqu','petrol','gÃ¡s'], seg: 'QuÃ­mica' },
+          { kws: ['aliment','bebid','agric','pecuár'], seg: 'Alimentos' },
+          { kws: ['metal','ferrament','caldeiraria','estrutura metál','soldagem','usinag'], seg: 'Metalurgia' },
+          { kws: ['automação','automação industrial','eletr','instrumentação'], seg: 'Automação' },
+          { kws: ['construção','obra','engenharia civil','arquitet'], seg: 'Construção Civil' },
+          { kws: ['quím','petroqu','petrol','gás'], seg: 'Química' },
           { kws: ['papel','celulos'], seg: 'Papel e Celulose' },
-          { kws: ['plÃ¡stic','borracha'], seg: 'PlÃ¡sticos e Borracha' },
-          { kws: ['tÃªxtil','confecÃ§Ã£o','vestuÃ¡rio'], seg: 'TÃªxtil' },
-          { kws: ['logÃ­stic','transport','armazenagem'], seg: 'LogÃ­stica' },
-          { kws: ['saÃºde','hospital','farmac','mÃ©dic'], seg: 'SaÃºde' },
+          { kws: ['plástic','borracha'], seg: 'Plásticos e Borracha' },
+          { kws: ['têxtil','confecção','vestuário'], seg: 'Têxtil' },
+          { kws: ['logístic','transport','armazenagem'], seg: 'Logística' },
+          { kws: ['saúde','hospital','farmac','médic'], seg: 'Saúde' },
           { kws: ['tecnologia','software','inform'], seg: 'Tecnologia' },
-          { kws: ['serviÃ§os','assessoria','consultoria'], seg: 'ServiÃ§os' },
+          { kws: ['serviços','assessoria','consultoria'], seg: 'Serviços' },
         ];
         let found = '';
         for (const { kws, seg } of mapa) {
@@ -660,7 +660,7 @@ const Clientes = (() => {
         }
       }
 
-      // EndereÃ§o
+      // Endereço
       const fEndereco = document.getElementById('fEndereco');
       if (fEndereco) {
         const partes = [
@@ -701,14 +701,14 @@ const Clientes = (() => {
     }
   }
 
-  /* â”€â”€ Portal do Cliente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Portal do Cliente ─────────────────────────────────────────────────── */
 
   async function gerarLinkPortal(clienteId) {
     const c = DB.get('clientes', clienteId);
     if (!c) return;
 
     const btn = document.getElementById(`btnPortal_${clienteId}`);
-    if (btn) { btn.textContent = 'â³ Gerando...'; btn.disabled = true; }
+    if (btn) { btn.textContent = '⏳ Gerando...'; btn.disabled = true; }
 
     try {
       // Criar token via Supabase
@@ -729,15 +729,15 @@ const Clientes = (() => {
       const link = `https://portal.bikows.com.br/?token=${data.token}`;
 
       Modal.open({
-        title: 'ðŸ”— Link do Portal â€” ' + c.nome,
+        title: '🔗 Link do Portal — ' + c.nome,
         body: `
           <div style="background:var(--success-light);border:1px solid var(--success-border);padding:16px;border-radius:var(--radius);margin-bottom:16px">
-            <div class="font-bold text-sm" style="color:var(--success);margin-bottom:8px">âœ… Link gerado com sucesso!</div>
-            <div class="text-xs text-muted mb-2">Envie este link para ${Utils.escHtml(c.nome)}. VÃ¡lido por 1 ano.</div>
+            <div class="font-bold text-sm" style="color:var(--success);margin-bottom:8px">✅ Link gerado com sucesso!</div>
+            <div class="text-xs text-muted mb-2">Envie este link para ${Utils.escHtml(c.nome)}. Válido por 1 ano.</div>
             <div style="display:flex;gap:8px;align-items:center">
               <input type="text" value="${Utils.escHtml(link)}" id="portalLink" readonly
                 style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:white">
-              <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${Utils.escHtml(link)}').then(()=>Toast.success('Link copiado!'))">ðŸ“‹ Copiar</button>
+              <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${Utils.escHtml(link)}').then(()=>Toast.success('Link copiado!'))">📋 Copiar</button>
             </div>
           </div>
           <div class="detail-grid">
@@ -745,9 +745,9 @@ const Clientes = (() => {
             <div class="detail-field"><div class="detail-label">Expira em</div><div class="detail-value">1 ano</div></div>
           </div>
           <div style="background:var(--bg);padding:12px;border-radius:var(--radius);margin-top:12px">
-            <div class="text-xs font-bold text-muted mb-1">ðŸ“§ SugestÃ£o de mensagem WhatsApp/e-mail:</div>
+            <div class="text-xs font-bold text-muted mb-1">📧 Sugestão de mensagem WhatsApp/e-mail:</div>
             <div style="font-size:12px;line-height:1.6;color:var(--text)">
-              "OlÃ¡ ${Utils.escHtml(c.nome)}! Criamos seu portal exclusivo Bikows onde vocÃª pode acompanhar projetos e aprovar propostas em tempo real. Acesse: ${Utils.escHtml(link)}"
+              "Olá ${Utils.escHtml(c.nome)}! Criamos seu portal exclusivo Bikows onde você pode acompanhar projetos e aprovar propostas em tempo real. Acesse: ${Utils.escHtml(link)}"
             </div>
           </div>
         `,
@@ -755,7 +755,7 @@ const Clientes = (() => {
     } catch (err) {
       Toast.error('Erro ao gerar link: ' + err.message);
     } finally {
-      if (btn) { btn.textContent = 'ðŸ”— Gerar Portal'; btn.disabled = false; }
+      if (btn) { btn.textContent = '🔗 Gerar Portal'; btn.disabled = false; }
     }
   }
 
@@ -770,20 +770,20 @@ const Clientes = (() => {
     if (!tokens?.length) { Toast.show('Nenhum link gerado ainda para este cliente.'); return; }
 
     Modal.open({
-      title: `ðŸ”— Links do Portal â€” ${c?.nome || ''}`,
+      title: `🔗 Links do Portal — ${c?.nome || ''}`,
       body: `
         <div class="table-wrap">
           <table class="tbl">
-            <thead><tr><th>Token</th><th>Criado em</th><th>Ãšltimo acesso</th><th>Expira</th><th>Ativo</th><th>AÃ§Ãµes</th></tr></thead>
+            <thead><tr><th>Token</th><th>Criado em</th><th>Último acesso</th><th>Expira</th><th>Ativo</th><th>Ações</th></tr></thead>
             <tbody>
               ${tokens.map(t => `<tr>
                 <td style="font-family:monospace;font-size:11px">${t.token.substring(0,20)}...</td>
                 <td class="text-xs">${Utils.formatDate(t.criado_em?.split('T')[0])}</td>
-                <td class="text-xs">${t.ultimo_acesso ? Utils.formatDate(t.ultimo_acesso.split('T')[0]) : 'â€”'}</td>
-                <td class="text-xs">${t.expira_em ? Utils.formatDate(t.expira_em.split('T')[0]) : 'âˆž'}</td>
+                <td class="text-xs">${t.ultimo_acesso ? Utils.formatDate(t.ultimo_acesso.split('T')[0]) : '—'}</td>
+                <td class="text-xs">${t.expira_em ? Utils.formatDate(t.expira_em.split('T')[0]) : '∞'}</td>
                 <td>${t.ativo ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
                 <td>
-                  <button class="btn btn-xs btn-secondary" onclick="navigator.clipboard.writeText('https://portal.bikows.com.br/?token=${t.token}').then(()=>Toast.success('Copiado!'))">ðŸ“‹</button>
+                  <button class="btn btn-xs btn-secondary" onclick="navigator.clipboard.writeText('https://portal.bikows.com.br/?token=${t.token}').then(()=>Toast.success('Copiado!'))">📋</button>
                   ${t.ativo ? `<button class="btn btn-xs btn-danger" onclick="Clientes.revogarToken('${t.id}')">Revogar</button>` : ''}
                 </td>
               </tr>`).join('')}

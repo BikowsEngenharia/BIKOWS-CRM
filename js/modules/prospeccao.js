@@ -1,51 +1,51 @@
-﻿/* ==========================================
-   PROSPECCAO â€” ProspecÃ§Ã£o de Leads via Google Places API
+/* ==========================================
+   PROSPECCAO — Prospecção de Leads via Google Places API
    ========================================== */
 const Prospeccao = (() => {
 
   let _resultados = [];
   let _buscando = false;
 
-  // Config padrÃ£o de busca
+  // Config padrão de busca
   let _config = {
-    keywords: ['NR-12', 'seguranÃ§a industrial', 'indÃºstria', 'agroindÃºstria', 'metal mecÃ¢nica', 'frigorÃ­fico', 'beneficiamento', 'automaÃ§Ã£o industrial', 'manutenÃ§Ã£o industrial', 'caldeiraria'],
+    keywords: ['NR-12', 'segurança industrial', 'indústria', 'agroindústria', 'metal mecânica', 'frigorífico', 'beneficiamento', 'automação industrial', 'manutenção industrial', 'caldeiraria'],
     estados: ['PR', 'SC', 'SP', 'MG', 'RS', 'GO', 'MT', 'MS'],
     estadoSelecionado: 'PR',
-    keywordSelecionada: 'indÃºstria',
+    keywordSelecionada: 'indústria',
     cidade: '',
     raio: 50000,
   };
 
-  // Mapeamento de categorias Google â†’ segmentos Bikows
+  // Mapeamento de categorias Google → segmentos Bikows
   const _CATEGORIA_MAP = {
-    'food': 'AgroindÃºstria',
-    'food_store': 'AgroindÃºstria',
-    'meal_delivery': 'AgroindÃºstria',
-    'meal_takeaway': 'AgroindÃºstria',
-    'bakery': 'AgroindÃºstria',
-    'slaughterhouse': 'FrigorÃ­fico',
-    'manufacturing': 'Metal mecÃ¢nica',
-    'factory': 'Metal mecÃ¢nica',
-    'industrial': 'IndÃºstria',
-    'storage': 'LogÃ­stica',
-    'warehouse': 'LogÃ­stica',
-    'moving_company': 'LogÃ­stica',
-    'car_repair': 'Metal mecÃ¢nica',
-    'electrician': 'EletromecÃ¢nica',
-    'plumber': 'HidrÃ¡ulica',
-    'general_contractor': 'ConstruÃ§Ã£o',
-    'construction': 'ConstruÃ§Ã£o',
-    'roofing_contractor': 'ConstruÃ§Ã£o',
-    'lodging': 'ServiÃ§os',
-    'hospital': 'SaÃºde',
-    'pharmacy': 'SaÃºde',
-    'school': 'EducaÃ§Ã£o',
-    'university': 'EducaÃ§Ã£o',
+    'food': 'Agroindústria',
+    'food_store': 'Agroindústria',
+    'meal_delivery': 'Agroindústria',
+    'meal_takeaway': 'Agroindústria',
+    'bakery': 'Agroindústria',
+    'slaughterhouse': 'Frigorífico',
+    'manufacturing': 'Metal mecânica',
+    'factory': 'Metal mecânica',
+    'industrial': 'Indústria',
+    'storage': 'Logística',
+    'warehouse': 'Logística',
+    'moving_company': 'Logística',
+    'car_repair': 'Metal mecânica',
+    'electrician': 'Eletromecânica',
+    'plumber': 'Hidráulica',
+    'general_contractor': 'Construção',
+    'construction': 'Construção',
+    'roofing_contractor': 'Construção',
+    'lodging': 'Serviços',
+    'hospital': 'Saúde',
+    'pharmacy': 'Saúde',
+    'school': 'Educação',
+    'university': 'Educação',
   };
 
   function _mapSegmento(tipos) {
-    if (!tipos || !Array.isArray(tipos)) return 'IndÃºstria';
-    // Lista de segmentos do usuÃ¡rio (config), em lowercase para fuzzy match
+    if (!tipos || !Array.isArray(tipos)) return 'Indústria';
+    // Lista de segmentos do usuário (config), em lowercase para fuzzy match
     const segmentosUsuario = (() => {
       try {
         return (DB.getConfig()?.segmentos || []).map(s => ({ raw: s, lower: s.toLowerCase() }));
@@ -54,20 +54,20 @@ const Prospeccao = (() => {
 
     for (const t of tipos) {
       const key = t.toLowerCase();
-      // 1) Primeiro tenta match no _CATEGORIA_MAP padrÃ£o
+      // 1) Primeiro tenta match no _CATEGORIA_MAP padrão
       for (const [cat, seg] of Object.entries(_CATEGORIA_MAP)) {
         if (key.includes(cat)) {
-          // Se o segmento mapeado bate com algum customizado do usuÃ¡rio, prioriza o do usuÃ¡rio
+          // Se o segmento mapeado bate com algum customizado do usuário, prioriza o do usuário
           const match = segmentosUsuario.find(s => s.lower === seg.toLowerCase());
           return match ? match.raw : seg;
         }
       }
-      // 2) Tenta match direto com segmentos customizados do usuÃ¡rio
+      // 2) Tenta match direto com segmentos customizados do usuário
       for (const s of segmentosUsuario) {
         if (key.includes(s.lower) || s.lower.includes(key)) return s.raw;
       }
     }
-    return 'IndÃºstria';
+    return 'Indústria';
   }
 
   function _categoriaBR(tipos) {
@@ -77,23 +77,23 @@ const Prospeccao = (() => {
     if (!limpo.length) return 'Empresa';
     // Traduz o primeiro tipo relevante
     const traducoes = {
-      manufacturing: 'IndÃºstria / Manufatura',
-      food_processing: 'IndÃºstria AlimentÃ­cia',
-      storage: 'Armazenagem / LogÃ­stica',
-      warehouse: 'DepÃ³sito / LogÃ­stica',
-      car_repair: 'Oficina / MetalÃºrgica',
-      electrician: 'EletromecÃ¢nica',
-      general_contractor: 'ConstruÃ§Ã£o Civil',
-      roofing_contractor: 'ConstruÃ§Ã£o',
-      plumber: 'HidrÃ¡ulica / Saneamento',
-      moving_company: 'LogÃ­stica / Transporte',
-      bakery: 'Panificadora / AgroindÃºstria',
-      hospital: 'Hospital / SaÃºde',
-      pharmacy: 'FarmÃ¡cia / SaÃºde',
-      school: 'Escola / EducaÃ§Ã£o',
+      manufacturing: 'Indústria / Manufatura',
+      food_processing: 'Indústria Alimentícia',
+      storage: 'Armazenagem / Logística',
+      warehouse: 'Depósito / Logística',
+      car_repair: 'Oficina / Metalúrgica',
+      electrician: 'Eletromecânica',
+      general_contractor: 'Construção Civil',
+      roofing_contractor: 'Construção',
+      plumber: 'Hidráulica / Saneamento',
+      moving_company: 'Logística / Transporte',
+      bakery: 'Panificadora / Agroindústria',
+      hospital: 'Hospital / Saúde',
+      pharmacy: 'Farmácia / Saúde',
+      school: 'Escola / Educação',
       university: 'Universidade',
       supermarket: 'Supermercado',
-      grocery_or_supermarket: 'Mercado / DistribuiÃ§Ã£o',
+      grocery_or_supermarket: 'Mercado / Distribuição',
       hardware_store: 'Ferragem / Materiais',
       home_goods_store: 'Materiais Industriais',
       lodging: 'Hospedagem',
@@ -128,16 +128,16 @@ const Prospeccao = (() => {
 
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
-        <h2 class="sec-title">ðŸ” ProspecÃ§Ã£o de Leads</h2>
+        <h2 class="sec-title">🔍 Prospecção de Leads</h2>
         <div class="sec-actions">
-          <button class="btn btn-ghost btn-sm" onclick="Prospeccao._showAjuda()">â“ Ajuda</button>
+          <button class="btn btn-ghost btn-sm" onclick="Prospeccao._showAjuda()">❓ Ajuda</button>
         </div>
       </div>
 
       <div class="card mb-4">
         <div class="card-header" style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:0">
-          <span style="font-size:13px;font-weight:600;color:var(--text)">ðŸŒ Busca via Google Meu NegÃ³cio</span>
-          <span style="font-size:12px;color:var(--text-muted);margin-left:8px">Encontre empresas na sua regiÃ£o e adicione ao CRM em 1 clique</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text)">🌐 Busca via Google Meu Negócio</span>
+          <span style="font-size:12px;color:var(--text-muted);margin-left:8px">Encontre empresas na sua região e adicione ao CRM em 1 clique</span>
         </div>
         <div style="padding:20px">
           <div class="form-row" style="align-items:flex-end;gap:12px;flex-wrap:wrap">
@@ -173,7 +173,7 @@ const Prospeccao = (() => {
             <div class="form-group" style="flex-shrink:0;align-self:flex-end">
               <button class="btn btn-primary" onclick="Prospeccao.buscar()" id="btnBuscar"
                 style="white-space:nowrap;padding:10px 20px">
-                ðŸ” Buscar Empresas
+                🔍 Buscar Empresas
               </button>
             </div>
           </div>
@@ -224,7 +224,7 @@ const Prospeccao = (() => {
     const btnBuscar = document.getElementById('btnBuscar');
     if (btnBuscar) {
       btnBuscar.disabled = true;
-      btnBuscar.textContent = 'â³ Buscando...';
+      btnBuscar.textContent = '⏳ Buscando...';
     }
 
     const statusEl = document.getElementById('pStatus');
@@ -232,7 +232,7 @@ const Prospeccao = (() => {
       statusEl.style.display = 'block';
       statusEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px">
         <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite"></span>
-        ðŸ” Buscando empresas para "<strong>${Utils.escHtml(keyword)}</strong>" em ${cidade ? cidade + ' - ' : ''}${estado}...
+        🔍 Buscando empresas para "<strong>${Utils.escHtml(keyword)}</strong>" em ${cidade ? cidade + ' - ' : ''}${estado}...
       </span>`;
     }
 
@@ -262,7 +262,7 @@ const Prospeccao = (() => {
       _resultados = Array.isArray(data) ? data : (data.resultados || []);
 
       if (statusEl) {
-        statusEl.innerHTML = `âœ… ${_resultados.length} empresa${_resultados.length !== 1 ? 's' : ''} encontrada${_resultados.length !== 1 ? 's' : ''} para "<strong>${Utils.escHtml(keyword)}</strong>" em ${cidade ? cidade + ' - ' : ''}${estado}`;
+        statusEl.innerHTML = `✅ ${_resultados.length} empresa${_resultados.length !== 1 ? 's' : ''} encontrada${_resultados.length !== 1 ? 's' : ''} para "<strong>${Utils.escHtml(keyword)}</strong>" em ${cidade ? cidade + ' - ' : ''}${estado}`;
       }
 
       _renderResultados(_resultados);
@@ -270,7 +270,7 @@ const Prospeccao = (() => {
     } catch (err) {
       console.error('[Prospeccao] Erro na busca:', err);
       if (statusEl) {
-        statusEl.innerHTML = `âŒ Erro ao conectar com o servidor. Verifique sua conexÃ£o.`;
+        statusEl.innerHTML = `❌ Erro ao conectar com o servidor. Verifique sua conexão.`;
         statusEl.style.color = 'var(--danger,#dc2626)';
       }
       _renderErroConexao();
@@ -278,7 +278,7 @@ const Prospeccao = (() => {
       _buscando = false;
       if (btnBuscar) {
         btnBuscar.disabled = false;
-        btnBuscar.textContent = 'ðŸ” Buscar Empresas';
+        btnBuscar.textContent = '🔍 Buscar Empresas';
       }
     }
   }
@@ -289,7 +289,7 @@ const Prospeccao = (() => {
 
     if (data?.error === 'API_KEY_NOT_CONFIGURED') {
       if (statusEl) {
-        statusEl.innerHTML = `âš™ï¸ ConfiguraÃ§Ã£o necessÃ¡ria â€” API Key nÃ£o configurada`;
+        statusEl.innerHTML = `⚙️ Configuração necessária — API Key não configurada`;
         statusEl.style.color = 'var(--warning,#f59e0b)';
       }
       if (resultadosEl) {
@@ -297,23 +297,23 @@ const Prospeccao = (() => {
           <div class="card" style="border-left:4px solid var(--warning,#f59e0b)">
             <div style="padding:24px">
               <div style="display:flex;align-items:flex-start;gap:16px">
-                <div style="font-size:32px;flex-shrink:0">âš™ï¸</div>
+                <div style="font-size:32px;flex-shrink:0">⚙️</div>
                 <div>
-                  <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">ConfiguraÃ§Ã£o necessÃ¡ria</div>
+                  <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Configuração necessária</div>
                   <div style="font-size:14px;color:var(--text-muted);margin-bottom:16px">
-                    Para usar a prospecÃ§Ã£o, vocÃª precisa configurar a <strong>Google Places API Key</strong>:
+                    Para usar a prospecção, você precisa configurar a <strong>Google Places API Key</strong>:
                   </div>
                   <ol style="font-size:13px;color:var(--text);line-height:2;padding-left:20px">
-                    <li><strong>Google Cloud Console</strong> â†’ Biblioteca de APIs â†’ <em>Places API</em> â†’ <strong>Ativar</strong></li>
-                    <li>Credenciais â†’ Criar Chave de API â†’ Restringir ao domÃ­nio <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px">bikowsengenharia.github.io</code></li>
-                    <li><strong>Supabase Dashboard</strong> â†’ Edge Functions â†’ Secrets â†’ Adicionar <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px">GOOGLE_PLACES_API_KEY</code></li>
+                    <li><strong>Google Cloud Console</strong> → Biblioteca de APIs → <em>Places API</em> → <strong>Ativar</strong></li>
+                    <li>Credenciais → Criar Chave de API → Restringir ao domínio <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px">bikowsengenharia.github.io</code></li>
+                    <li><strong>Supabase Dashboard</strong> → Edge Functions → Secrets → Adicionar <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px">GOOGLE_PLACES_API_KEY</code></li>
                   </ol>
                   <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
                     <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" class="btn btn-primary btn-sm">
-                      ðŸŒ Abrir Google Cloud Console
+                      🌐 Abrir Google Cloud Console
                     </a>
                     <a href="https://supabase.com/dashboard/project/mxvwccyopzfewhvscrzj/functions" target="_blank" class="btn btn-secondary btn-sm">
-                      âš¡ Abrir Supabase Edge Functions
+                      ⚡ Abrir Supabase Edge Functions
                     </a>
                   </div>
                 </div>
@@ -324,14 +324,14 @@ const Prospeccao = (() => {
     } else {
       const msg = data?.message || 'Erro desconhecido ao buscar empresas';
       if (statusEl) {
-        statusEl.innerHTML = `âŒ ${Utils.escHtml(msg)}`;
+        statusEl.innerHTML = `❌ ${Utils.escHtml(msg)}`;
         statusEl.style.color = 'var(--danger,#dc2626)';
       }
       if (resultadosEl) {
         resultadosEl.innerHTML = `
           <div class="card">
             <div style="padding:24px;text-align:center">
-              <div style="font-size:32px;margin-bottom:8px">âŒ</div>
+              <div style="font-size:32px;margin-bottom:8px">❌</div>
               <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Erro ao buscar empresas</div>
               <div style="font-size:13px;color:var(--text-muted)">${Utils.escHtml(msg)}</div>
             </div>
@@ -346,10 +346,10 @@ const Prospeccao = (() => {
     resultadosEl.innerHTML = `
       <div class="card">
         <div style="padding:24px;text-align:center">
-          <div style="font-size:32px;margin-bottom:8px">ðŸ”Œ</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Sem conexÃ£o com o servidor</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Verifique sua conexÃ£o com a internet e tente novamente.</div>
-          <button class="btn btn-primary btn-sm" onclick="Prospeccao.buscar()">ðŸ”„ Tentar novamente</button>
+          <div style="font-size:32px;margin-bottom:8px">🔌</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Sem conexão com o servidor</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Verifique sua conexão com a internet e tente novamente.</div>
+          <button class="btn btn-primary btn-sm" onclick="Prospeccao.buscar()">🔄 Tentar novamente</button>
         </div>
       </div>`;
   }
@@ -362,7 +362,7 @@ const Prospeccao = (() => {
       el.innerHTML = `
         <div class="card">
           <div style="padding:40px;text-align:center">
-            <div style="font-size:40px;margin-bottom:12px">ðŸ”</div>
+            <div style="font-size:40px;margin-bottom:12px">🔍</div>
             <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">Nenhuma empresa encontrada</div>
             <div style="font-size:13px;color:var(--text-muted)">Tente palavras-chave diferentes ou amplie o raio de busca.</div>
           </div>
@@ -373,7 +373,7 @@ const Prospeccao = (() => {
     el.innerHTML = `
       <div class="sec-header" style="margin-bottom:16px">
         <h3 style="font-size:14px;font-weight:600;color:var(--text)">
-          ðŸ“‹ Resultados â€” ${lista.length} empresa${lista.length !== 1 ? 's' : ''} encontrada${lista.length !== 1 ? 's' : ''}
+          📋 Resultados — ${lista.length} empresa${lista.length !== 1 ? 's' : ''} encontrada${lista.length !== 1 ? 's' : ''}
         </h3>
         <span style="font-size:12px;color:var(--text-muted)">Clique em "+ Adicionar" para incluir no CRM</span>
       </div>
@@ -395,7 +395,7 @@ const Prospeccao = (() => {
         <div style="padding:16px">
           <!-- Header do card -->
           <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
-            <div style="width:40px;height:40px;background:var(--primary-light,#eff6ff);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">ðŸ­</div>
+            <div style="width:40px;height:40px;background:var(--primary-light,#eff6ff);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏭</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:14px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:2px">${Utils.escHtml(r.nome || 'Empresa sem nome')}</div>
               ${statusLabel ? `<span style="font-size:10px;font-weight:700;color:${statusColor};background:${statusColor}18;padding:2px 8px;border-radius:99px">${statusLabel}</span>` : ''}
@@ -406,42 +406,42 @@ const Prospeccao = (() => {
           <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
             ${r.endereco ? `
               <div style="display:flex;gap:6px;align-items:flex-start">
-                <span style="flex-shrink:0;margin-top:1px">ðŸ“</span>
+                <span style="flex-shrink:0;margin-top:1px">📍</span>
                 <span style="font-size:12px;color:var(--text-muted)">${Utils.escHtml(r.endereco)}</span>
               </div>` : ''}
             ${r.telefone ? `
               <div style="display:flex;gap:6px;align-items:center">
-                <span style="flex-shrink:0">ðŸ“ž</span>
+                <span style="flex-shrink:0">📞</span>
                 <a href="tel:${Utils.escHtml(r.telefone)}" style="font-size:12px;color:var(--primary);text-decoration:none">${Utils.escHtml(r.telefone)}</a>
               </div>` : ''}
             ${r.website ? `
               <div style="display:flex;gap:6px;align-items:center">
-                <span style="flex-shrink:0">ðŸŒ</span>
+                <span style="flex-shrink:0">🌐</span>
                 <a href="${Utils.escHtml(r.website)}" target="_blank" style="font-size:12px;color:var(--primary);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px">${Utils.escHtml(r.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>
               </div>` : ''}
             ${ratingText ? `
               <div style="display:flex;gap:6px;align-items:center">
-                <span style="flex-shrink:0">â­</span>
+                <span style="flex-shrink:0">⭐</span>
                 <span>${ratingText}</span>
               </div>` : ''}
             ${r.categoria || r.categoriasBR?.length ? `
               <div style="display:flex;gap:6px;align-items:center">
-                <span style="flex-shrink:0">ðŸ·ï¸</span>
+                <span style="flex-shrink:0">🏷️</span>
                 <span style="font-size:12px;color:var(--text-muted)">${Utils.escHtml(r.categoriasBR?.[0] || r.categoria || '')}</span>
               </div>` : ''}
           </div>
 
-          <!-- BotÃµes de aÃ§Ã£o -->
+          <!-- Botões de ação -->
           <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px">
             <button class="btn btn-primary btn-sm" style="flex:1" onclick="Prospeccao.adicionarLead(${idx})">
-              ðŸ’¼ + Lead
+              💼 + Lead
             </button>
             <button class="btn btn-secondary btn-sm" style="flex:1" onclick="Prospeccao.adicionarCliente(${idx})">
-              ðŸ¢ + Cliente
+              🏢 + Cliente
             </button>
             ${r.website ? `
               <a href="${Utils.escHtml(r.website)}" target="_blank" class="btn btn-ghost btn-sm" title="Abrir site">
-                ðŸ”—
+                🔗
               </a>` : ''}
           </div>
         </div>
@@ -454,9 +454,9 @@ const Prospeccao = (() => {
     const empty = 5 - full - half;
     return (
       '<span style="color:#f59e0b;font-size:12px">' +
-      'â˜…'.repeat(full) +
-      (half ? 'Â½' : '') +
-      '<span style="color:var(--border)">' + 'â˜…'.repeat(empty) + '</span>' +
+      '★'.repeat(full) +
+      (half ? '½' : '') +
+      '<span style="color:var(--border)">' + '★'.repeat(empty) + '</span>' +
       '</span>'
     );
   }
@@ -467,17 +467,17 @@ const Prospeccao = (() => {
 
     const segmento = _mapSegmento(r.tipos || [r.categoria]);
     const obs = [
-      r.endereco ? `EndereÃ§o: ${r.endereco}` : '',
+      r.endereco ? `Endereço: ${r.endereco}` : '',
       r.telefone ? `Telefone: ${r.telefone}` : '',
       r.website  ? `Site: ${r.website}` : '',
-      r.rating   ? `Google: â­ ${r.rating} (${r.totalAvaliacoes || 0} avaliaÃ§Ãµes)` : '',
+      r.rating   ? `Google: ⭐ ${r.rating} (${r.totalAvaliacoes || 0} avaliações)` : '',
       r.categoriasBR?.length ? `Categoria: ${r.categoriasBR.join(', ')}` : '',
     ].filter(Boolean).join('\n');
 
-    // Abrir formulÃ¡rio de lead
+    // Abrir formulário de lead
     Pipeline.openForm(null, 'lead_identificado');
 
-    // Preencher campos apÃ³s o modal abrir
+    // Preencher campos após o modal abrir
     setTimeout(() => {
       const fTitulo = document.getElementById('fTitulo');
       const fSegmento = document.getElementById('fSegmento');
@@ -486,22 +486,22 @@ const Prospeccao = (() => {
       const fObs = document.getElementById('fObs');
       const fProximaAcao = document.getElementById('fProximaAcao');
 
-      if (fTitulo) fTitulo.value = `ProspecÃ§Ã£o â€” ${r.nome}`;
+      if (fTitulo) fTitulo.value = `Prospecção — ${r.nome}`;
       if (fSegmento) {
-        // Tentar selecionar o segmento mais prÃ³ximo
+        // Tentar selecionar o segmento mais próximo
         const opts = Array.from(fSegmento.options).map(o => o.value.toLowerCase());
         const best = opts.find(o => o.includes(segmento.toLowerCase()) || segmento.toLowerCase().includes(o));
         if (best) fSegmento.value = Array.from(fSegmento.options).find(o => o.value.toLowerCase() === best)?.value || fSegmento.value;
       }
-      if (fOrigem) fOrigem.value = 'ProspecÃ§Ã£o Ativa';
+      if (fOrigem) fOrigem.value = 'Prospecção Ativa';
       if (fDecisor) fDecisor.value = '';
       if (fObs) fObs.value = obs;
-      if (fProximaAcao) fProximaAcao.value = 'Primeiro contato â€” ligar ou enviar email';
+      if (fProximaAcao) fProximaAcao.value = 'Primeiro contato — ligar ou enviar email';
 
       // Trigger onchange da origem para atualizar badge visual
       if (fOrigem) fOrigem.dispatchEvent(new Event('change'));
 
-      Toast.show(`ðŸ“‹ FormulÃ¡rio preenchido para ${r.nome}`);
+      Toast.show(`📋 Formulário preenchido para ${r.nome}`);
     }, 300);
   }
 
@@ -511,11 +511,11 @@ const Prospeccao = (() => {
 
     const segmento = _mapSegmento(r.tipos || [r.categoria]);
 
-    // Extrair cidade e estado do endereÃ§o, se possÃ­vel
+    // Extrair cidade e estado do endereço, se possível
     let cidade = '';
     let estado = '';
     if (r.endereco) {
-      // Tentar extrair "Cidade - UF" do final do endereÃ§o
+      // Tentar extrair "Cidade - UF" do final do endereço
       const match = r.endereco.match(/,\s*([^,]+)\s*-\s*([A-Z]{2})\s*,?\s*Brasil\s*$/i)
         || r.endereco.match(/,\s*([^,]+)\s*-\s*([A-Z]{2})\s*$/i);
       if (match) {
@@ -524,10 +524,10 @@ const Prospeccao = (() => {
       }
     }
 
-    // Abrir formulÃ¡rio de cliente
+    // Abrir formulário de cliente
     Clientes.openForm(null);
 
-    // Preencher campos apÃ³s o modal abrir
+    // Preencher campos após o modal abrir
     setTimeout(() => {
       const fNome = document.getElementById('fNome');
       const fSegmento = document.getElementById('fSegmento');
@@ -544,8 +544,8 @@ const Prospeccao = (() => {
       if (fEstado && estado) fEstado.value = estado;
       if (fObs) {
         const obs = [
-          'Importado via ProspecÃ§Ã£o Google',
-          r.rating ? `â­ ${r.rating} (${r.totalAvaliacoes || 0} avaliaÃ§Ãµes no Google)` : '',
+          'Importado via Prospecção Google',
+          r.rating ? `⭐ ${r.rating} (${r.totalAvaliacoes || 0} avaliações no Google)` : '',
           r.categoriasBR?.length ? `Categoria: ${r.categoriasBR.join(', ')}` : '',
         ].filter(Boolean).join('\n');
         fObs.value = obs;
@@ -556,30 +556,30 @@ const Prospeccao = (() => {
         if (best) fSegmento.value = Array.from(fSegmento.options).find(o => o.value.toLowerCase() === best)?.value || fSegmento.value;
       }
 
-      Toast.show(`ðŸ“‹ FormulÃ¡rio preenchido para ${r.nome}`);
+      Toast.show(`📋 Formulário preenchido para ${r.nome}`);
     }, 300);
   }
 
   function _showAjuda() {
     Modal.open({
-      title: 'â“ Como usar a ProspecÃ§Ã£o',
+      title: '❓ Como usar a Prospecção',
       body: `
         <div style="font-size:14px;line-height:1.8;color:var(--text)">
-          <div style="font-weight:700;font-size:15px;margin-bottom:12px">ðŸ” Como funciona</div>
-          <p>Este mÃ³dulo usa a <strong>Google Places API</strong> para encontrar empresas reais cadastradas no Google Meu NegÃ³cio na sua regiÃ£o.</p>
+          <div style="font-weight:700;font-size:15px;margin-bottom:12px">🔍 Como funciona</div>
+          <p>Este módulo usa a <strong>Google Places API</strong> para encontrar empresas reais cadastradas no Google Meu Negócio na sua região.</p>
 
-          <div style="font-weight:700;margin:16px 0 8px">ðŸ“‹ Passo a passo</div>
+          <div style="font-weight:700;margin:16px 0 8px">📋 Passo a passo</div>
           <ol style="padding-left:20px;display:flex;flex-direction:column;gap:8px">
-            <li><strong>Palavra-chave</strong>: Use termos como "indÃºstria", "agroindÃºstria", "metal mecÃ¢nica", "frigorÃ­fico", "NR-12"</li>
-            <li><strong>Estado + Cidade</strong>: Filtra empresas na regiÃ£o desejada</li>
-            <li><strong>Raio</strong>: DistÃ¢ncia em km ao redor do centro da cidade</li>
-            <li>Clique em <strong>"ðŸ” Buscar Empresas"</strong></li>
-            <li>Nos resultados, clique em <strong>"ðŸ’¼ + Lead"</strong> ou <strong>"ðŸ¢ + Cliente"</strong> para adicionar ao CRM</li>
+            <li><strong>Palavra-chave</strong>: Use termos como "indústria", "agroindústria", "metal mecânica", "frigorífico", "NR-12"</li>
+            <li><strong>Estado + Cidade</strong>: Filtra empresas na região desejada</li>
+            <li><strong>Raio</strong>: Distância em km ao redor do centro da cidade</li>
+            <li>Clique em <strong>"🔍 Buscar Empresas"</strong></li>
+            <li>Nos resultados, clique em <strong>"💼 + Lead"</strong> ou <strong>"🏢 + Cliente"</strong> para adicionar ao CRM</li>
           </ol>
 
-          <div style="font-weight:700;margin:16px 0 8px">âš™ï¸ Requisitos</div>
+          <div style="font-weight:700;margin:16px 0 8px">⚙️ Requisitos</div>
           <p>Para funcionar, a <strong>Google Places API Key</strong> precisa estar configurada como secret na Edge Function do Supabase.</p>
-          <p style="margin-top:8px">Se aparecer aviso de "ConfiguraÃ§Ã£o necessÃ¡ria", acesse o Supabase Dashboard â†’ Edge Functions â†’ crm-prospeccao â†’ Secrets e adicione a chave <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px">GOOGLE_PLACES_API_KEY</code>.</p>
+          <p style="margin-top:8px">Se aparecer aviso de "Configuração necessária", acesse o Supabase Dashboard → Edge Functions → crm-prospeccao → Secrets e adicione a chave <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px">GOOGLE_PLACES_API_KEY</code>.</p>
         </div>
       `,
       saveCb: null,

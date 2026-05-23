@@ -1,18 +1,18 @@
-﻿/* ==========================================
-   Marketing.js â€” MÃ³dulo de Marketing & ConteÃºdo
+/* ==========================================
+   Marketing.js — Módulo de Marketing & Conteúdo
    ========================================== */
 const Marketing = (() => {
 
   /* ---- Constantes ---- */
-  const CANAIS = ['LinkedIn','Instagram','YouTube','Google Meu NegÃ³cio','Site/Blog'];
-  const CANAL_ICONS = { 'LinkedIn':'ðŸ’¼','Instagram':'ðŸ“¸','YouTube':'â–¶ï¸','Google Meu NegÃ³cio':'ðŸ“','Site/Blog':'ðŸŒ' };
-  const CANAL_COLORS = { 'LinkedIn':'#0077B5','Instagram':'#E1306C','YouTube':'#FF0000','Google Meu NegÃ³cio':'#4285F4','Site/Blog':'#059669' };
-  const FORMATOS = ['Post Imagem','Carrossel','VÃ­deo Curto (Reels/Shorts)','VÃ­deo Longo','Artigo/Blog','Story','NotÃ­cia (GMN)','Outro'];
-  const PILARES = ['SeguranÃ§a do Trabalho','Engenharia e Projetos','Cases e Resultados','Equipe e Cultura','Dicas TÃ©cnicas','LicitaÃ§Ãµes','Outro'];
+  const CANAIS = ['LinkedIn','Instagram','YouTube','Google Meu Negócio','Site/Blog'];
+  const CANAL_ICONS = { 'LinkedIn':'💼','Instagram':'📸','YouTube':'▶️','Google Meu Negócio':'📍','Site/Blog':'🌐' };
+  const CANAL_COLORS = { 'LinkedIn':'#0077B5','Instagram':'#E1306C','YouTube':'#FF0000','Google Meu Negócio':'#4285F4','Site/Blog':'#059669' };
+  const FORMATOS = ['Post Imagem','Carrossel','Vídeo Curto (Reels/Shorts)','Vídeo Longo','Artigo/Blog','Story','Notícia (GMN)','Outro'];
+  const PILARES = ['Segurança do Trabalho','Engenharia e Projetos','Cases e Resultados','Equipe e Cultura','Dicas Técnicas','Licitações','Outro'];
   const STATUS_POST = ['ideia','rascunho','agendado','publicado','pausado'];
   const STATUS_CORES = { ideia:'#94a3b8', rascunho:'#d97706', agendado:'#2563eb', publicado:'#059669', pausado:'#dc2626' };
   const PRIORIDADES = ['alta','media','baixa'];
-  const PRIOR_ICONS = { alta:'ðŸ”´', media:'ðŸŸ¡', baixa:'ðŸŸ¢' };
+  const PRIOR_ICONS = { alta:'🔴', media:'🟡', baixa:'🟢' };
 
   /* ---- Estado ---- */
   let _tab = 'calendario';
@@ -58,23 +58,23 @@ const Marketing = (() => {
     el.innerHTML = `
       <div class="sec-header" style="margin-bottom:0">
         <div>
-          <h2 class="sec-title">Marketing & ConteÃºdo</h2>
-          <p style="font-size:12px;color:var(--text-muted);margin-top:2px">CalendÃ¡rio editorial, campanhas, KPIs e estratÃ©gia de conteÃºdo</p>
+          <h2 class="sec-title">Marketing & Conteúdo</h2>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:2px">Calendário editorial, campanhas, KPIs e estratégia de conteúdo</p>
         </div>
         <div class="sec-actions">
           <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
-            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Marketing.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${{mes:'MÃªs',trimestre:'Trimestre',semestre:'Semestre',ano:'Ano',tudo:'Tudo'}[p]}</button>`).join('')}
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Marketing.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${{mes:'Mês',trimestre:'Trimestre',semestre:'Semestre',ano:'Ano',tudo:'Tudo'}[p]}</button>`).join('')}
           </div>
         </div>
       </div>
 
       <div class="tabs" style="margin:16px 0 0 0">
         ${[
-          {id:'calendario', label:'ðŸ“… CalendÃ¡rio'},
-          {id:'campanhas',  label:'ðŸš€ Campanhas'},
-          {id:'ideias',     label:'ðŸ’¡ Banco de Ideias'},
-          {id:'kpis',       label:'ðŸ“Š KPIs'},
-          {id:'estrategia', label:'ðŸŽ¯ EstratÃ©gia'},
+          {id:'calendario', label:'📅 Calendário'},
+          {id:'campanhas',  label:'🚀 Campanhas'},
+          {id:'ideias',     label:'💡 Banco de Ideias'},
+          {id:'kpis',       label:'📊 KPIs'},
+          {id:'estrategia', label:'🎯 Estratégia'},
         ].map(t => `<button class="tab-btn${_tab===t.id?' active':''}" onclick="Marketing._setTab('${t.id}')">${t.label}</button>`).join('')}
       </div>
 
@@ -103,7 +103,7 @@ const Marketing = (() => {
   }
 
   /* ====================================================
-     TAB: CALENDÃƒÂRIO
+     TAB: CALENDÃRIO
      ==================================================== */
   function _renderCalendario() {
     const el = document.getElementById('mktContent');
@@ -111,7 +111,7 @@ const Marketing = (() => {
 
     const posts = DB.getAll('marketing_posts');
 
-    // Filtro por mÃªs
+    // Filtro por mês
     const postsMes = posts.filter(p => {
       const d = (p.data || '').slice(0,7);
       return d === _filtroMes;
@@ -134,13 +134,13 @@ const Marketing = (() => {
     el.innerHTML = `
       <!-- KPI Row -->
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
-        <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total no mÃªs</div></div>
+        <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total no mês</div></div>
         <div class="kpi-card"><div class="kpi-value" style="color:var(--success)">${publicados}</div><div class="kpi-label">Publicados</div></div>
         <div class="kpi-card"><div class="kpi-value" style="color:#2563eb">${agendados}</div><div class="kpi-label">Agendados</div></div>
         <div class="kpi-card"><div class="kpi-value" style="color:var(--warning)">${afazer}</div><div class="kpi-label">A fazer</div></div>
       </div>
 
-      <!-- Filtros + AÃ§Ãµes -->
+      <!-- Filtros + Ações -->
       <div class="filters" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;align-items:center">
         <input type="month" class="form-input" style="width:160px" value="${_filtroMes}"
           onchange="Marketing._setFiltroMes(this.value)">
@@ -153,9 +153,9 @@ const Marketing = (() => {
           ${STATUS_POST.map(s => `<option value="${s}"${_filtroStatus===s?' selected':''}>${s}</option>`).join('')}
         </select>
         <div style="flex:1"></div>
-        <button class="btn btn-ghost btn-sm" onclick="Marketing._downloadTemplate()">â¬‡ Template CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="Marketing._downloadTemplate()">⬇ Template CSV</button>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer">
-          ðŸ“¥ Importar CSV
+          📥 Importar CSV
           <input type="file" accept=".csv" style="display:none" onchange="Marketing._importCSV(event)">
         </label>
         <button class="btn btn-primary btn-sm" onclick="Marketing.openPostForm()">+ Novo Post</button>
@@ -164,9 +164,9 @@ const Marketing = (() => {
       <!-- Lista de posts -->
       ${filtrados.length === 0 ? `
         <div class="empty-state">
-          <div class="empty-icon">ðŸ“…</div>
-          <div class="empty-title">Nenhum conteÃºdo planejado para este mÃªs</div>
-          <div class="empty-sub">Clique em "+ Novo Post" para comeÃ§ar a preencher o calendÃ¡rio.</div>
+          <div class="empty-icon">📅</div>
+          <div class="empty-title">Nenhum conteúdo planejado para este mês</div>
+          <div class="empty-sub">Clique em "+ Novo Post" para começar a preencher o calendário.</div>
         </div>
       ` : filtrados.map(p => _renderPostCard(p)).join('')}
     `;
@@ -174,23 +174,23 @@ const Marketing = (() => {
 
   function _renderPostCard(p) {
     const cor = CANAL_COLORS[p.canal] || '#64748b';
-    const icon = CANAL_ICONS[p.canal] || 'ðŸ“¢';
+    const icon = CANAL_ICONS[p.canal] || '📢';
     const statusCor = STATUS_CORES[p.status] || '#94a3b8';
-    const dataFmt = p.data ? Utils.formatDate(p.data) : 'â€”';
+    const dataFmt = p.data ? Utils.formatDate(p.data) : '—';
     return `
       <div class="mkt-post-card">
         <div class="mkt-post-date">${dataFmt}</div>
-        <span class="canal-badge" style="background:${cor}">${icon} ${Utils.escHtml(p.canal||'â€”')}</span>
-        <div class="mkt-post-title">${Utils.escHtml(Utils.truncate(p.titulo||'Sem tÃ­tulo',60))}</div>
+        <span class="canal-badge" style="background:${cor}">${icon} ${Utils.escHtml(p.canal||'—')}</span>
+        <div class="mkt-post-title">${Utils.escHtml(Utils.truncate(p.titulo||'Sem título',60))}</div>
         <div class="mkt-post-meta">
           ${p.formato ? `<span class="pilar-badge">${Utils.escHtml(p.formato)}</span>` : ''}
           ${p.pilar ? `<span class="pilar-badge" style="background:#f0fdf4;color:#059669">${Utils.escHtml(p.pilar)}</span>` : ''}
-          <span class="status-post-badge" style="background:${statusCor}">${p.status||'â€”'}</span>
+          <span class="status-post-badge" style="background:${statusCor}">${p.status||'—'}</span>
         </div>
         <div class="tbl-actions">
-          <button class="btn-icon" title="Editar" onclick="Marketing.openPostForm('${p.id}')">Ã¢Å“Â</button>
-          <button class="btn-icon" title="Duplicar" onclick="Marketing.duplicatePost('${p.id}')">ðŸ“‹</button>
-          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deletePost('${p.id}')">ðŸ—‘</button>
+          <button class="btn-icon" title="Editar" onclick="Marketing.openPostForm('${p.id}')">âœ</button>
+          <button class="btn-icon" title="Duplicar" onclick="Marketing.duplicatePost('${p.id}')">📋</button>
+          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deletePost('${p.id}')">🗑</button>
         </div>
       </div>
     `;
@@ -203,12 +203,12 @@ const Marketing = (() => {
   /* ---- Form de Post ---- */
   function openPostForm(id) {
     const post = id ? DB.get('marketing_posts', id) : null;
-    const HORARIOS = { 'LinkedIn':'08:00','Instagram':'19:00','YouTube':'12:00','Google Meu NegÃ³cio':'09:00','Site/Blog':'10:00' };
+    const HORARIOS = { 'LinkedIn':'08:00','Instagram':'19:00','YouTube':'12:00','Google Meu Negócio':'09:00','Site/Blog':'10:00' };
 
     const body = `
       <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:14px">
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">TÃ­tulo *</label>
+          <label class="form-label">Título *</label>
           <input class="form-input" id="postTitulo" value="${Utils.escHtml(post?.titulo||'')}" placeholder="Ex: Como a NR-12 protege sua empresa">
         </div>
         <div class="form-group">
@@ -224,7 +224,7 @@ const Marketing = (() => {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Pilar de ConteÃºdo</label>
+          <label class="form-label">Pilar de Conteúdo</label>
           <select class="form-input" id="postPilar">
             ${PILARES.map(p2 => `<option value="${p2}"${post?.pilar===p2?' selected':''}>${p2}</option>`).join('')}
           </select>
@@ -236,15 +236,15 @@ const Marketing = (() => {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Data de publicaÃ§Ã£o</label>
+          <label class="form-label">Data de publicação</label>
           <input class="form-input" type="date" id="postData" value="${post?.data||''}">
         </div>
         <div class="form-group">
-          <label class="form-label">HorÃ¡rio sugerido</label>
+          <label class="form-label">Horário sugerido</label>
           <input class="form-input" type="time" id="postHorario" value="${post?.horario||(HORARIOS[post?.canal]||'08:00')}">
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">DescriÃ§Ã£o / Legenda</label>
+          <label class="form-label">Descrição / Legenda</label>
           <textarea class="form-input" id="postDescricao" rows="4" placeholder="Texto do post...">${Utils.escHtml(post?.descricao||'')}</textarea>
         </div>
         <div class="form-group">
@@ -252,7 +252,7 @@ const Marketing = (() => {
           <input class="form-input" id="postHashtags" value="${Utils.escHtml(post?.hashtags||'')}" placeholder="#NR12 #SegurancaDoTrabalho">
         </div>
         <div class="form-group">
-          <label class="form-label">CTA â€” Call to Action</label>
+          <label class="form-label">CTA — Call to Action</label>
           <input class="form-input" id="postCta" value="${Utils.escHtml(post?.cta||'')}" placeholder="Ex: Acesse o link na bio">
         </div>
         <div class="form-group" style="grid-column:1/-1">
@@ -260,7 +260,7 @@ const Marketing = (() => {
           <input class="form-input" type="url" id="postLink" value="${Utils.escHtml(post?.link||'')}" placeholder="https://...">
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">ObservaÃ§Ãµes</label>
+          <label class="form-label">Observações</label>
           <textarea class="form-input" id="postObs" rows="2" placeholder="Notas internas...">${Utils.escHtml(post?.observacoes||'')}</textarea>
         </div>
       </div>
@@ -272,7 +272,7 @@ const Marketing = (() => {
       size: 'modal-lg',
       saveCb: () => {
         const titulo = document.getElementById('postTitulo')?.value.trim();
-        if (!titulo) { Toast.error('Informe o tÃ­tulo do post'); return; }
+        if (!titulo) { Toast.error('Informe o título do post'); return; }
         const data = {
           titulo,
           canal:      document.getElementById('postCanal')?.value,
@@ -301,7 +301,7 @@ const Marketing = (() => {
   }
 
   function _updateHorario() {
-    const HORARIOS = { 'LinkedIn':'08:00','Instagram':'19:00','YouTube':'12:00','Google Meu NegÃ³cio':'09:00','Site/Blog':'10:00' };
+    const HORARIOS = { 'LinkedIn':'08:00','Instagram':'19:00','YouTube':'12:00','Google Meu Negócio':'09:00','Site/Blog':'10:00' };
     const canal = document.getElementById('postCanal')?.value;
     const horEl = document.getElementById('postHorario');
     if (horEl && canal && HORARIOS[canal]) horEl.value = HORARIOS[canal];
@@ -315,7 +315,7 @@ const Marketing = (() => {
       d.setDate(d.getDate() + 7);
       return d.toISOString().split('T')[0];
     })() : '';
-    DB.create('marketing_posts', { ...post, id: undefined, titulo: post.titulo + ' (cÃ³pia)', status: 'rascunho', data: novaData });
+    DB.create('marketing_posts', { ...post, id: undefined, titulo: post.titulo + ' (cópia)', status: 'rascunho', data: novaData });
     Toast.success('Post duplicado!');
     _renderCalendario();
   }
@@ -324,10 +324,10 @@ const Marketing = (() => {
     const post = DB.get('marketing_posts', id);
     Confirm.show({
       title: 'Excluir post',
-      msg: `Excluir "${post?.titulo || 'este post'}"? Esta aÃ§Ã£o nÃ£o pode ser desfeita.`,
+      msg: `Excluir "${post?.titulo || 'este post'}"? Esta ação não pode ser desfeita.`,
       onConfirm: () => {
         DB.remove('marketing_posts', id);
-        Toast.success('Post excluÃ­do.');
+        Toast.success('Post excluído.');
         _renderCalendario();
       }
     });
@@ -369,8 +369,8 @@ const Marketing = (() => {
 
   function _downloadTemplate() {
     const header = 'data;canal;titulo;descricao;formato;pilar;status;hashtags;cta';
-    const ex1 = `${new Date().toISOString().split('T')[0]};LinkedIn;Como a NR-12 protege sua empresa;Texto do post aqui...;Post Imagem;SeguranÃ§a do Trabalho;rascunho;#NR12 #SeguranÃ§a;Fale com a Bikows`;
-    const ex2 = `${new Date().toISOString().split('T')[0]};Instagram;Case: Projeto de linha de vida;Descrevemos o projeto...;Carrossel;Cases e Resultados;ideia;#Engenharia #Cases;Ver portfÃ³lio no link`;
+    const ex1 = `${new Date().toISOString().split('T')[0]};LinkedIn;Como a NR-12 protege sua empresa;Texto do post aqui...;Post Imagem;Segurança do Trabalho;rascunho;#NR12 #Segurança;Fale com a Bikows`;
+    const ex2 = `${new Date().toISOString().split('T')[0]};Instagram;Case: Projeto de linha de vida;Descrevemos o projeto...;Carrossel;Cases e Resultados;ideia;#Engenharia #Cases;Ver portfólio no link`;
     const csv = [header, ex1, ex2].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -391,7 +391,7 @@ const Marketing = (() => {
 
     const total = campanhas.length;
     const ativas = campanhas.filter(c => c.status === 'ativa').length;
-    const concluidas = campanhas.filter(c => c.status === 'concluÃ­da').length;
+    const concluidas = campanhas.filter(c => c.status === 'concluída').length;
     const budget = campanhas.reduce((acc, c) => acc + (parseFloat(c.orcamento)||0), 0);
 
     el.innerHTML = `
@@ -399,11 +399,11 @@ const Marketing = (() => {
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
         <div class="kpi-card"><div class="kpi-value">${total}</div><div class="kpi-label">Total campanhas</div></div>
         <div class="kpi-card"><div class="kpi-value" style="color:var(--success)">${ativas}</div><div class="kpi-label">Ativas</div></div>
-        <div class="kpi-card"><div class="kpi-value" style="color:#64748b">${concluidas}</div><div class="kpi-label">ConcluÃ­das</div></div>
+        <div class="kpi-card"><div class="kpi-value" style="color:#64748b">${concluidas}</div><div class="kpi-label">Concluídas</div></div>
         <div class="kpi-card"><div class="kpi-value" style="color:var(--primary)">${Utils.formatCurrency(budget)}</div><div class="kpi-label">Budget total</div></div>
       </div>
 
-      <!-- AÃ§Ãµes -->
+      <!-- Ações -->
       <div class="filters" style="margin-bottom:14px">
         <div style="flex:1"></div>
         <button class="btn btn-primary btn-sm" onclick="Marketing.openCampanhaForm()">+ Nova Campanha</button>
@@ -412,7 +412,7 @@ const Marketing = (() => {
       <!-- Cards -->
       ${campanhas.length === 0 ? `
         <div class="empty-state">
-          <div class="empty-icon">ðŸš€</div>
+          <div class="empty-icon">🚀</div>
           <div class="empty-title">Nenhuma campanha cadastrada</div>
           <div class="empty-sub">Crie sua primeira campanha de marketing.</div>
         </div>
@@ -423,7 +423,7 @@ const Marketing = (() => {
   }
 
   function _renderCampanhaCard(c) {
-    const STATUS_CAMP_CORES = { planejada:'#94a3b8', ativa:'#059669', pausada:'#d97706', 'concluÃ­da':'#2563eb', cancelada:'#dc2626' };
+    const STATUS_CAMP_CORES = { planejada:'#94a3b8', ativa:'#059669', pausada:'#d97706', 'concluída':'#2563eb', cancelada:'#dc2626' };
     const cor = STATUS_CAMP_CORES[c.status] || '#94a3b8';
     const orcamento = parseFloat(c.orcamento)||0;
     const gasto = parseFloat(c.gasto)||0;
@@ -434,13 +434,13 @@ const Marketing = (() => {
       <div class="campanha-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text)">${Utils.escHtml(c.nome||'â€”')}</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text)">${Utils.escHtml(c.nome||'—')}</div>
             <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${Utils.escHtml(Utils.truncate(c.objetivo||'',50))}</div>
           </div>
-          <span class="status-post-badge" style="background:${cor}">${c.status||'â€”'}</span>
+          <span class="status-post-badge" style="background:${cor}">${c.status||'—'}</span>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
-          ðŸ“… ${c.dataInicio ? Utils.formatDate(c.dataInicio) : 'â€”'} Ã¢â€ â€™ ${c.dataFim ? Utils.formatDate(c.dataFim) : 'â€”'}
+          📅 ${c.dataInicio ? Utils.formatDate(c.dataInicio) : '—'} â†’ ${c.dataFim ? Utils.formatDate(c.dataFim) : '—'}
         </div>
         <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px">${canais}</div>
         ${orcamento > 0 ? `
@@ -454,11 +454,11 @@ const Marketing = (() => {
             </div>
           </div>
         ` : ''}
-        ${c.leads ? `<div style="font-size:12px;color:var(--success);margin-bottom:8px">ðŸŽ¯ ${c.leads} leads gerados</div>` : ''}
+        ${c.leads ? `<div style="font-size:12px;color:var(--success);margin-bottom:8px">🎯 ${c.leads} leads gerados</div>` : ''}
         <div class="tbl-actions" style="justify-content:flex-end">
-          <button class="btn-icon" onclick="Marketing.viewCampanha('${c.id}')">ðŸ‘</button>
-          <button class="btn-icon" onclick="Marketing.openCampanhaForm('${c.id}')">Ã¢Å“Â</button>
-          <button class="btn-icon text-danger" onclick="Marketing.deleteCampanha('${c.id}')">ðŸ—‘</button>
+          <button class="btn-icon" onclick="Marketing.viewCampanha('${c.id}')">👁</button>
+          <button class="btn-icon" onclick="Marketing.openCampanhaForm('${c.id}')">âœ</button>
+          <button class="btn-icon text-danger" onclick="Marketing.deleteCampanha('${c.id}')">🗑</button>
         </div>
       </div>
     `;
@@ -466,7 +466,7 @@ const Marketing = (() => {
 
   function openCampanhaForm(id) {
     const c = id ? DB.get('marketing_campanhas', id) : null;
-    const STATUS_CAMP = ['planejada','ativa','pausada','concluÃ­da','cancelada'];
+    const STATUS_CAMP = ['planejada','ativa','pausada','concluída','cancelada'];
 
     const body = `
       <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:14px">
@@ -490,7 +490,7 @@ const Marketing = (() => {
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Data InÃ­cio</label>
+          <label class="form-label">Data Início</label>
           <input class="form-input" type="date" id="campInicio" value="${c?.dataInicio||''}">
         </div>
         <div class="form-group">
@@ -504,7 +504,7 @@ const Marketing = (() => {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">OrÃ§amento (R$)</label>
+          <label class="form-label">Orçamento (R$)</label>
           <input class="form-input" type="number" id="campOrc" value="${c?.orcamento||''}" placeholder="0">
         </div>
         <div class="form-group">
@@ -520,11 +520,11 @@ const Marketing = (() => {
           <input class="form-input" type="number" id="campAlcance" value="${c?.alcance||''}" placeholder="0">
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">DescriÃ§Ã£o</label>
+          <label class="form-label">Descrição</label>
           <textarea class="form-input" id="campDesc" rows="3">${Utils.escHtml(c?.descricao||'')}</textarea>
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">ObservaÃ§Ãµes</label>
+          <label class="form-label">Observações</label>
           <textarea class="form-input" id="campObs" rows="2">${Utils.escHtml(c?.observacoes||'')}</textarea>
         </div>
       </div>
@@ -571,19 +571,19 @@ const Marketing = (() => {
         <div style="display:flex;flex-direction:column;gap:14px">
           <div class="estrategia-section">
             <div class="estrategia-section-title">Objetivo</div>
-            <div class="estrategia-section-content">${Utils.escHtml(c.objetivo||'â€”')}</div>
+            <div class="estrategia-section-content">${Utils.escHtml(c.objetivo||'—')}</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div><span class="form-label">PerÃ­odo</span><div class="font-bold">${c.dataInicio?Utils.formatDate(c.dataInicio):'â€”'} Ã¢â€ â€™ ${c.dataFim?Utils.formatDate(c.dataFim):'â€”'}</div></div>
-            <div><span class="form-label">Status</span><div>${c.status||'â€”'}</div></div>
-            <div><span class="form-label">OrÃ§amento</span><div class="font-bold">${Utils.formatCurrency(c.orcamento||0)}</div></div>
+            <div><span class="form-label">Período</span><div class="font-bold">${c.dataInicio?Utils.formatDate(c.dataInicio):'—'} â†’ ${c.dataFim?Utils.formatDate(c.dataFim):'—'}</div></div>
+            <div><span class="form-label">Status</span><div>${c.status||'—'}</div></div>
+            <div><span class="form-label">Orçamento</span><div class="font-bold">${Utils.formatCurrency(c.orcamento||0)}</div></div>
             <div><span class="form-label">Gasto Real</span><div class="font-bold" style="color:${(c.gasto||0)>(c.orcamento||0)?'var(--danger)':'var(--success)'}">${Utils.formatCurrency(c.gasto||0)}</div></div>
             <div><span class="form-label">Leads Gerados</span><div class="font-bold">${c.leads||0}</div></div>
             <div><span class="form-label">Alcance Estimado</span><div class="font-bold">${(c.alcance||0).toLocaleString('pt-BR')}</div></div>
           </div>
-          <div><span class="form-label">Canais</span><div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${canais||'â€”'}</div></div>
-          ${c.descricao ? `<div class="estrategia-section"><div class="estrategia-section-title">DescriÃ§Ã£o</div><div class="estrategia-section-content">${Utils.escHtml(c.descricao)}</div></div>` : ''}
-          ${c.observacoes ? `<div class="estrategia-section"><div class="estrategia-section-title">ObservaÃ§Ãµes</div><div class="estrategia-section-content">${Utils.escHtml(c.observacoes)}</div></div>` : ''}
+          <div><span class="form-label">Canais</span><div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${canais||'—'}</div></div>
+          ${c.descricao ? `<div class="estrategia-section"><div class="estrategia-section-title">Descrição</div><div class="estrategia-section-content">${Utils.escHtml(c.descricao)}</div></div>` : ''}
+          ${c.observacoes ? `<div class="estrategia-section"><div class="estrategia-section-title">Observações</div><div class="estrategia-section-content">${Utils.escHtml(c.observacoes)}</div></div>` : ''}
         </div>
       `
     });
@@ -594,7 +594,7 @@ const Marketing = (() => {
     Confirm.show({
       title: 'Excluir campanha',
       msg: `Excluir "${c?.nome || 'esta campanha'}"?`,
-      onConfirm: () => { DB.remove('marketing_campanhas', id); Toast.success('Campanha excluÃ­da.'); _renderCampanhas(); }
+      onConfirm: () => { DB.remove('marketing_campanhas', id); Toast.success('Campanha excluída.'); _renderCampanhas(); }
     });
   }
 
@@ -611,7 +611,7 @@ const Marketing = (() => {
     if (_filtroIdeiaPilar) ideias = ideias.filter(i => i.pilar === _filtroIdeiaPilar);
     if (_filtroIdeiaPrior) ideias = ideias.filter(i => i.prioridade === _filtroIdeiaPrior);
 
-    // Ordenar: alta Ã¢â€ â€™ media Ã¢â€ â€™ baixa
+    // Ordenar: alta â†’ media â†’ baixa
     const priorOrd = { alta:0, media:1, baixa:2 };
     ideias = ideias.sort((a,b) => (priorOrd[a.prioridade]??3) - (priorOrd[b.prioridade]??3));
 
@@ -636,9 +636,9 @@ const Marketing = (() => {
 
       ${ideias.length === 0 ? `
         <div class="empty-state">
-          <div class="empty-icon">ðŸ’¡</div>
+          <div class="empty-icon">💡</div>
           <div class="empty-title">Banco de ideias vazio</div>
-          <div class="empty-sub">Registre suas ideias de conteÃºdo para nÃ£o perder nada.</div>
+          <div class="empty-sub">Registre suas ideias de conteúdo para não perder nada.</div>
         </div>
       ` : ideias.map(i => _renderIdeiaCard(i)).join('')}
     `;
@@ -646,24 +646,24 @@ const Marketing = (() => {
 
   function _renderIdeiaCard(i) {
     const cor = CANAL_COLORS[i.canal] || '#64748b';
-    const icon = CANAL_ICONS[i.canal] || 'ðŸ“¢';
-    const priorIcon = PRIOR_ICONS[i.prioridade] || 'âšª';
+    const icon = CANAL_ICONS[i.canal] || '📢';
+    const priorIcon = PRIOR_ICONS[i.prioridade] || '⚪';
     const borderCor = i.prioridade === 'alta' ? '#dc2626' : i.prioridade === 'media' ? '#d97706' : '#059669';
     return `
       <div class="ideia-card" style="border-left-color:${borderCor}">
         <div style="font-size:16px">${priorIcon}</div>
         <div style="flex:1">
-          <div style="font-size:13px;font-weight:600;color:var(--text)">${Utils.escHtml(Utils.truncate(i.titulo||'â€”',60))}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${Utils.escHtml(Utils.truncate(i.titulo||'—',60))}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${Utils.escHtml(i.pilar||'')}</div>
         </div>
         <div class="mkt-post-meta">
-          <span class="canal-badge" style="background:${cor}">${icon} ${Utils.escHtml(i.canal||'â€”')}</span>
+          <span class="canal-badge" style="background:${cor}">${icon} ${Utils.escHtml(i.canal||'—')}</span>
           ${i.formato ? `<span class="pilar-badge">${Utils.escHtml(i.formato)}</span>` : ''}
         </div>
         <div class="tbl-actions">
-          <button class="btn-icon" title="Editar" onclick="Marketing.openIdeiaForm('${i.id}')">Ã¢Å“Â</button>
-          <button class="btn-icon" title="Usar como post" onclick="Marketing.usarIdeia('${i.id}')">âž¡</button>
-          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deleteIdeia('${i.id}')">ðŸ—‘</button>
+          <button class="btn-icon" title="Editar" onclick="Marketing.openIdeiaForm('${i.id}')">âœ</button>
+          <button class="btn-icon" title="Usar como post" onclick="Marketing.usarIdeia('${i.id}')">➡</button>
+          <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deleteIdeia('${i.id}')">🗑</button>
         </div>
       </div>
     `;
@@ -678,11 +678,11 @@ const Marketing = (() => {
     const body = `
       <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:14px">
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">TÃ­tulo *</label>
-          <input class="form-input" id="ideiaTitle" value="${Utils.escHtml(ideia?.titulo||'')}" placeholder="Ex: VÃ­deo sobre proteÃ§Ã£o de mÃ¡quinas">
+          <label class="form-label">Título *</label>
+          <input class="form-input" id="ideiaTitle" value="${Utils.escHtml(ideia?.titulo||'')}" placeholder="Ex: Vídeo sobre proteção de máquinas">
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">DescriÃ§Ã£o</label>
+          <label class="form-label">Descrição</label>
           <textarea class="form-input" id="ideiaDesc" rows="3" placeholder="Detalhe a ideia...">${Utils.escHtml(ideia?.descricao||'')}</textarea>
         </div>
         <div class="form-group">
@@ -698,7 +698,7 @@ const Marketing = (() => {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Pilar de ConteÃºdo</label>
+          <label class="form-label">Pilar de Conteúdo</label>
           <select class="form-input" id="ideiaPilar">
             ${PILARES.map(p => `<option value="${p}"${ideia?.pilar===p?' selected':''}>${p}</option>`).join('')}
           </select>
@@ -714,7 +714,7 @@ const Marketing = (() => {
           <input class="form-input" id="ideiaTags" value="${Utils.escHtml(ideia?.tags||'')}" placeholder="tag1, tag2">
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label class="form-label">ObservaÃ§Ãµes</label>
+          <label class="form-label">Observações</label>
           <textarea class="form-input" id="ideiaObs" rows="2">${Utils.escHtml(ideia?.observacoes||'')}</textarea>
         </div>
       </div>
@@ -726,7 +726,7 @@ const Marketing = (() => {
       size: 'modal-lg',
       saveCb: () => {
         const titulo = document.getElementById('ideiaTitle')?.value.trim();
-        if (!titulo) { Toast.error('Informe o tÃ­tulo'); return; }
+        if (!titulo) { Toast.error('Informe o título'); return; }
         const data = {
           titulo,
           descricao:   document.getElementById('ideiaDesc')?.value,
@@ -777,7 +777,7 @@ const Marketing = (() => {
     Confirm.show({
       title: 'Excluir ideia',
       msg: `Excluir "${i?.titulo || 'esta ideia'}"?`,
-      onConfirm: () => { DB.remove('marketing_ideias', id); Toast.success('Ideia excluÃ­da.'); _renderIdeias(); }
+      onConfirm: () => { DB.remove('marketing_ideias', id); Toast.success('Ideia excluída.'); _renderIdeias(); }
     });
   }
 
@@ -785,11 +785,11 @@ const Marketing = (() => {
      TAB: KPIs
      ==================================================== */
   const KPI_METRICAS = {
-    'LinkedIn':              ['Seguidores','Posts publicados','Alcance mÃ©dio','Engajamento mÃ©dio (%)'],
+    'LinkedIn':              ['Seguidores','Posts publicados','Alcance médio','Engajamento médio (%)'],
     'Instagram':             ['Seguidores','Posts + Stories','Alcance','Engajamento (%)'],
-    'YouTube':               ['Inscritos','VÃ­deos publicados','VisualizaÃ§Ãµes totais'],
-    'Google Meu NegÃ³cio':    ['VisualizaÃ§Ãµes','Cliques no site','LigaÃ§Ãµes recebidas','AvaliaÃ§Ã£o (estrelas)'],
-    'Site/Blog':             ['SessÃµes','UsuÃ¡rios Ãºnicos','Pageviews','Leads gerados'],
+    'YouTube':               ['Inscritos','Vídeos publicados','Visualizações totais'],
+    'Google Meu Negócio':    ['Visualizações','Cliques no site','Ligações recebidas','Avaliação (estrelas)'],
+    'Site/Blog':             ['Sessões','Usuários únicos','Pageviews','Leads gerados'],
   };
 
   function _renderKpis() {
@@ -800,10 +800,10 @@ const Marketing = (() => {
     const mesKpi = kpis.find(k => k.mes === _kpiMes && k.tipo !== 'estrategia') || {};
 
     const [ano, mesN] = _kpiMes.split('-').map(Number);
-    const mesNomes = ['Janeiro','Fevereiro','MarÃ§o','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const mesNomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
     const mesNome = mesNomes[(mesN||1)-1] + ' ' + ano;
 
-    // Calcular leads totais do mÃªs
+    // Calcular leads totais do mês
     const leadsTotal = CANAIS.reduce((acc, canal) => {
       const cData = mesKpi[canal] || {};
       if (canal === 'Site/Blog' && cData['Leads gerados']) return acc + parseInt(cData['Leads gerados']||0);
@@ -811,11 +811,11 @@ const Marketing = (() => {
     }, 0);
 
     el.innerHTML = `
-      <!-- Seletor de mÃªs -->
+      <!-- Seletor de mês -->
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
-        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesAnterior()">Ã¢â€ Â MÃªs anterior</button>
+        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesAnterior()">â† Mês anterior</button>
         <span style="font-size:15px;font-weight:700;color:var(--text)">${mesNome}</span>
-        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesPosterior()">PrÃ³ximo mÃªs Ã¢â€ â€™</button>
+        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesPosterior()">Próximo mês â†’</button>
         <div style="flex:1"></div>
         ${leadsTotal > 0 ? `<div class="kpi-card" style="padding:8px 16px"><span style="font-size:13px;color:var(--text-muted)">Leads totais: </span><strong style="color:var(--success)">${leadsTotal}</strong></div>` : ''}
       </div>
@@ -827,7 +827,7 @@ const Marketing = (() => {
   }
 
   function _renderKpiCanalCard(canal, dados, mes) {
-    const icon = CANAL_ICONS[canal] || 'ðŸ“Š';
+    const icon = CANAL_ICONS[canal] || '📊';
     const cor  = CANAL_COLORS[canal] || '#64748b';
     const metricas = KPI_METRICAS[canal] || [];
 
@@ -838,12 +838,12 @@ const Marketing = (() => {
             <span style="font-size:22px">${icon}</span>
             <span style="font-size:13px;font-weight:700;color:${cor}">${canal}</span>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="Marketing.editKpi('${mes}','${canal}')">Ã¢Å“Â Editar</button>
+          <button class="btn btn-ghost btn-sm" onclick="Marketing.editKpi('${mes}','${canal}')">âœ Editar</button>
         </div>
         ${metricas.map(m => `
           <div class="kpi-canal-metric">
             <span class="kpi-canal-metric-label">${m}</span>
-            <span class="kpi-canal-metric-value">${dados[m] !== undefined ? Number(dados[m]).toLocaleString('pt-BR') : '<span style="color:var(--text-muted);font-size:13px">â€”</span>'}</span>
+            <span class="kpi-canal-metric-value">${dados[m] !== undefined ? Number(dados[m]).toLocaleString('pt-BR') : '<span style="color:var(--text-muted);font-size:13px">—</span>'}</span>
           </div>
         `).join('')}
       </div>
@@ -871,7 +871,7 @@ const Marketing = (() => {
     const metricas = KPI_METRICAS[canal] || [];
 
     const body = `
-      <div style="margin-bottom:8px;font-size:13px;color:var(--text-muted)">Canal: <strong style="color:${CANAL_COLORS[canal]}">${CANAL_ICONS[canal]} ${canal}</strong> â€” MÃªs: <strong>${mes}</strong></div>
+      <div style="margin-bottom:8px;font-size:13px;color:var(--text-muted)">Canal: <strong style="color:${CANAL_COLORS[canal]}">${CANAL_ICONS[canal]} ${canal}</strong> — Mês: <strong>${mes}</strong></div>
       <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
         ${metricas.map(m => `
           <div class="form-group">
@@ -883,7 +883,7 @@ const Marketing = (() => {
     `;
 
     Modal.open({
-      title: `KPIs â€” ${canal}`,
+      title: `KPIs — ${canal}`,
       body,
       saveCb: () => {
         const novosDados = {};
@@ -905,9 +905,9 @@ const Marketing = (() => {
   }
 
   /* ====================================================
-     TAB: ESTRATÃ‰GIA
+     TAB: ESTRATÉGIA
      ==================================================== */
-  const FREQ_OPCOES = ['diÃ¡ria','3-4x semana','semanal','quinzenal','mensal'];
+  const FREQ_OPCOES = ['diária','3-4x semana','semanal','quinzenal','mensal'];
 
   function _renderEstrategia() {
     const el = document.getElementById('mktContent');
@@ -925,8 +925,8 @@ const Marketing = (() => {
         <!-- Persona -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ‘¤ Persona Principal</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('persona')">Ã¢Å“Â Editar</button>
+            <div class="estrategia-section-title">👤 Persona Principal</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('persona')">âœ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.persona || 'Clique em Editar para definir a persona principal da Bikows.')}</div>
         </div>
@@ -934,66 +934,66 @@ const Marketing = (() => {
         <!-- Proposta de Valor -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ’Ž Proposta de Valor</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('proposta')">Ã¢Å“Â Editar</button>
+            <div class="estrategia-section-title">💎 Proposta de Valor</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('proposta')">âœ Editar</button>
           </div>
-          <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.proposta || 'Descreva o que torna a Bikows Ãºnica no mercado.')}</div>
+          <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.proposta || 'Descreva o que torna a Bikows única no mercado.')}</div>
         </div>
 
         <!-- Tom de Voz -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ—£ Tom de Voz</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('tom')">Ã¢Å“Â Editar</button>
+            <div class="estrategia-section-title">🗣 Tom de Voz</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('tom')">âœ Editar</button>
           </div>
-          <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.tom || 'Defina como a Bikows se comunica: tÃ©cnico mas acessÃ­vel, confiante...')}</div>
+          <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.tom || 'Defina como a Bikows se comunica: técnico mas acessível, confiante...')}</div>
         </div>
 
         <!-- Objetivos -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸŽ¯ Objetivos de Marketing</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('objetivos')">Ã¢Å“Â Editar</button>
+            <div class="estrategia-section-title">🎯 Objetivos de Marketing</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('objetivos')">âœ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.objetivos || 'Liste os principais objetivos de marketing da empresa.')}</div>
         </div>
 
-        <!-- ConcorrÃªncia -->
+        <!-- Concorrência -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">Ã¢Å¡â€ ConcorrÃªncia</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('concorrencia')">Ã¢Å“Â Editar</button>
+            <div class="estrategia-section-title">âš” Concorrência</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('concorrencia')">âœ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.concorrencia || 'Liste principais concorrentes e diferenciais competitivos.')}</div>
         </div>
 
-        <!-- Pilares de ConteÃºdo -->
+        <!-- Pilares de Conteúdo -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ» Pilares de ConteÃºdo</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('pilares')">Ã¢Å“Â Editar</button>
+            <div class="estrategia-section-title">🏻 Pilares de Conteúdo</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('pilares')">âœ Editar</button>
           </div>
           <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
             ${PILARES.map(p => `
               <div style="padding:10px;background:var(--bg);border-radius:8px">
                 <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:4px">${p}</div>
-                <div style="font-size:12px;color:var(--text-secondary)">${Utils.escHtml(pilaresTxt[p] || 'Sem descriÃ§Ã£o ainda.')}</div>
+                <div style="font-size:12px;color:var(--text-secondary)">${Utils.escHtml(pilaresTxt[p] || 'Sem descrição ainda.')}</div>
               </div>
             `).join('')}
           </div>
         </div>
 
-        <!-- FrequÃªncia por Canal -->
+        <!-- Frequência por Canal -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">ðŸ“† FrequÃªncia por Canal</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('frequencia')">Ã¢Å“Â Editar</button>
+            <div class="estrategia-section-title">📆 Frequência por Canal</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('frequencia')">âœ Editar</button>
           </div>
           <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
             ${CANAIS.map(canal => `
               <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg);border-radius:8px">
                 <span style="font-size:13px">${CANAL_ICONS[canal]} <strong>${canal}</strong></span>
-                <span class="pilar-badge">${freq[canal] || 'nÃ£o definida'}</span>
+                <span class="pilar-badge">${freq[canal] || 'não definida'}</span>
               </div>
             `).join('')}
           </div>
@@ -1012,10 +1012,10 @@ const Marketing = (() => {
 
     if (campo === 'persona') {
       title = 'Persona Principal';
-      body = `<div class="form-group"><label class="form-label">DescriÃ§Ã£o da persona ideal</label><textarea class="form-input" id="estCampo" rows="6" placeholder="Quem Ã© o cliente ideal da Bikows? Cargo, setor, dores, objetivos...">${Utils.escHtml(est.persona||'')}</textarea></div>`;
+      body = `<div class="form-group"><label class="form-label">Descrição da persona ideal</label><textarea class="form-input" id="estCampo" rows="6" placeholder="Quem é o cliente ideal da Bikows? Cargo, setor, dores, objetivos...">${Utils.escHtml(est.persona||'')}</textarea></div>`;
     } else if (campo === 'proposta') {
       title = 'Proposta de Valor';
-      body = `<div class="form-group"><label class="form-label">O que torna a Bikows Ãºnica</label><textarea class="form-input" id="estCampo" rows="6">${Utils.escHtml(est.proposta||'')}</textarea></div>`;
+      body = `<div class="form-group"><label class="form-label">O que torna a Bikows única</label><textarea class="form-input" id="estCampo" rows="6">${Utils.escHtml(est.proposta||'')}</textarea></div>`;
     } else if (campo === 'tom') {
       title = 'Tom de Voz';
       body = `<div class="form-group"><label class="form-label">Como a Bikows se comunica</label><textarea class="form-input" id="estCampo" rows="6">${Utils.escHtml(est.tom||'')}</textarea></div>`;
@@ -1023,26 +1023,26 @@ const Marketing = (() => {
       title = 'Objetivos de Marketing';
       body = `<div class="form-group"><label class="form-label">Principais objetivos</label><textarea class="form-input" id="estCampo" rows="6">${Utils.escHtml(est.objetivos||'')}</textarea></div>`;
     } else if (campo === 'concorrencia') {
-      title = 'ConcorrÃªncia';
+      title = 'Concorrência';
       body = `<div class="form-group"><label class="form-label">Concorrentes e diferenciais</label><textarea class="form-input" id="estCampo" rows="6">${Utils.escHtml(est.concorrencia||'')}</textarea></div>`;
     } else if (campo === 'pilares') {
-      title = 'Pilares de ConteÃºdo';
+      title = 'Pilares de Conteúdo';
       body = `<div class="form-grid" style="grid-template-columns:1fr;gap:12px">
         ${PILARES.map(p => `
           <div class="form-group">
             <label class="form-label">${p}</label>
-            <textarea class="form-input" id="pilar_${p.replace(/[^a-zA-Z0-9]/g,'_')}" rows="2" placeholder="Por que publicamos conteÃºdo sobre ${p}?">${Utils.escHtml((est.pilares||{})[p]||'')}</textarea>
+            <textarea class="form-input" id="pilar_${p.replace(/[^a-zA-Z0-9]/g,'_')}" rows="2" placeholder="Por que publicamos conteúdo sobre ${p}?">${Utils.escHtml((est.pilares||{})[p]||'')}</textarea>
           </div>
         `).join('')}
       </div>`;
     } else if (campo === 'frequencia') {
-      title = 'FrequÃªncia por Canal';
+      title = 'Frequência por Canal';
       body = `<div class="form-grid" style="grid-template-columns:1fr;gap:10px">
         ${CANAIS.map(canal => `
           <div class="form-group">
             <label class="form-label">${CANAL_ICONS[canal]} ${canal}</label>
             <select class="form-input" id="freq_${canal.replace(/[^a-zA-Z0-9]/g,'_')}">
-              <option value="">NÃ£o definida</option>
+              <option value="">Não definida</option>
               ${FREQ_OPCOES.map(f => `<option value="${f}"${(est.frequencia||{})[canal]===f?' selected':''}>${f}</option>`).join('')}
             </select>
           </div>
@@ -1077,7 +1077,7 @@ const Marketing = (() => {
         } else {
           DB.create('marketing_kpis', { tipo: 'estrategia', ...updates });
         }
-        Toast.success('EstratÃ©gia atualizada!');
+        Toast.success('Estratégia atualizada!');
         Modal.close();
         _renderEstrategia();
       }
@@ -1085,7 +1085,7 @@ const Marketing = (() => {
   }
 
   /* ====================================================
-     addNew â€” dispatcher por tab
+     addNew — dispatcher por tab
      ==================================================== */
   function addNew() {
     if (_tab === 'calendario') openPostForm();
@@ -1094,7 +1094,7 @@ const Marketing = (() => {
     else openPostForm();
   }
 
-  /* ---- ExpÃµe funÃ§Ãµes para o HTML ---- */
+  /* ---- Expõe funções para o HTML ---- */
   return {
     render, addNew,
     _setTab,

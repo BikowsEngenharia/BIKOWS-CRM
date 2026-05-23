@@ -961,5 +961,5 @@ const Contratos = (() => {
     Toast.success(`Lead de renovação criado para "${clienteNome}"`);
   }
 
-  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo, drillDown, criarDePropostal, _calcDataFimFromPrazo, exportarPDF, criarLeadRenovacaoLaudo, criarLeadRenovacaoContrato, getContratosVencendo, getLaudosVencendo };
+  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo, drillDown, criarDePropostal, _calcDataFimFromPrazo, exportarPDF, criarLeadRenovacaoLaudo, criarLeadRenovacaoContrato, getContratosVencendo, getLaudosVencendo, abrirAssinatura, _limparCanvas, _confirmarAssinatura };
 })();

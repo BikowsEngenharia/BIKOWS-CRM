@@ -208,7 +208,324 @@ const Projetos = (() => {
     });
   }
 
-  function view(id) {
+  /* ====================================================
+     CHECKLIST TEMPLATES (Melhoria 3)
+     ==================================================== */
+  const _CHECKLIST_TEMPLATES = {
+    'NR-12': [
+      'Inventário de máquinas e equipamentos',
+      'Análise de risco das máquinas',
+      'Laudo técnico NR-12',
+      'Relatório fotográfico antes/depois',
+      'Memorial descritivo das adequações',
+      'Planilha de conformidades/não-conformidades',
+      'ART registrada no CREA',
+      'Treinamento dos operadores documentado',
+      'Assinatura do responsável técnico',
+    ],
+    'NR-35': [
+      'Análise de risco para trabalho em altura',
+      'Plano de resgate documentado',
+      'Inspeção dos EPIs (cadeirinha, trava-quedas, capacete)',
+      'Laudo técnico NR-35',
+      'Relatório fotográfico do local',
+      'ART registrada no CREA',
+      'Lista de presença do treinamento',
+      'Certificados de treinamento dos trabalhadores',
+    ],
+    'NR-33': [
+      'Identificação e classificação dos espaços confinados',
+      'Análise de risco e PTE (Permissão de Trabalho em Espaço Confinado)',
+      'Procedimento de entrada e saída',
+      'Inspeção dos equipamentos de medição de gases',
+      'Laudo técnico NR-33',
+      'Relatório fotográfico',
+      'ART registrada no CREA',
+      'Treinamento da equipe documentado',
+      'Plano de resgate aprovado',
+    ],
+    'Linha de Vida': [
+      'Projeto executivo da linha de vida',
+      'Memória de cálculo estrutural',
+      'Especificação dos materiais (cabo, conectores, ancoragem)',
+      'Laudo de resistência estrutural',
+      'Relatório fotográfico da instalação',
+      'Teste de carga documentado',
+      'Manual de uso e manutenção',
+      'ART registrada no CREA',
+      'Certificado do fabricante do sistema',
+    ],
+    'Laudo Técnico Padrão': [
+      'Vistoria técnica realizada',
+      'Coleta de dados e medições',
+      'Relatório fotográfico',
+      'Análise e conclusão técnica',
+      'Laudo técnico redigido e revisado',
+      'ART registrada no CREA',
+      'Assinatura digital do responsável técnico',
+      'Entrega ao cliente com protocolo',
+    ],
+  };
+
+  function aplicarTemplateChecklist(tipo) {
+    const container = document.getElementById('fpChecklist');
+    if (!container) return;
+    const itens = _CHECKLIST_TEMPLATES[tipo];
+    if (!itens) return;
+    container.innerHTML = itens.map(texto => `
+      <div class="checklist-item" style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">
+        <input type="checkbox" style="flex-shrink:0">
+        <input class="form-control" style="flex:1;padding:4px 8px;height:auto" value="${Utils.escHtml(texto)}" placeholder="Item do checklist">
+        <button type="button" class="btn btn-xs btn-danger" onclick="this.closest('.checklist-item').remove()">✕</button>
+      </div>`).join('');
+    Toast.success(`Template "${tipo}" aplicado — ${itens.length} itens carregados.`);
+  }
+
+  /* ====================================================
+     TIMESHEET — Banco de Horas (Melhoria 2)
+     ==================================================== */
+  function _renderTimesheetTab(projetoId) {
+    const p = DB.get('projetos', projetoId);
+    if (!p) return;
+    const cfg = DB.getConfig();
+    const funcionarios = DB.getAll('funcionarios');
+    const lancamentos = DB.getAll('timesheet').filter(t => t.projetoId === projetoId);
+    const totalHoras = lancamentos.reduce((s, t) => s + (t.horas || 0), 0);
+    const totalCusto = lancamentos.reduce((s, t) => s + ((t.horas || 0) * (t.custoHora || 0)), 0);
+    const custoVsValor = p.valor > 0 ? Math.round((totalCusto / p.valor) * 100) : 0;
+
+    const respOpts = [...cfg.responsaveis, ...funcionarios.map(f => f.nome)].filter(Boolean)
+      .map(r => `<option value="${Utils.escHtml(r)}">${Utils.escHtml(r)}</option>`).join('');
+
+    const el = document.getElementById('viewProjetoTabContent');
+    if (!el) return;
+    el.innerHTML = `
+      <!-- KPIs Timesheet -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+        <div style="background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center;border-left:3px solid var(--primary)">
+          <div class="text-xs text-muted">Total de Horas</div>
+          <div class="font-bold" style="font-size:22px;color:var(--primary)">${totalHoras.toFixed(1)}h</div>
+        </div>
+        <div style="background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center;border-left:3px solid #ef4444">
+          <div class="text-xs text-muted">Custo Total Mão de Obra</div>
+          <div class="font-bold" style="font-size:18px;color:#ef4444">${Utils.formatCurrency(totalCusto)}</div>
+        </div>
+        <div style="background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center;border-left:3px solid ${custoVsValor > 60 ? '#ef4444' : custoVsValor > 30 ? '#f59e0b' : '#10b981'}">
+          <div class="text-xs text-muted">Custo MO / Valor Projeto</div>
+          <div class="font-bold" style="font-size:18px;color:${custoVsValor > 60 ? '#ef4444' : custoVsValor > 30 ? '#f59e0b' : '#10b981'}">${custoVsValor}%</div>
+        </div>
+      </div>
+
+      <!-- Formulário Lançar Horas -->
+      <div style="background:var(--bg);border-radius:var(--radius);padding:14px;margin-bottom:16px;border:1px solid var(--border)">
+        <div class="font-bold text-sm mb-3">+ Lançar Horas</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 2fr auto;gap:8px;align-items:end">
+          <div>
+            <div class="text-xs text-muted mb-1">Funcionário / Responsável</div>
+            <select class="form-control" id="tsFunc" style="height:34px;padding:4px 8px">
+              <option value="">—</option>${respOpts}
+            </select>
+          </div>
+          <div>
+            <div class="text-xs text-muted mb-1">Data</div>
+            <input class="form-control" id="tsData" type="date" value="${Utils.todayStr()}" style="height:34px;padding:4px 8px">
+          </div>
+          <div>
+            <div class="text-xs text-muted mb-1">Horas</div>
+            <input class="form-control" id="tsHoras" type="number" min="0.5" step="0.5" placeholder="Ex: 4" style="height:34px;padding:4px 8px">
+          </div>
+          <div>
+            <div class="text-xs text-muted mb-1">Custo/h (R$)</div>
+            <input class="form-control" id="tsCusto" type="number" step="0.01" placeholder="Ex: 120" style="height:34px;padding:4px 8px">
+          </div>
+          <div>
+            <div class="text-xs text-muted mb-1">Descrição</div>
+            <input class="form-control" id="tsDesc" placeholder="Ex: Levantamento de campo" style="height:34px;padding:4px 8px">
+          </div>
+          <button class="btn btn-primary" onclick="Projetos.salvarTimesheet('${projetoId}')" style="height:34px;white-space:nowrap">+ Lançar</button>
+        </div>
+      </div>
+
+      <!-- Listagem de lançamentos -->
+      ${lancamentos.length === 0 ? `<div class="text-muted text-sm" style="text-align:center;padding:32px">Nenhuma hora lançada. Use o formulário acima para registrar as horas trabalhadas.</div>` : `
+      <table class="tbl">
+        <thead><tr><th>Data</th><th>Funcionário</th><th>Horas</th><th>Custo/h</th><th>Custo Total</th><th>Descrição</th><th></th></tr></thead>
+        <tbody>
+          ${lancamentos.sort((a,b) => (b.data||'').localeCompare(a.data||'')).map(t => `
+            <tr>
+              <td class="text-sm">${Utils.formatDate(t.data)}</td>
+              <td class="text-sm">${Utils.escHtml(t.funcionarioNome||'—')}</td>
+              <td class="font-bold">${(t.horas||0).toFixed(1)}h</td>
+              <td class="text-sm text-muted">${t.custoHora ? Utils.formatCurrency(t.custoHora) : '—'}</td>
+              <td class="font-bold" style="color:#ef4444">${t.custoHora ? Utils.formatCurrency((t.horas||0)*(t.custoHora||0)) : '—'}</td>
+              <td class="text-sm text-muted">${Utils.escHtml(t.descricao||'')}</td>
+              <td><button class="btn btn-xs btn-danger" onclick="Projetos.removerTimesheet('${projetoId}','${t.id}')">🗑</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`}
+    `;
+  }
+
+  function salvarTimesheet(projetoId) {
+    const funcionarioNome = document.getElementById('tsFunc')?.value.trim();
+    const data = document.getElementById('tsData')?.value;
+    const horas = Number(document.getElementById('tsHoras')?.value) || 0;
+    const custoHora = Number(document.getElementById('tsCusto')?.value) || 0;
+    const descricao = document.getElementById('tsDesc')?.value.trim() || '';
+    if (!data || horas <= 0) { Toast.error('Data e horas são obrigatórios'); return; }
+    DB.create('timesheet', { projetoId, funcionarioNome, data, horas, custoHora, descricao });
+    Toast.success(`${horas}h lançada(s) com sucesso!`);
+    _renderTimesheetTab(projetoId);
+  }
+
+  function removerTimesheet(projetoId, tsId) {
+    Confirm.show('Remover lançamento', 'Tem certeza que deseja remover este lançamento de horas?', () => {
+      DB.remove('timesheet', tsId);
+      Toast.success('Lançamento removido');
+      _renderTimesheetTab(projetoId);
+    });
+  }
+
+  /* ====================================================
+     ARTs — Aba dedicada (Melhoria 4)
+     ==================================================== */
+  function _renderArtsTab(projetoId) {
+    const p = DB.get('projetos', projetoId);
+    if (!p) return;
+    const arts = DB.getAll('arts').filter(a => a.projetoId === projetoId);
+    const artStatusLabel = { pendente:'⏳ Pendente', registrada:'✅ Registrada', baixada:'🏁 Baixada', cancelada:'❌ Cancelada' };
+    const artStatusColor = { pendente:'#f59e0b', registrada:'#10b981', baixada:'#3b82f6', cancelada:'#ef4444' };
+
+    const el = document.getElementById('viewProjetoTabContent');
+    if (!el) return;
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="font-bold text-sm">📜 ARTs — Anotações de Responsabilidade Técnica</div>
+        <button class="btn btn-primary btn-sm" onclick="Projetos.abrirFormART('${projetoId}')">+ Nova ART</button>
+      </div>
+      ${arts.length === 0 ? `
+        <div style="text-align:center;padding:32px;color:var(--text-muted)">
+          ${p.status === 'em_andamento' ? '<div style="color:#ef4444;font-weight:600;margin-bottom:8px">⚠ Projeto em andamento sem ART registrada!</div>' : ''}
+          <div class="text-sm">Nenhuma ART cadastrada. Clique em "+ Nova ART" para adicionar.</div>
+        </div>` : `
+      <table class="tbl">
+        <thead><tr><th>Número</th><th>Tipo</th><th>Data Emissão</th><th>Responsável</th><th>Valor</th><th>Status</th><th>Obs</th><th>Ações</th></tr></thead>
+        <tbody>
+          ${arts.map(a => `
+            <tr>
+              <td class="font-bold text-sm" style="color:var(--primary)">${Utils.escHtml(a.numero||'—')}</td>
+              <td class="text-sm">${Utils.escHtml(a.tipo||'—')}</td>
+              <td class="text-sm">${Utils.formatDate(a.dataEmissao)}</td>
+              <td class="text-sm">${Utils.escHtml(a.responsavel||'—')}</td>
+              <td class="text-sm">${a.valor ? Utils.formatCurrency(a.valor) : '—'}</td>
+              <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:${artStatusColor[a.status]||'#94a3b8'}20;color:${artStatusColor[a.status]||'#94a3b8'};border:1px solid ${artStatusColor[a.status]||'#94a3b8'}44">${artStatusLabel[a.status]||a.status}</span></td>
+              <td class="text-xs text-muted" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escHtml(a.observacao||'')}">${Utils.escHtml(a.observacao||'—')}</td>
+              <td>
+                <div class="tbl-actions">
+                  ${a.link ? `<a href="${Utils.escHtml(a.link)}" target="_blank" class="btn btn-xs btn-secondary" title="Abrir link">🔗</a>` : ''}
+                  <button class="btn btn-xs btn-secondary" onclick="Projetos.abrirFormART('${projetoId}','${a.id}')">✏</button>
+                  <button class="btn btn-xs btn-danger" onclick="Projetos.removerART('${projetoId}','${a.id}')">🗑</button>
+                </div>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`}
+    `;
+  }
+
+  function abrirFormART(projetoId, artId = null) {
+    const art = artId ? DB.get('arts', artId) : null;
+    const cfg = DB.getConfig();
+    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${art?.responsavel===r?'selected':''}>${r}</option>`).join('');
+
+    Modal.open({
+      title: artId ? 'Editar ART' : 'Nova ART',
+      size: 'modal-md',
+      body: `
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label class="form-label">Número da ART *</label>
+            <input class="form-control" id="artNumero" value="${Utils.escHtml(art?.numero||'')}" placeholder="Ex: 2026000123456">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo de Serviço</label>
+            <input class="form-control" id="artTipo" value="${Utils.escHtml(art?.tipo||'')}" placeholder="Ex: NR-12, Projeto Elétrico...">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data de Emissão</label>
+            <input class="form-control" id="artDataEmissao" type="date" value="${art?.dataEmissao||''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Engenheiro Responsável</label>
+            <select class="form-control" id="artResponsavel">
+              <option value="">—</option>${respOpts}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select class="form-control" id="artStatus">
+              ${[['pendente','⏳ Pendente'],['registrada','✅ Registrada'],['baixada','🏁 Baixada'],['cancelada','❌ Cancelada']]
+                .map(([v,l]) => `<option value="${v}" ${(art?.status||'pendente')===v?'selected':''}>${l}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Valor da ART (R$)</label>
+            <input class="form-control" id="artValor" type="number" step="0.01" value="${art?.valor||''}" placeholder="0,00">
+          </div>
+          <div class="form-group" style="flex:3">
+            <label class="form-label">Link / Arquivo (URL)</label>
+            <input class="form-control" id="artLink" value="${Utils.escHtml(art?.link||'')}" placeholder="https://...">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Observações</label>
+          <textarea class="form-control" id="artObs" rows="2">${Utils.escHtml(art?.observacao||'')}</textarea>
+        </div>
+      `,
+      saveCb: () => {
+        const numero = document.getElementById('artNumero').value.trim();
+        if (!numero) { Toast.error('Número da ART é obrigatório'); return; }
+        const data = {
+          projetoId,
+          numero,
+          tipo: document.getElementById('artTipo').value.trim(),
+          dataEmissao: document.getElementById('artDataEmissao').value,
+          responsavel: document.getElementById('artResponsavel').value,
+          status: document.getElementById('artStatus').value,
+          valor: Number(document.getElementById('artValor').value) || 0,
+          link: document.getElementById('artLink').value.trim(),
+          observacao: document.getElementById('artObs').value.trim(),
+        };
+        if (artId) {
+          DB.update('arts', artId, data);
+          Toast.success('ART atualizada!');
+        } else {
+          DB.create('arts', data);
+          Toast.success('ART cadastrada!');
+        }
+        // Reabrir view do projeto na aba ARTs
+        setTimeout(() => { view(projetoId, 'arts'); }, 300);
+      },
+    });
+  }
+
+  function removerART(projetoId, artId) {
+    const a = DB.get('arts', artId);
+    Confirm.show('Remover ART', `Remover ART ${a?.numero || ''}?`, () => {
+      DB.remove('arts', artId);
+      Toast.success('ART removida');
+      _renderArtsTab(projetoId);
+    });
+  }
+
+  /* ====================================================
+     VIEW COM ABAS (Melhoria 2, 3, 4)
+     ==================================================== */
+  function view(id, abaInicial = 'overview') {
     const p = DB.get('projetos', id);
     if (!p) return;
     const etapas = p.etapas || [];
@@ -216,10 +533,11 @@ const Projetos = (() => {
     const rent = _calcRentabilidade(p);
     const margemColor = rent.margemPct >= 40 ? 'var(--success)' : rent.margemPct >= 20 ? 'var(--warning)' : rent.custoTotal > 0 ? 'var(--danger)' : 'var(--text-muted)';
 
-    // ART display
-    const art = p.art || {};
+    // ART display (inline, aba overview)
+    const artInline = p.art || {};
     const artStatusLabel = { pendente:'⏳ Pendente', registrada:'✅ Registrada', baixada:'🏁 Baixada', cancelada:'❌ Cancelada' };
-    const artColor = art.numero ? (art.status === 'registrada' || art.status === 'baixada' ? '#10b981' : '#f59e0b') : (p.status === 'em_andamento' ? '#ef4444' : '#94a3b8');
+    const artsEntity = DB.getAll('arts').filter(a => a.projetoId === id);
+    const artColor = artsEntity.length > 0 ? '#10b981' : (artInline.numero ? '#f59e0b' : (p.status === 'em_andamento' ? '#ef4444' : '#94a3b8'));
 
     // Checklist
     const checklist = p.checklist || [];
@@ -229,19 +547,89 @@ const Projetos = (() => {
     // NPS stars
     const npsStars = p.npsCliente ? '⭐'.repeat(p.npsCliente) + ` (${p.npsCliente}/5)` : '—';
 
+    // Timesheet summary
+    const tsLancamentos = DB.getAll('timesheet').filter(t => t.projetoId === id);
+    const tsHoras = tsLancamentos.reduce((s, t) => s + (t.horas || 0), 0);
+
+    function tabStyle(key) {
+      const active = key === abaInicial;
+      return `style="padding:8px 16px;border:none;border-bottom:2px solid ${active ? 'var(--primary)' : 'transparent'};background:transparent;font-weight:${active ? '700' : '400'};color:${active ? 'var(--primary)' : 'var(--text-muted)'};cursor:pointer;font-size:13px"`;
+    }
+
     Modal.open({
       title: p.titulo,
       size: 'modal-lg',
+      saveLabel: null,
       body: `
         <!-- CABEÇALHO: OS + badges principais -->
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
           ${p.ordemServico ? `<span style="background:var(--primary);color:#fff;font-weight:700;font-size:13px;padding:4px 12px;border-radius:99px">${Utils.escHtml(p.ordemServico)}</span>` : ''}
           ${p.codigo ? `<span style="background:var(--bg);color:var(--text-muted);font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--border)">${Utils.escHtml(p.codigo)}</span>` : ''}
           ${Utils.projBadge(p.status)}
           ${p.nfEmitida ? '<span class="badge badge-green text-xs">NF Emitida</span>' : '<span class="badge badge-gray text-xs">Sem NF</span>'}
           ${p.npsCliente ? `<span title="NPS do Cliente" style="font-size:13px">${npsStars}</span>` : ''}
+          ${artsEntity.length === 0 && !artInline.numero && p.status === 'em_andamento' ? '<span style="background:#fef2f2;color:#ef4444;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;border:1px solid #ef444440">⚠ SEM ART</span>' : ''}
         </div>
 
+        <!-- TABS -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px">
+          <button ${tabStyle('overview')} onclick="Projetos._switchViewTab('${id}','overview')">📋 Overview</button>
+          <button ${tabStyle('horas')} onclick="Projetos._switchViewTab('${id}','horas')">⏱ Horas ${tsHoras > 0 ? `<span style="background:var(--primary);color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${tsHoras.toFixed(0)}h</span>` : ''}</button>
+          <button ${tabStyle('arts')} onclick="Projetos._switchViewTab('${id}','arts')">📜 ARTs ${artsEntity.length > 0 ? `<span style="background:#10b981;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${artsEntity.length}</span>` : ''}</button>
+        </div>
+
+        <div id="viewProjetoTabContent">
+          ${_buildOverviewTab(id, p, etapas, pct, rent, margemColor, artInline, artColor, artStatusLabel, checklist, checkDone, checkPct)}
+        </div>
+
+        <div class="mt-4 flex gap-2" style="border-top:1px solid var(--border);padding-top:12px">
+          <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="Modal.close();ProjetoFinanceiro.open('${id}')">💰 Financeiro</button>
+          <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
+        </div>
+      `,
+    });
+
+    // Se abaInicial não é 'overview', renderiza a aba correta
+    if (abaInicial === 'horas') setTimeout(() => _renderTimesheetTab(id), 50);
+    if (abaInicial === 'arts') setTimeout(() => _renderArtsTab(id), 50);
+  }
+
+  function _switchViewTab(projetoId, aba) {
+    // Atualiza estilos dos botões de aba
+    const tabContainer = document.querySelector('#viewProjetoTabContent')?.previousElementSibling;
+    if (tabContainer) {
+      tabContainer.querySelectorAll('button').forEach(btn => {
+        const isActive = btn.getAttribute('onclick')?.includes(`'${aba}'`);
+        btn.style.borderBottom = isActive ? '2px solid var(--primary)' : '2px solid transparent';
+        btn.style.fontWeight = isActive ? '700' : '400';
+        btn.style.color = isActive ? 'var(--primary)' : 'var(--text-muted)';
+      });
+    }
+    if (aba === 'overview') {
+      const p = DB.get('projetos', projetoId);
+      const etapas = p?.etapas || [];
+      const pct = etapas.length ? Math.round(etapas.reduce((s,e)=>s+(e.pct||0),0)/etapas.length) : 0;
+      const rent = _calcRentabilidade(p);
+      const margemColor = rent.margemPct >= 40 ? 'var(--success)' : rent.margemPct >= 20 ? 'var(--warning)' : rent.custoTotal > 0 ? 'var(--danger)' : 'var(--text-muted)';
+      const artInline = p?.art || {};
+      const artStatusLabel = { pendente:'⏳ Pendente', registrada:'✅ Registrada', baixada:'🏁 Baixada', cancelada:'❌ Cancelada' };
+      const artsEntity = DB.getAll('arts').filter(a => a.projetoId === projetoId);
+      const artColor = artsEntity.length > 0 ? '#10b981' : (artInline.numero ? '#f59e0b' : (p?.status === 'em_andamento' ? '#ef4444' : '#94a3b8'));
+      const checklist = p?.checklist || [];
+      const checkDone = checklist.filter(c => c.concluido).length;
+      const checkPct = checklist.length ? Math.round(checkDone / checklist.length * 100) : null;
+      const el = document.getElementById('viewProjetoTabContent');
+      if (el) el.innerHTML = _buildOverviewTab(projetoId, p, etapas, pct, rent, margemColor, artInline, artColor, artStatusLabel, checklist, checkDone, checkPct);
+    } else if (aba === 'horas') {
+      _renderTimesheetTab(projetoId);
+    } else if (aba === 'arts') {
+      _renderArtsTab(projetoId);
+    }
+  }
+
+  function _buildOverviewTab(id, p, etapas, pct, rent, margemColor, artInline, artColor, artStatusLabel, checklist, checkDone, checkPct) {
+    return `
         <!-- GRID INFO PRINCIPAL -->
         <div class="detail-grid mb-3">
           <div class="detail-field"><div class="detail-label">Cliente</div><div class="detail-value">${Utils.escHtml(Utils.getClientName(p.clienteId))}</div></div>
@@ -252,19 +640,19 @@ const Projetos = (() => {
           <div class="detail-field"><div class="detail-label">Pagamento</div><div class="detail-value">${p.pagamentoRecebido?'<span class="badge badge-green">Recebido</span>':'<span class="badge badge-gray">Pendente</span>'}</div></div>
         </div>
 
-        <!-- ART -->
+        <!-- ART (inline resumo) -->
         <div style="background:var(--bg);border-radius:var(--radius);padding:14px;margin-bottom:14px;border-left:4px solid ${artColor}">
-          <div class="font-bold text-sm mb-2" style="color:${artColor}">📜 ART — Anotação de Responsabilidade Técnica</div>
-          ${art.numero ? `
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-              <div><div class="text-xs text-muted">Número</div><div class="font-bold text-sm">${Utils.escHtml(art.numero)}</div></div>
-              <div><div class="text-xs text-muted">Status</div><div class="font-bold text-sm">${artStatusLabel[art.status]||art.status}</div></div>
-              <div><div class="text-xs text-muted">Engenheiro</div><div class="text-sm">${Utils.escHtml(art.engResponsavel||'—')}</div></div>
-              <div><div class="text-xs text-muted">Data de Registro</div><div class="text-sm">${Utils.formatDate(art.data)}</div></div>
-              <div><div class="text-xs text-muted">Valor da ART</div><div class="text-sm">${art.valor ? Utils.formatCurrency(art.valor) : '—'}</div></div>
-              <div><div class="text-xs text-muted">Link / Arquivo</div><div class="text-sm">${art.link ? `<a href="${Utils.escHtml(art.link)}" target="_blank" style="color:var(--primary)">🔗 Abrir</a>` : '—'}</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="font-bold text-sm" style="color:${artColor}">📜 ART — Anotação de Responsabilidade Técnica</div>
+            <button class="btn btn-xs btn-secondary" onclick="Projetos._switchViewTab('${id}','arts')">Ver ARTs →</button>
+          </div>
+          ${artInline.numero ? `
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px">
+              <div><div class="text-xs text-muted">Número</div><div class="font-bold text-sm">${Utils.escHtml(artInline.numero)}</div></div>
+              <div><div class="text-xs text-muted">Status</div><div class="font-bold text-sm">${artStatusLabel[artInline.status]||artInline.status}</div></div>
+              <div><div class="text-xs text-muted">Engenheiro</div><div class="text-sm">${Utils.escHtml(artInline.engResponsavel||'—')}</div></div>
             </div>
-          ` : `<div class="text-sm" style="color:${artColor}">${p.status === 'em_andamento' ? '⚠ Nenhuma ART registrada. Projeto em andamento sem ART!' : 'Nenhuma ART registrada.'}</div>`}
+          ` : `<div class="text-sm mt-2" style="color:${artColor}">${p.status === 'em_andamento' ? '⚠ Nenhuma ART registrada. Clique em "Ver ARTs" para adicionar.' : 'Nenhuma ART registrada.'}</div>`}
         </div>
 
         <!-- RENTABILIDADE -->
@@ -284,7 +672,7 @@ const Projetos = (() => {
               <div class="text-xs" style="color:${margemColor}">${Utils.formatCurrency(rent.margem)}</div>
             </div>
           </div>
-          ${rent.custoTotal === 0 ? `<div class="text-xs text-muted mt-2">ℹ Registre horas e custos para ver a margem real.</div>` : ''}
+          ${rent.custoTotal === 0 ? `<div class="text-xs text-muted mt-2">ℹ Registre horas e custos para ver a margem real. Use a aba ⏱ Horas.</div>` : ''}
         </div>
 
         <!-- PROGRESSO ETAPAS -->
@@ -346,14 +734,7 @@ const Projetos = (() => {
             <button onclick="Modal.close();App.navigate('contratos');setTimeout(()=>Contratos.view('${contratoVinculado.id}'),300)" class="btn btn-xs btn-secondary" style="margin-top:8px">Ver contrato →</button>
           </div>`;
         })()}
-
-        <div class="mt-4 flex gap-2">
-          <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
-          <button class="btn btn-secondary btn-sm" onclick="Modal.close();ProjetoFinanceiro.open('${id}')">💰 Financeiro</button>
-          <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
-        </div>
-      `,
-    });
+    `;
   }
 
   function openForm(id = null) {
@@ -475,7 +856,13 @@ const Projetos = (() => {
         <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px">
           <div class="flex items-center justify-between mb-2">
             <div class="font-bold text-sm">📦 Checklist de Entrega</div>
-            <button type="button" class="btn btn-xs btn-secondary" onclick="Projetos.addChecklistItem()">+ Item</button>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select class="form-control" style="height:28px;padding:2px 8px;font-size:12px" onchange="if(this.value){Projetos.aplicarTemplateChecklist(this.value);this.value=''}">
+                <option value="">📋 Usar template...</option>
+                ${Object.keys(_CHECKLIST_TEMPLATES).map(t => `<option value="${t}">${t}</option>`).join('')}
+              </select>
+              <button type="button" class="btn btn-xs btn-secondary" onclick="Projetos.addChecklistItem()">+ Item</button>
+            </div>
           </div>
           <div id="fpChecklist">
             ${(p?.checklist||[]).map((item,i) => `
@@ -484,7 +871,7 @@ const Projetos = (() => {
                 <input class="form-control" style="flex:1;padding:4px 8px;height:auto" value="${Utils.escHtml(item.texto)}" placeholder="Ex: Laudo técnico, Relatório fotográfico...">
                 <button type="button" class="btn btn-xs btn-danger" onclick="this.closest('.checklist-item').remove()">✕</button>
               </div>`).join('')}
-            ${(p?.checklist||[]).length===0 ? `<div class="text-xs text-muted">Ex: Laudo, Relatório, Desenho técnico, Certificado, ART baixada...</div>` : ''}
+            ${(p?.checklist||[]).length===0 ? `<div class="text-xs text-muted">Selecione um template acima ou adicione itens manualmente.</div>` : ''}
           </div>
         </div>
 
@@ -877,5 +1264,15 @@ const Projetos = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew, verRentabilidade, addChecklistItem, toggleChecklistItem, _nextOS, setPeriodo, drillDown };
+  return {
+    render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew,
+    verRentabilidade, addChecklistItem, toggleChecklistItem, aplicarTemplateChecklist,
+    _nextOS, setPeriodo, drillDown,
+    // Timesheet (Melhoria 2)
+    salvarTimesheet, removerTimesheet,
+    // ARTs (Melhoria 4)
+    abrirFormART, removerART,
+    // Tab switching
+    _switchViewTab,
+  };
 })();

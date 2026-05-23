@@ -17,6 +17,111 @@ const Pipeline = (() => {
   // Dias sem atualização para considerar lead frio
   const DIAS_FRIO = 7;
 
+  /* ---- SLA por etapa (dias) ---- */
+  const _SLA = {
+    lead_identificado:   { amarelo: 7,  vermelho: 14 },
+    primeiro_contato:    { amarelo: 3,  vermelho: 7  },
+    qualificacao:        { amarelo: 7,  vermelho: 15 },
+    proposta_elaboracao: { amarelo: 5,  vermelho: 10 },
+    proposta_enviada:    { amarelo: 3,  vermelho: 7  },
+    negociacao:          { amarelo: 7,  vermelho: 15 },
+  };
+
+  /* Dias que o lead está na etapa atual */
+  function _diasNaEtapa(lead) {
+    const ref = lead.dataMudancaStatus || lead.createdAt;
+    if (!ref) return null;
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const d = new Date(ref); d.setHours(0,0,0,0);
+    return Math.round((hoje - d) / 86400000);
+  }
+
+  /* SLA badge e border color para o card */
+  function _slaBadge(lead) {
+    const sla = _SLA[lead.status];
+    if (!sla) return { badge: '', borderColor: '' };
+    const dias = _diasNaEtapa(lead);
+    if (dias === null) return { badge: '', borderColor: '' };
+    if (dias >= sla.vermelho) {
+      return {
+        badge: `<span style="font-size:10px;background:#ef444420;color:#ef4444;padding:1px 5px;border-radius:99px;font-weight:700">🔴 ${dias}d</span>`,
+        borderColor: '#ef4444',
+      };
+    }
+    if (dias >= sla.amarelo) {
+      return {
+        badge: `<span style="font-size:10px;background:#f59e0b20;color:#f59e0b;padding:1px 5px;border-radius:99px;font-weight:700">🕐 ${dias}d</span>`,
+        borderColor: '#f59e0b',
+      };
+    }
+    return { badge: `<span style="font-size:10px;color:var(--text-muted)">${dias}d</span>`, borderColor: '' };
+  }
+
+  /* ---- Score de Lead (0–100) ---- */
+  function calcLeadScore(lead) {
+    let score = 0;
+    const detalhes = [];
+
+    // Porte (por valor estimado como proxy)
+    const val = lead.valorEstimado || 0;
+    if (val > 100000) { score += 25; detalhes.push('Porte Grande +25'); }
+    else if (val > 30000) { score += 15; detalhes.push('Porte Médio +15'); }
+    else { score += 5; detalhes.push('Porte Pequeno +5'); }
+
+    // Segmento premium
+    const segs = ['Metal-Mecânica','Alimentos','Agro','Energia','Petroquímica'];
+    if (segs.includes(lead.segmento)) { score += 20; detalhes.push('Segmento Premium +20'); }
+
+    // Valor estimado
+    if (val > 50000) { score += 20; detalhes.push('Valor >50k +20'); }
+    else if (val >= 20000) { score += 15; detalhes.push('Valor 20-50k +15'); }
+    else if (val >= 10000) { score += 10; detalhes.push('Valor 10-20k +10'); }
+    else { score += 5; detalhes.push('Valor <10k +5'); }
+
+    // Origem
+    if (lead.origemLead === 'Indicação') { score += 15; detalhes.push('Origem Indicação +15'); }
+    else if (['LinkedIn','Evento / Feira'].includes(lead.origemLead)) { score += 10; detalhes.push(`Origem ${lead.origemLead} +10`); }
+    else if (lead.origemLead) { score += 5; detalhes.push(`Origem ${lead.origemLead} +5`); }
+
+    // Etapa
+    if (['negociacao','fechado_ganho'].includes(lead.status)) { score += 15; detalhes.push('Etapa avançada +15'); }
+    else if (lead.status === 'proposta_enviada') { score += 10; detalhes.push('Proposta enviada +10'); }
+    else if (lead.status === 'qualificacao') { score += 5; detalhes.push('Qualificação +5'); }
+
+    // Tempo no funil
+    const diasFunil = _diasSemAtualizacao(lead);
+    if (diasFunil !== null && diasFunil < 14) { score += 5; detalhes.push('Recente (<14d) +5'); }
+    else if (diasFunil !== null && diasFunil > 60) { score -= 10; detalhes.push('Esfriando (>60d) -10'); }
+
+    score = Math.max(0, Math.min(100, score));
+    return { score, detalhes };
+  }
+
+  function _scoreBadge(lead) {
+    const { score } = calcLeadScore(lead);
+    if (score >= 70) return `<span style="font-size:11px;font-weight:700;color:#10b981" title="Score: ${score}/100">🔥${score}</span>`;
+    if (score >= 40) return `<span style="font-size:11px;font-weight:700;color:#f59e0b" title="Score: ${score}/100">⚡${score}</span>`;
+    return `<span style="font-size:11px;font-weight:700;color:#94a3b8" title="Score: ${score}/100">🧊${score}</span>`;
+  }
+
+  /* ---- Templates de e-mail por etapa ---- */
+  const _EMAIL_TEMPLATES = {
+    lead_identificado: (lead, clienteNome) =>
+      `Olá ${lead.decisor || clienteNome || '[Nome]'},\n\nSomos a Bikows Engenharia, especializados em segurança do trabalho e engenharia industrial (NR-12, NR-35, NR-33, Laudos, ARTs).\n\nTemos soluções completas que podem atender às necessidades de ${clienteNome || 'sua empresa'}. Podemos agendar uma conversa?\n\nAtenciosamente,\n${lead.responsavel || 'Bikows Engenharia'}`,
+    primeiro_contato: (lead, clienteNome) =>
+      `Olá ${lead.decisor || clienteNome || '[Nome]'},\n\nConforme nossa conversa, gostaria de agendar uma visita técnica para levantarmos as necessidades de ${clienteNome || 'sua empresa'} e elaborarmos uma proposta personalizada.\n\nQual seria a melhor data para você?\n\nAtenciosamente,\n${lead.responsavel || 'Bikows Engenharia'}`,
+    qualificacao: (lead, clienteNome) =>
+      `Olá ${lead.decisor || clienteNome || '[Nome]'},\n\nPara elaborarmos a proposta mais adequada para ${clienteNome || 'vocês'}, preciso de algumas informações:\n\n1. Quantas máquinas/equipamentos precisam de adequação?\n2. Qual o prazo ideal para o serviço?\n3. Há algum laudo ou ART existente para referência?\n\nAguardo seu retorno!\n\nAtenciosamente,\n${lead.responsavel || 'Bikows Engenharia'}`,
+    proposta_elaboracao: (lead, clienteNome) =>
+      `Olá ${lead.decisor || clienteNome || '[Nome]'},\n\nEstamos elaborando a proposta para ${clienteNome || 'vocês'} referente a: ${lead.titulo}.\n\nAssim que estiver pronta, encaminharei para sua análise. Fique à vontade para sanar qualquer dúvida!\n\nAtenciosamente,\n${lead.responsavel || 'Bikows Engenharia'}`,
+    proposta_enviada: (lead, clienteNome) =>
+      `Olá ${lead.decisor || clienteNome || '[Nome]'},\n\nEnviei nossa proposta para ${lead.titulo}. Gostaria de saber se recebeu e se ficou alguma dúvida sobre os serviços ou valores.\n\nEstou à disposição para uma call de alinhamento quando quiser!\n\nAtenciosamente,\n${lead.responsavel || 'Bikows Engenharia'}`,
+    negociacao: (lead, clienteNome) =>
+      `Olá ${lead.decisor || clienteNome || '[Nome]'},\n\nEstou verificando se podemos avançar com a proposta para ${lead.titulo}. Há algum ponto que precise de ajuste?\n\nNossa equipe está pronta para iniciar assim que tivermos o go-ahead!\n\nAtenciosamente,\n${lead.responsavel || 'Bikows Engenharia'}`,
+    followup: (lead, clienteNome) =>
+      `Olá ${lead.decisor || clienteNome || '[Nome]'},\n\nPassando para retomar o contato sobre nossa proposta para ${clienteNome || 'vocês'}. Houve alguma mudança no cenário ou posso ajudar com alguma informação adicional?\n\nAtenciosamente,\n${lead.responsavel || 'Bikows Engenharia'}`,
+  };
+
   /* ---- Mapa de canais de origem ---- */
   const _ORIGENS_MAP = {
     'Tráfego Pago':      { icon: '🎯', color: '#ef4444', bg: '#fef2f2' },
@@ -220,6 +325,7 @@ const Pipeline = (() => {
           </div>
           <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Ver somente licitações">🏛 Licitações</button>
           <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
+          <button class="btn btn-secondary" onclick="Pipeline.reativarLeadsPerdidos()" title="Reativar leads perdidos">♻️ Reativar</button>
           <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
           <button class="btn btn-secondary" onclick="Pipeline.downloadCSVTemplate()" title="Baixar modelo CSV de leads">📋 Modelo CSV</button>
           <label class="btn btn-secondary" title="Importar leads via CSV">
@@ -390,18 +496,27 @@ const Pipeline = (() => {
           ? `<div style="font-size:10px;color:var(--text-muted);margin:3px 0">📄 Sem proposta vinculada</div>`
           : '');
 
+    const sla = _slaBadge(lead);
+    const scoreEl = _scoreBadge(lead);
+    const valColor = (lead.valorEstimado||0) >= 20000 ? '#10b981' : (lead.valorEstimado||0) >= 5000 ? '#3b82f6' : '#94a3b8';
+    const borderStyle = sla.borderColor ? `border-left:3px solid ${sla.borderColor}` : '';
     return `<div class="kanban-card ${frio ? 'lead-frio' : ''}" draggable="true" data-id="${lead.id}"
-      style="--card-color:${color}"
+      style="--card-color:${color};${borderStyle}"
       ondragstart="Pipeline.dragStart(event,'${lead.id}')"
       ondragend="Pipeline.dragEnd(event)">
-      <div class="kc-name">
-        ${frio ? `<span title="Lead frio: ${diasSemAtualizar}d sem atualização" style="cursor:help">🧊</span> ` : ''}${Utils.escHtml(lead.titulo)}
+      <div class="kc-name" style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">
+        <span>${frio ? `<span title="Lead frio: ${diasSemAtualizar}d sem atualização" style="cursor:help">🧊</span> ` : ''}${Utils.escHtml(lead.titulo)}</span>
+        ${scoreEl}
       </div>
       <div class="kc-empresa" style="display:flex;align-items:center;justify-content:space-between;gap:4px">
         <span>🏢 ${Utils.escHtml(empresa)}</span>
         ${lead.origemLead ? _origemBadge(lead.origemLead) : ''}
       </div>
-      <div class="kc-valor">${Utils.formatCurrency(lead.valorEstimado)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:2px 0">
+        <span style="font-size:12px;font-weight:700;color:${valColor}">${Utils.formatCurrency(lead.valorEstimado)}</span>
+        ${sla.badge}
+      </div>
+      <!-- kc-valor removed — value shown above -->
       ${licBadge}
       ${propBadge}
       ${frio ? `<div style="font-size:10px;color:#f59e0b;margin-bottom:4px">⚠ ${diasSemAtualizar}d sem atualização</div>` : ''}
@@ -601,6 +716,57 @@ const Pipeline = (() => {
           return '';
         })()}
 
+        <!-- SCORE DETALHADO -->
+        ${(() => {
+          const { score, detalhes } = calcLeadScore(lead);
+          const scoreCor = score >= 70 ? '#10b981' : score >= 40 ? '#f59e0b' : '#94a3b8';
+          const scoreIcon = score >= 70 ? '🔥' : score >= 40 ? '⚡' : '🧊';
+          return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-top:12px;border-left:3px solid ${scoreCor}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <div class="font-bold text-sm">${scoreIcon} Score do Lead</div>
+              <div style="font-size:22px;font-weight:800;color:${scoreCor}">${score}<span style="font-size:13px">/100</span></div>
+            </div>
+            <div style="height:6px;background:var(--border);border-radius:99px;margin-bottom:8px">
+              <div style="width:${score}%;height:100%;background:${scoreCor};border-radius:99px"></div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">${detalhes.map(d => `<span style="font-size:10px;background:var(--surface-2);padding:2px 6px;border-radius:99px;color:var(--text-muted)">${d}</span>`).join('')}</div>
+          </div>`;
+        })()}
+
+        <!-- MODELOS DE E-MAIL -->
+        ${(() => {
+          const clienteNome = Utils.getClientName(lead.clienteId) || '';
+          const tmplFn = _EMAIL_TEMPLATES[lead.status] || _EMAIL_TEMPLATES.followup;
+          const texto = tmplFn(lead, clienteNome);
+          const textEsc = Utils.escHtml(texto);
+          const wppText = encodeURIComponent(texto);
+          const telefone = lead.contato || '';
+          return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-top:12px">
+            <div class="font-bold text-sm mb-2">📧 Modelo de E-mail / Mensagem</div>
+            <div id="emailTemplate_${lead.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;white-space:pre-wrap;max-height:140px;overflow-y:auto;color:var(--text)">${textEsc}</div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-xs btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('emailTemplate_${lead.id}').textContent).then(()=>Toast.success('Copiado!'))">📋 Copiar</button>
+              ${telefone ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366;color:#fff" onclick="window.open('https://wa.me/55${encodeURIComponent(telefone.replace(/\D/g,''))}?text=${wppText}','_blank')">📱 WhatsApp</button>` : ''}
+              <button class="btn btn-xs btn-secondary" onclick="Pipeline.showEmailTemplates('${lead.id}')">📨 Ver todos modelos</button>
+            </div>
+          </div>`;
+        })()}
+
+        <!-- HISTÓRICO DO REGISTRO -->
+        ${(() => {
+          const logs = (DB.getAuditLog ? DB.getAuditLog() : []).filter(l => l.recordId === lead.id);
+          if (!logs.length) return `<div style="margin-top:12px"><div class="font-bold text-sm mb-1">📜 Histórico</div><div class="text-xs text-muted">Nenhuma alteração registrada ainda.</div></div>`;
+          return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-top:12px">
+            <div class="font-bold text-sm mb-2">📜 Histórico de Alterações</div>
+            <div style="max-height:120px;overflow-y:auto">
+              ${logs.slice(-10).reverse().map(l => `<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px">
+                <span style="color:var(--text-muted);white-space:nowrap">${Utils.formatDate(l.ts?.split('T')[0]||'')}</span>
+                <span>${Utils.escHtml(l.action||'')}: ${Utils.escHtml(l.field||'')} ${l.from !== undefined ? `<em>${Utils.escHtml(String(l.from||''))}</em> → <strong>${Utils.escHtml(String(l.to||''))}</strong>` : ''}</span>
+              </div>`).join('')}
+            </div>
+          </div>`;
+        })()}
+
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
           ${lead.status === 'fechado_ganho' ? `<button class="btn btn-success btn-sm" onclick="Modal.close();Pipeline.abrirContratoLead('${id}')">🤝 Fechar Contrato</button>` : ''}
           ${['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status) && !_getPropostaLead(lead.id) ? `<button class="btn btn-secondary btn-sm" onclick="Modal.close();Pipeline.criarPropostaLead('${id}')">📄 Criar Proposta</button>` : ''}
@@ -611,6 +777,52 @@ const Pipeline = (() => {
         </div>
       `,
     });
+  }
+
+  /* Mostrar todos os modelos de e-mail para o lead */
+  function showEmailTemplates(leadId) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    const clienteNome = Utils.getClientName(lead.clienteId) || '';
+    const etapas = [
+      { key: 'lead_identificado', label: 'Lead Identificado' },
+      { key: 'primeiro_contato', label: 'Primeiro Contato' },
+      { key: 'qualificacao', label: 'Qualificação' },
+      { key: 'proposta_elaboracao', label: 'Proposta em Elaboração' },
+      { key: 'proposta_enviada', label: 'Proposta Enviada' },
+      { key: 'negociacao', label: 'Negociação' },
+      { key: 'followup', label: 'Follow-up Genérico' },
+    ];
+    let activeKey = lead.status;
+    if (!_EMAIL_TEMPLATES[activeKey]) activeKey = 'followup';
+
+    Modal.open({
+      title: '📧 Modelos de E-mail / Mensagem',
+      size: 'modal-lg',
+      body: `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          ${etapas.map(e => `<button class="btn btn-xs ${e.key===activeKey?'btn-primary':'btn-secondary'}" onclick="Pipeline._selectEmailTemplate('${leadId}','${e.key}','${Utils.escHtml(clienteNome)}')" id="etmpl_btn_${e.key}">${e.label}</button>`).join('')}
+        </div>
+        <div id="etmpl_text" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px;font-size:13px;white-space:pre-wrap;min-height:150px;color:var(--text)">${Utils.escHtml((_EMAIL_TEMPLATES[activeKey]||_EMAIL_TEMPLATES.followup)(lead, clienteNome))}</div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('etmpl_text').textContent).then(()=>Toast.success('Copiado!'))">📋 Copiar</button>
+          ${lead.contato ? `<button class="btn btn-success" style="background:#25D366;border-color:#25D366;color:#fff" onclick="window.open('https://wa.me/55'+document.getElementById('etmpl_text').textContent.replace(/\\D/g,'').slice(-11)+'?text='+encodeURIComponent(document.getElementById('etmpl_text').textContent),'_blank')">📱 WhatsApp</button>` : ''}
+        </div>
+      `,
+      saveLabel: null,
+    });
+  }
+
+  function _selectEmailTemplate(leadId, key, clienteNome) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    const fn = _EMAIL_TEMPLATES[key] || _EMAIL_TEMPLATES.followup;
+    const texto = fn(lead, clienteNome);
+    const el = document.getElementById('etmpl_text');
+    if (el) el.textContent = texto;
+    document.querySelectorAll('[id^="etmpl_btn_"]').forEach(b => b.classList.replace('btn-primary','btn-secondary'));
+    const btn = document.getElementById(`etmpl_btn_${key}`);
+    if (btn) { btn.classList.replace('btn-secondary','btn-primary'); }
   }
 
   /* ====================================================
@@ -959,6 +1171,11 @@ const Pipeline = (() => {
           <div class="text-xs text-muted mt-1">Segure Ctrl para selecionar múltiplos</div>
         </div>
         <div class="form-group">
+          <label class="form-label">Comissão do Responsável (%)</label>
+          <input class="form-control" id="fComissaoPerc" type="number" min="0" max="100" step="0.5" value="${lead?.comissaoPerc||5}" placeholder="5">
+          <div class="text-xs text-muted mt-1">Padrão: 5%. Usado no relatório de comissões.</div>
+        </div>
+        <div class="form-group">
           <label class="form-label">Observações</label>
           <textarea class="form-control" id="fObs" rows="3">${Utils.escHtml(lead?.observacoes||'')}</textarea>
         </div>
@@ -1076,6 +1293,7 @@ const Pipeline = (() => {
       motivoPerda: document.getElementById('fMotivo').value,
       contato: document.getElementById('fContato').value,
       servicoInteresse: servicos,
+      comissaoPerc: Number(document.getElementById('fComissaoPerc')?.value) || 5,
       observacoes: document.getElementById('fObs').value,
     };
 
@@ -1387,6 +1605,87 @@ const Pipeline = (() => {
     render();
   }
 
+  /* ================================================
+     MELHORIA 8: REATIVAÇÃO DE LEADS PERDIDOS
+     ================================================ */
+  function reativarLeadsPerdidos() {
+    const limiteData = new Date();
+    limiteData.setDate(limiteData.getDate() - 90);
+    const limitStr = limiteData.toISOString().split('T')[0];
+
+    const perdidos = DB.getAll('leads').filter(l => {
+      if (l.status !== 'fechado_perdido') return false;
+      const ref = l.updatedAt || l.createdAt || '';
+      return ref.slice(0,10) <= limitStr;
+    }).sort((a,b) => (a.updatedAt||a.createdAt||'').localeCompare(b.updatedAt||b.createdAt||''));
+
+    if (!perdidos.length) {
+      Toast.info('Nenhum lead perdido há mais de 90 dias encontrado.');
+      return;
+    }
+
+    Modal.open({
+      title: `♻️ Reativar Leads Perdidos — ${perdidos.length} leads`,
+      size: 'modal-lg',
+      body: `
+        <div style="margin-bottom:12px;padding:10px;background:#ecfdf5;border-radius:var(--radius);border-left:3px solid #10b981">
+          <div class="text-sm">Leads marcados como perdidos há <strong>mais de 90 dias</strong>. Reative para colocar de volta no pipeline.</div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Empresa/Lead</th><th>Motivo Perda</th><th>Valor</th><th>Dias desde perda</th><th>Resp.</th><th>Ações</th></tr></thead>
+          <tbody>
+            ${perdidos.map(l => {
+              const ref = l.updatedAt || l.createdAt || '';
+              const diasPerda = ref ? Math.round((Date.now() - new Date(ref)) / 86400000) : '—';
+              return `<tr id="row_reativar_${l.id}">
+                <td>
+                  <div class="font-bold text-sm">${Utils.escHtml(l.titulo)}</div>
+                  <div class="text-xs text-muted">${Utils.escHtml(Utils.getClientName(l.clienteId))}</div>
+                </td>
+                <td class="text-xs">${Utils.escHtml(l.motivoPerda || '—')}</td>
+                <td class="text-sm font-bold">${Utils.formatCurrency(l.valorEstimado)}</td>
+                <td><span class="badge badge-yellow">${diasPerda}d</span></td>
+                <td class="text-xs">${Utils.escHtml(l.responsavel || '—')}</td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-xs btn-primary" onclick="Pipeline._reativarLead('${l.id}')">📞 Reativar</button>
+                    <button class="btn btn-xs btn-danger" onclick="Pipeline._arquivarLead('${l.id}')">🗑 Arquivar</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `,
+      saveLabel: null,
+    });
+  }
+
+  function _reativarLead(leadId) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    DB.update('leads', leadId, {
+      status: 'lead_identificado',
+      motivoPerda: null,
+      dataProximaAcao: Utils.todayStr(),
+      proximaAcao: 'Reativar contato',
+    });
+    Toast.success(`Lead "${lead.titulo}" reativado e voltou ao funil!`);
+    // Remove a linha da tabela
+    const row = document.getElementById(`row_reativar_${leadId}`);
+    if (row) row.remove();
+    render();
+  }
+
+  function _arquivarLead(leadId) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    DB.update('leads', leadId, { status: 'fechado_perdido', arquivado: true });
+    Toast.info(`Lead "${lead.titulo}" arquivado definitivamente.`);
+    const row = document.getElementById(`row_reativar_${leadId}`);
+    if (row) row.remove();
+  }
+
   return {
     render, openForm, saveLead, deleteLead, viewLead, addNew,
     dragStart, dragEnd, dragOver, dragLeave, drop,
@@ -1397,5 +1696,8 @@ const Pipeline = (() => {
     drillDown,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
     importCSV, downloadCSVTemplate,
+    reativarLeadsPerdidos, _reativarLead, _arquivarLead,
+    showEmailTemplates, _selectEmailTemplate,
+    calcLeadScore,
   };
 })();

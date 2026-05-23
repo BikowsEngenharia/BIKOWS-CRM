@@ -196,6 +196,7 @@ const Clientes = (() => {
           <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">✅ Atividades (${atividades.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">👤 Contatos (${contatos.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabTimeline360')">🕐 Interações</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabAudit360')">📜 Alterações</button>
         </div>
 
         <!-- HISTÓRICO DE SERVIÇOS -->
@@ -315,6 +316,26 @@ const Clientes = (() => {
                 <div style="font-weight:600;font-size:13px">${ev.icone} ${Utils.escHtml(ev.titulo)}</div>
                 ${ev.detalhe ? `<div style="font-size:12px;color:var(--text-secondary)">${Utils.escHtml(ev.detalhe)}</div>` : ''}
               </div>`).join('')}
+            </div>`;
+          })()}
+        </div>
+
+        <!-- AUDIT LOG -->
+        <div id="tabAudit360" class="hidden">
+          ${(() => {
+            const logs = DB.getAuditLog ? DB.getAuditLog().filter(l => l.recordId === id).slice(0, 30) : [];
+            if (!logs.length) return '<div class="text-sm text-muted p-3">Nenhuma alteração registrada no log de auditoria.</div>';
+            const actionIcon = { create: '➕', update: '✏', delete: '🗑' };
+            return `<div style="max-height:300px;overflow-y:auto">
+              ${logs.map(l => `
+                <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start">
+                  <div style="font-size:16px;flex-shrink:0">${actionIcon[l.action]||'📌'}</div>
+                  <div style="flex:1">
+                    <div class="text-sm font-bold">${Utils.escHtml(l.action === 'create' ? 'Registro criado' : l.action === 'update' ? 'Registro atualizado' : 'Registro removido')}</div>
+                    <div class="text-xs text-muted">${l.timestamp ? Utils.formatDate(l.timestamp.split('T')[0]) + ' ' + (l.timestamp.split('T')[1]||'').substring(0,5) : '—'} · ${Utils.escHtml(l.user || 'Sistema')}</div>
+                    ${l.changes && Object.keys(l.changes).length ? `<div class="text-xs text-muted mt-1">${Object.entries(l.changes).map(([k,v]) => `<span style="background:var(--bg);border-radius:4px;padding:1px 5px;margin:1px">${k}: ${Utils.escHtml(String(v||'').substring(0,50))}</span>`).join(' ')}</div>` : ''}
+                  </div>
+                </div>`).join('')}
             </div>`;
           })()}
         </div>

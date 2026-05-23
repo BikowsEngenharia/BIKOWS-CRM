@@ -124,13 +124,22 @@ const Contratos = (() => {
         <div class="table-wrap">
           ${list.length === 0 ? _emptyState() : `
           <table class="tbl">
-            <thead><tr><th>Nº</th><th>Objeto</th><th>Cliente</th><th>Valor</th><th>Vigência</th><th>Vencimento</th><th>Renovação</th><th>Status</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Nº</th><th>Objeto</th><th>Cliente</th><th>Valor</th><th>Vigência</th><th>Vencimento</th><th>Laudo</th><th>Renovação</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody>
               ${list.map(c => {
                 const status = _autoStatus(c);
                 const dias = Utils.daysUntil(c.dataFim);
                 const vencLabel = dias == null ? '—' : dias < 0 ? `⚠ ${Math.abs(dias)}d atraso` : dias === 0 ? 'Hoje' : `${dias}d`;
                 const vencClass = dias != null && dias < 0 ? 'text-danger' : dias != null && dias <= 30 ? 'text-warning' : 'text-muted';
+                const laudoBadge = (() => {
+                  if (!c.validadeLaudo) return '<span class="text-xs text-muted">—</span>';
+                  const dl = Utils.daysUntil(c.validadeLaudo);
+                  if (dl == null) return '<span class="text-xs text-muted">—</span>';
+                  if (dl < 0) return `<span class="badge badge-red text-xs" title="Laudo vencido">⚠ Vencido</span>`;
+                  if (dl <= 30) return `<span class="badge badge-red text-xs" title="Vence em ${dl}d">🔴 ${dl}d</span>`;
+                  if (dl <= 60) return `<span class="badge badge-yellow text-xs" title="Vence em ${dl}d">⚠ ${dl}d</span>`;
+                  return `<span class="badge badge-green text-xs">${dl}d</span>`;
+                })();
                 return `<tr>
                   <td class="text-xs font-bold text-muted">${Utils.escHtml(c.numero||'—')}</td>
                   <td><div class="font-bold" style="max-width:180px">${Utils.escHtml(c.objeto||'—')}</div></td>
@@ -138,6 +147,7 @@ const Contratos = (() => {
                   <td class="font-bold text-primary">${Utils.formatCurrency(c.valor)}</td>
                   <td class="text-sm text-muted">${Utils.formatDate(c.dataInicio)} → ${Utils.formatDate(c.dataFim)}</td>
                   <td class="text-sm ${vencClass}">${Utils.formatDate(c.dataFim)} <span class="text-xs">${vencLabel}</span></td>
+                  <td>${laudoBadge}</td>
                   <td class="text-xs">${c.renovacaoAutomatica ? '<span class="badge badge-green">Auto</span>' : '<span class="badge badge-gray">Manual</span>'}</td>
                   <td>${_statusBadge(status)}</td>
                   <td>
@@ -190,6 +200,17 @@ const Contratos = (() => {
         ${c.descricao ? `<div class="detail-field mb-3"><div class="detail-label">Descrição / Escopo</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(c.descricao)}</div></div>` : ''}
         ${c.observacoes ? `<div class="detail-field mb-3"><div class="detail-label">Observações</div><div class="detail-value" style="white-space:pre-wrap">${Utils.escHtml(c.observacoes)}</div></div>` : ''}
         ${(() => {
+          if (!c.validadeLaudo) return '';
+          const dl = Utils.daysUntil(c.validadeLaudo);
+          const cor = dl == null ? '#94a3b8' : dl < 0 ? '#ef4444' : dl <= 30 ? '#ef4444' : dl <= 60 ? '#f59e0b' : '#10b981';
+          const msg = dl == null ? '—' : dl < 0 ? `⚠ Vencido há ${Math.abs(dl)} dias` : dl === 0 ? '⚠ Vence HOJE' : `Vence em ${dl} dias`;
+          return `<div style="background:${cor}15;border:1px solid ${cor}44;border-radius:var(--radius);padding:12px;margin-bottom:12px">
+            <div class="font-bold text-sm mb-1" style="color:${cor}">📋 Laudo / Certificado${c.tipoLaudo ? ' — ' + Utils.escHtml(c.tipoLaudo) : ''}</div>
+            <div class="text-sm">Validade: <strong>${Utils.formatDate(c.validadeLaudo)}</strong> · <span style="color:${cor};font-weight:700">${msg}</span></div>
+            ${(dl != null && dl <= 60) ? `<button class="btn btn-xs btn-warning mt-2" onclick="Contratos.criarLeadRenovacaoLaudo('${id}')">📋 Criar lead de renovação</button>` : ''}
+          </div>`;
+        })()}
+        ${(() => {
           if (!c.projetoId) return '';
           const pj = DB.get('projetos', c.projetoId);
           if (!pj) return '';
@@ -203,14 +224,154 @@ const Contratos = (() => {
             </div>
           </div>`;
         })()}
+        <!-- ASSINATURA DIGITAL -->
+        ${c.assinatura ? `<div style="background:#f0fdf4;border:1px solid #10b981;border-radius:var(--radius);padding:12px;margin-top:12px">
+          <div class="font-bold text-sm mb-1" style="color:#10b981">✅ Contrato Assinado Digitalmente</div>
+          <div class="text-sm"><strong>${Utils.escHtml(c.assinatura.nome)}</strong> · CPF: ${Utils.escHtml(c.assinatura.cpf)} · ${Utils.escHtml(c.assinatura.cargo)}</div>
+          <div class="text-xs text-muted">Em ${Utils.formatDate(c.assinatura.data)}</div>
+          ${c.assinatura.imagem ? `<img src="${c.assinatura.imagem}" style="max-width:200px;margin-top:8px;border:1px solid var(--border);border-radius:4px" alt="Assinatura">` : ''}
+        </div>` : ''}
+
+        <!-- HISTÓRICO DE ALTERAÇÕES (Melhoria 15) -->
+        ${(() => {
+          const logs = DB.getAuditLog ? DB.getAuditLog().filter(l => l.recordId === id).slice(0, 20) : [];
+          if (!logs.length) return '';
+          const actionLabel = { create: '➕ Contrato criado', update: '✏ Atualizado', delete: '🗑 Removido' };
+          return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-top:12px">
+            <div class="font-bold text-sm mb-2">📜 Histórico de Alterações</div>
+            <div style="max-height:180px;overflow-y:auto">
+              ${logs.map(l => `
+                <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start;font-size:12px">
+                  <div style="flex:1">
+                    <span class="font-bold">${actionLabel[l.action]||l.action}</span>
+                    ${l.user ? `<span class="text-muted"> · ${Utils.escHtml(l.user)}</span>` : ''}
+                    <span class="text-muted"> · ${l.timestamp ? Utils.formatDate(l.timestamp.split('T')[0]) + ' ' + (l.timestamp.split('T')[1]||'').substring(0,5) : '—'}</span>
+                    ${l.changes && Object.keys(l.changes).length ? `<div class="text-xs text-muted mt-1">${Object.entries(l.changes).slice(0,3).map(([k,v]) => `${k}: ${String(v||'').substring(0,40)}`).join(' · ')}</div>` : ''}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>`;
+        })()}
+
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
           ${status === 'vencido' || status === 'renovando' ? `<button class="btn btn-success btn-sm" onclick="Contratos.renovar('${id}')">🔄 Renovar Contrato</button>` : ''}
+          ${!c.assinatura ? `<button class="btn btn-secondary btn-sm" onclick="Contratos.abrirAssinatura('${id}')">✍️ Assinar Contrato</button>` : ''}
           <button class="btn btn-secondary btn-sm" onclick="Modal.close();Contratos.exportarPDF('${id}')">📄 Exportar PDF</button>
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Contratos.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
       `,
     });
+  }
+
+  /* ================================================
+     MELHORIA 16: ASSINATURA DIGITAL
+  ================================================ */
+  function abrirAssinatura(contratoId) {
+    const c = DB.get('contratos', contratoId);
+    if (!c) return;
+
+    Modal.open({
+      title: '✍️ Assinar Contrato Digitalmente',
+      size: 'modal-lg',
+      body: `
+        <div style="background:var(--primary-light);border-radius:var(--radius);padding:12px;margin-bottom:16px">
+          <div class="font-bold text-sm">${Utils.escHtml(c.objeto || c.numero || '')}</div>
+          <div class="text-xs text-muted">${Utils.escHtml(Utils.getClientName(c.clienteId))} · ${Utils.formatCurrency(c.valor)}</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nome Completo *</label>
+            <input class="form-control" id="asNome" placeholder="Nome do signatário">
+          </div>
+          <div class="form-group">
+            <label class="form-label">CPF *</label>
+            <input class="form-control" id="asCpf" placeholder="000.000.000-00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cargo / Função</label>
+            <input class="form-control" id="asCargo" placeholder="Ex: Gerente de Manutenção">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assinatura (desenhe abaixo)</label>
+          <div style="border:2px solid var(--border);border-radius:var(--radius);background:#fff;position:relative">
+            <canvas id="assinaturaCanvas" width="660" height="160" style="display:block;cursor:crosshair;touch-action:none"></canvas>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="Contratos._limparCanvas()" style="position:absolute;top:4px;right:4px">Limpar</button>
+          </div>
+          <div class="text-xs text-muted mt-1">Use o mouse ou toque para desenhar a assinatura</div>
+        </div>
+      `,
+      saveLabel: '✅ Confirmar Assinatura',
+      saveCb: () => _confirmarAssinatura(contratoId),
+    });
+
+    // Inicializar canvas após render
+    setTimeout(() => _initCanvas(), 100);
+  }
+
+  let _drawing = false;
+
+  function _initCanvas() {
+    const canvas = document.getElementById('assinaturaCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    }
+
+    canvas.addEventListener('mousedown', (e) => { _drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+    canvas.addEventListener('mousemove', (e) => { if (!_drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+    canvas.addEventListener('mouseup', () => { _drawing = false; });
+    canvas.addEventListener('mouseleave', () => { _drawing = false; });
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); _drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!_drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }, { passive: false });
+    canvas.addEventListener('touchend', () => { _drawing = false; });
+  }
+
+  function _limparCanvas() {
+    const canvas = document.getElementById('assinaturaCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function _confirmarAssinatura(contratoId) {
+    const nome = document.getElementById('asNome')?.value.trim();
+    const cpf = document.getElementById('asCpf')?.value.trim();
+    const cargo = document.getElementById('asCargo')?.value.trim();
+    if (!nome || !cpf) { Toast.error('Nome e CPF são obrigatórios'); return; }
+
+    const canvas = document.getElementById('assinaturaCanvas');
+    const imagem = canvas ? canvas.toDataURL('image/png') : '';
+
+    // Verifica se o canvas tem algum traço
+    const ctx = canvas?.getContext('2d');
+    const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+    const hasDrawing = imageData ? imageData.data.some((v, i) => i % 4 === 3 && v > 0) : false;
+    if (!hasDrawing) { Toast.error('Por favor, desenhe a assinatura no campo acima'); return; }
+
+    DB.update('contratos', contratoId, {
+      assinatura: {
+        nome,
+        cpf,
+        cargo: cargo || '',
+        data: Utils.todayStr(),
+        imagem,
+      },
+    });
+    Toast.success('Contrato assinado digitalmente!');
+    Modal.close();
+    render();
   }
 
   function renovar(id) {
@@ -359,6 +520,22 @@ const Contratos = (() => {
           <label class="form-label">Observações</label>
           <textarea class="form-control" id="fcObs" rows="2">${Utils.escHtml(c?.observacoes||'')}</textarea>
         </div>
+
+        <!-- VALIDADE DE LAUDO -->
+        <div style="background:#fef9c3;border:1px solid #f59e0b44;border-radius:var(--radius);padding:12px;margin-top:8px">
+          <div class="font-bold text-sm mb-2">📋 Validade do Laudo / Certificado</div>
+          <div class="form-row" style="margin:0">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Data de Validade do Laudo</label>
+              <input class="form-control" id="fcValidadeLaudo" type="date" value="${c?.validadeLaudo||''}">
+              <div class="text-xs text-muted mt-1">Gera alerta automático 60 dias antes do vencimento</div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Tipo de Laudo</label>
+              <input class="form-control" id="fcTipoLaudo" value="${Utils.escHtml(c?.tipoLaudo||'')}" placeholder="Ex: PPRA, PCMSO, NR-12, Linha de Vida...">
+            </div>
+          </div>
+        </div>
       `,
       saveCb: () => saveContrato(id),
     });
@@ -388,6 +565,9 @@ const Contratos = (() => {
       projetoId:          document.getElementById('fContratoProjetoId').value || null,
       propostaId:         document.getElementById('fcPropostaId')?.value || null,
     };
+
+    data.validadeLaudo = document.getElementById('fcValidadeLaudo')?.value || null;
+    data.tipoLaudo = document.getElementById('fcTipoLaudo')?.value.trim() || null;
 
     if (id) { DB.update('contratos', id, data); Toast.success('Contrato atualizado'); }
     else { DB.create('contratos', data); Toast.success('Contrato criado'); }
@@ -719,5 +899,67 @@ const Contratos = (() => {
     });
   }
 
-  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo, drillDown, criarDePropostal, _calcDataFimFromPrazo, exportarPDF };
+  /* ================================================
+     MELHORIAS: Validade de Laudo + Alertas de Vencimento
+  ================================================ */
+
+  // Cria lead de renovação quando laudo/certificado está vencendo
+  function criarLeadRenovacaoLaudo(contratoId) {
+    const c = DB.get('contratos', contratoId);
+    if (!c) return;
+    const clienteNome = Utils.getClientName(c.clienteId);
+    const titulo = `Renovação de ${c.tipoLaudo || 'Laudo'} — ${clienteNome}`;
+    const novo = DB.create('leads', {
+      titulo,
+      clienteId: c.clienteId,
+      status: 'lead_identificado',
+      valorEstimado: c.valor || 0,
+      responsavel: c.responsavel || '',
+      origemLead: 'Recorrência',
+      observacoes: `Renovação originada do contrato ${c.numero || ''} — laudo vence em ${Utils.formatDate(c.validadeLaudo)}`,
+      dataEntrada: Utils.todayStr(),
+    });
+    Toast.success(`Lead de renovação criado: "${titulo}"`);
+    Modal.close();
+    App.navigate('pipeline');
+  }
+
+  // Retorna contratos a vencer em N dias (para o dashboard)
+  function getContratosVencendo(dias = 60) {
+    return DB.getAll('contratos').filter(c => {
+      if (['encerrado'].includes(c.status)) return false;
+      const d = Utils.daysUntil(c.dataFim);
+      return d != null && d >= 0 && d <= dias;
+    });
+  }
+
+  // Retorna contratos com laudo vencendo em N dias
+  function getLaudosVencendo(dias = 60) {
+    return DB.getAll('contratos').filter(c => {
+      if (!c.validadeLaudo) return false;
+      const d = Utils.daysUntil(c.validadeLaudo);
+      return d != null && d <= dias;
+    });
+  }
+
+  // Cria lead de renovação de contrato
+  function criarLeadRenovacaoContrato(contratoId) {
+    const c = DB.get('contratos', contratoId);
+    if (!c) return;
+    const clienteNome = Utils.getClientName(c.clienteId);
+    const titulo = `Renovação de Contrato — ${clienteNome}`;
+    DB.create('leads', {
+      titulo,
+      clienteId: c.clienteId,
+      status: 'lead_identificado',
+      valorEstimado: c.valor || 0,
+      responsavel: c.responsavel || '',
+      origemLead: 'Recorrência',
+      observacoes: `Renovação do contrato ${c.numero || ''} que vence em ${Utils.formatDate(c.dataFim)}`,
+      dataEntrada: Utils.todayStr(),
+    });
+    Toast.success(`Lead de renovação criado para "${clienteNome}"`);
+  }
+
+  return { render, openForm, saveContrato, deleteContrato, view, setFilter, renovar, addNew, setPeriodo, drillDown, criarDePropostal, _calcDataFimFromPrazo, exportarPDF, criarLeadRenovacaoLaudo, criarLeadRenovacaoContrato, getContratosVencendo, getLaudosVencendo };
 })();

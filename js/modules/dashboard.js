@@ -351,6 +351,9 @@ const Dashboard = (() => {
       <!-- Licitações Urgentes -->
       ${_renderLicitacoesUrgentes(licsAtivas)}
 
+      <!-- Alertas de Contratos e Laudos Vencendo -->
+      ${_renderAlertasContratos()}
+
       ${_renderTrafegoWidget()}
 
       <!-- Alertas Follow-up -->
@@ -410,6 +413,114 @@ const Dashboard = (() => {
     }
 
     _renderMetasKpi();
+  }
+
+  /* ================================================
+     WIDGET: ALERTAS DE CONTRATOS E LAUDOS VENCENDO
+     ================================================ */
+  function _renderAlertasContratos() {
+    try {
+      const contratos = DB.getAll('contratos').filter(c => c.status !== 'encerrado');
+
+      const vencendo = contratos.filter(c => {
+        if (!c.dataFim) return false;
+        const d = Utils.daysUntil(c.dataFim);
+        return d != null && d >= 0 && d <= 90;
+      });
+
+      const laudos = contratos.filter(c => {
+        if (!c.validadeLaudo) return false;
+        const d = Utils.daysUntil(c.validadeLaudo);
+        return d != null && d <= 60;
+      });
+
+      if (vencendo.length === 0 && laudos.length === 0) return '';
+
+      return `<div class="card mb-4" style="border-left:4px solid #f59e0b">
+        <div class="card-header">
+          <div class="card-title" style="color:#f59e0b">⚠ Alertas de Contratos e Laudos</div>
+          <button class="btn btn-xs btn-secondary" onclick="App.navigate('contratos')">Ver contratos →</button>
+        </div>
+        <div class="card-body" style="padding:0 16px 16px">
+          <div id="dashAlertasContratos">
+            ${_renderAlertasContratosFiltrado(_alertaContratosDias)}
+          </div>
+        </div>
+      </div>`;
+    } catch(e) { return ''; }
+  }
+
+  let _alertaContratosDias = 90;
+
+  function _filtrarAlertasContratos(dias) {
+    _alertaContratosDias = dias;
+    // Re-renderiza só o widget de alertas
+    const container = document.getElementById('dashAlertasContratos');
+    if (!container) { Toast.info(`Filtro: contratos que vencem em até ${dias} dias`); return; }
+    container.innerHTML = _renderAlertasContratosFiltrado(dias);
+  }
+
+  function _renderAlertasContratosFiltrado(dias) {
+    try {
+      const contratos = DB.getAll('contratos').filter(c => c.status !== 'encerrado');
+
+      const vencendo = contratos.filter(c => {
+        if (!c.dataFim) return false;
+        const d = Utils.daysUntil(c.dataFim);
+        return d != null && d >= 0 && d <= dias;
+      }).sort((a, b) => (a.dataFim||'').localeCompare(b.dataFim||''));
+
+      const laudos = contratos.filter(c => {
+        if (!c.validadeLaudo) return false;
+        const d = Utils.daysUntil(c.validadeLaudo);
+        return d != null && d <= Math.min(dias, 60);
+      }).sort((a, b) => (a.validadeLaudo||'').localeCompare(b.validadeLaudo||''));
+
+      let html = `<div style="display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap;align-items:center">
+        <span class="text-xs font-bold text-muted">Filtrar:</span>
+        ${[30,60,90].map(d => `<button onclick="Dashboard._filtrarAlertasContratos(${d})" class="btn btn-xs ${dias===d?'btn-primary':'btn-secondary'}">${d} dias</button>`).join('')}
+        <span class="text-xs text-muted">(${vencendo.length + laudos.length} alertas)</span>
+      </div>`;
+
+      if (laudos.length === 0 && vencendo.length === 0) {
+        return html + `<div class="text-sm text-muted" style="text-align:center;padding:16px">Nenhum alerta para os próximos ${dias} dias.</div>`;
+      }
+
+      if (laudos.length > 0) {
+        html += `<div class="font-bold text-sm mb-2" style="color:#ef4444">📋 Laudos / Certificados Vencendo (${laudos.length})</div>`;
+        html += laudos.map(c => {
+          const d = Utils.daysUntil(c.validadeLaudo);
+          const cor = d == null ? '#94a3b8' : d < 0 ? '#ef4444' : d <= 30 ? '#ef4444' : '#f59e0b';
+          const label = d == null ? '—' : d < 0 ? `Vencido há ${Math.abs(d)}d` : d === 0 ? 'Vence HOJE' : `${d} dias`;
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1">
+              <div class="font-bold text-sm">${Utils.escHtml(Utils.getClientName(c.clienteId))}</div>
+              <div class="text-xs text-muted">${Utils.escHtml(c.tipoLaudo || c.objeto || '—')} · ${Utils.escHtml(c.numero||'')}</div>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:${cor}">${label}</span>
+            <button class="btn btn-xs btn-warning" onclick="Contratos.criarLeadRenovacaoLaudo('${c.id}')">📋 Lead</button>
+          </div>`;
+        }).join('');
+      }
+
+      if (vencendo.length > 0) {
+        html += `<div class="font-bold text-sm mb-2 mt-3" style="color:#f59e0b">📄 Contratos Vencendo em ${dias} Dias (${vencendo.length})</div>`;
+        html += vencendo.map(c => {
+          const d = Utils.daysUntil(c.dataFim);
+          const cor = d == null ? '#94a3b8' : d < 0 ? '#ef4444' : d <= 30 ? '#ef4444' : d <= 60 ? '#f59e0b' : '#10b981';
+          const label = d == null ? '—' : d < 0 ? `Vencido há ${Math.abs(d)}d` : d === 0 ? 'Vence HOJE' : `${d} dias`;
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1">
+              <div class="font-bold text-sm">${Utils.escHtml(Utils.getClientName(c.clienteId))}</div>
+              <div class="text-xs text-muted">${Utils.escHtml(c.objeto||'—')} · ${Utils.formatCurrency(c.valor)}</div>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:${cor}">${label}</span>
+            <button class="btn btn-xs btn-secondary" onclick="Contratos.criarLeadRenovacaoContrato('${c.id}');this.disabled=true;this.textContent='✓'">🔄 Renovar</button>
+          </div>`;
+        }).join('');
+      }
+      return html;
+    } catch(e) { return '<div class="text-sm text-muted">Erro ao carregar alertas.</div>'; }
   }
 
   /* ================================================
@@ -886,5 +997,5 @@ const Dashboard = (() => {
     setTimeout(() => { const f = document.getElementById('modalFoot'); if(f) f.style.display='none'; }, 0);
   }
 
-  return { render, setPeriodo, drillDown };
+  return { render, setPeriodo, drillDown, _filtrarAlertasContratos };
 })();

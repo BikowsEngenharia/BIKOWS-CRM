@@ -186,6 +186,7 @@ const Propostas = (() => {
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.view('${p.id}')">Ver</button>
                       <button class="btn btn-xs btn-success" onclick="PropostaGenerator.open('${p.id}')" title="Gerar proposta PDF">🖨 Gerar</button>
+                      <button class="btn btn-xs btn-secondary" onclick="Propostas.duplicar('${p.id}')" title="Duplicar proposta">📋 Dupl.</button>
                       ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-xs btn-secondary" title="Abrir no Canva">🎨</a>` : ''}
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.openForm('${p.id}')">✏</button>
                       <button class="btn btn-xs btn-danger" onclick="Propostas.deleteProposta('${p.id}')">🗑</button>
@@ -1137,6 +1138,32 @@ const Propostas = (() => {
     setTimeout(()=>{ const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; },0);
   }
 
+  /* ================================================
+     MELHORIA 5: DUPLICAR PROPOSTA
+     ================================================ */
+  function duplicar(id) {
+    const original = DB.get('propostas', id);
+    if (!original) return;
+    const novoNumero = _nextNumeroProposta();
+    const copia = DB.create('propostas', {
+      numero: novoNumero,
+      titulo: original.titulo,
+      clienteId: original.clienteId,
+      clienteNome: original.clienteNome,
+      responsavel: original.responsavel,
+      valor: original.valor,
+      status: 'elaboracao',
+      validade: '',
+      descricao: original.descricao,
+      observacoes: original.observacoes,
+      itens: JSON.parse(JSON.stringify(original.itens || [])),
+      versoes: [],
+      leadId: original.leadId || null,
+    });
+    Toast.success(`Proposta ${novoNumero} duplicada! Edite os detalhes.`);
+    setTimeout(() => openForm(copia.id), 300);
+  }
+
   return {
     render, openForm, saveProposta, deleteProposta, view, setFilter, changeStatus,
     criarRecebivel, addNew, addItemRow, removeItemRow, _setItemField,
@@ -1145,5 +1172,6 @@ const Propostas = (() => {
     nextNumeroProposta: _nextNumeroProposta, // exposto para uso no pipeline
     setPeriodo,
     drillDown,
+    duplicar,
   };
 })();

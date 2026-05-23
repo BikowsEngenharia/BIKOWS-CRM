@@ -1352,6 +1352,13 @@ body.dark-mode .kpi-meta-card { background: var(--surface); border-color: var(--
   /* Contrato PDF */
   #contratoImpressao { display: block !important; }
   #appLayout { display: none !important; }
+
+  /* Relatório PDF (Melhoria 9) */
+  #relatorioPrint { display: block !important; }
+  #relatorioPrint .rp-section { break-inside: avoid; margin-bottom: 24px; }
+  #relatorioPrint table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  #relatorioPrint th, #relatorioPrint td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
+  #relatorioPrint th { background: #f1f5f9; font-weight: 700; }
 }
 
 /* Contrato impresso — oculto na tela, visível apenas na impressão */
@@ -1362,6 +1369,20 @@ body.dark-mode .kpi-meta-card { background: var(--surface); border-color: var(--
   z-index: 99999;
   background: #fff;
   overflow: auto;
+}
+
+/* Relatório PDF — oculto na tela, visível apenas na impressão */
+#relatorioPrint {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #fff;
+  padding: 2cm;
+  overflow: auto;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  color: #0f172a;
 }
 
 /* ==========================================

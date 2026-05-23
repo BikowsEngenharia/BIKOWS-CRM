@@ -40,6 +40,7 @@ const Relatorios = (() => {
             ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Relatorios.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
           </div>
           <button class="btn btn-secondary" onclick="Relatorios.exportarCSV()">📥 Exportar CSV</button>
+          <button class="btn btn-secondary" onclick="Relatorios.exportarPDF()">📄 Exportar PDF</button>
           <button class="btn btn-secondary" onclick="window.print()">🖨 Imprimir</button>
         </div>
       </div>
@@ -50,6 +51,7 @@ const Relatorios = (() => {
         <button class="tab-btn ${_tab==='clientes'?'active':''}" onclick="Relatorios.setTab('clientes')">🏢 Clientes</button>
         <button class="tab-btn ${_tab==='licitacoes'?'active':''}" onclick="Relatorios.setTab('licitacoes')">🏛 Licitações</button>
         <button class="tab-btn ${_tab==='margem'?'active':''}" onclick="Relatorios.setTab('margem')">📊 Margem</button>
+        <button class="tab-btn ${_tab==='comissoes'?'active':''}" onclick="Relatorios.setTab('comissoes')">💰 Comissões</button>
       </div>
       <div id="relContent">${renderTab()}</div>
     `;
@@ -69,6 +71,7 @@ const Relatorios = (() => {
     if (_tab === 'clientes') return renderClientesTab();
     if (_tab === 'licitacoes') return renderLicitacoesTab();
     if (_tab === 'margem') return renderMargemTab();
+    if (_tab === 'comissoes') return renderComissoesTab();
     return '';
   }
 
@@ -810,5 +813,223 @@ const Relatorios = (() => {
     a.click();
   }
 
-  return { render, setTab, exportarCSV, setPeriodo };
+  /* ================================================
+     MELHORIA 9: EXPORTAR PDF DO RELATÓRIO
+     ================================================ */
+  function exportarPDF() {
+    const cfg = DB.getConfig();
+    const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
+    const periodoLabel = periodoLabels[_periodo] || '';
+
+    const leads = _filtrarPorPeriodo(DB.getAll('leads'), 'dataEntrada');
+    const ganhos = leads.filter(l => l.status === 'fechado_ganho');
+    const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const perdidos = leads.filter(l => l.status === 'fechado_perdido');
+    const taxa = leads.length ? ((ganhos.length/leads.length)*100).toFixed(1) : 0;
+    const receitaFechada = ganhos.reduce((s,l) => s + (l.valorFechado||0), 0);
+    const pipeline = ativos.reduce((s,l) => s + (l.valorEstimado||0), 0);
+
+    const contratos = DB.getAll('contratos').filter(c => ['ativo','renovando'].includes(c.status || 'ativo'));
+    const valorContratos = contratos.reduce((s,c) => s + (c.valor||0), 0);
+
+    const projetos = _filtrarPorPeriodo(DB.getAll('projetos'), 'dataInicio');
+    const projetosAtivos = DB.getAll('projetos').filter(p => p.status === 'em_andamento');
+
+    // Pipeline por estágio
+    const STAGES = ['lead_identificado','primeiro_contato','qualificacao','proposta_elaboracao','proposta_enviada','negociacao'];
+    const stageNames = { lead_identificado:'Lead Identificado', primeiro_contato:'Primeiro Contato', qualificacao:'Qualificação', proposta_elaboracao:'Prop. Elaboração', proposta_enviada:'Prop. Enviada', negociacao:'Negociação' };
+
+    // Top clientes por receita fechada
+    const clienteMap = {};
+    ganhos.forEach(l => {
+      const n = Utils.getClientName(l.clienteId) || 'Sem cliente';
+      clienteMap[n] = (clienteMap[n]||0) + (l.valorFechado||0);
+    });
+    const topClientes = Object.entries(clienteMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+    let area = document.getElementById('relatorioPrint');
+    if (!area) {
+      area = document.createElement('div');
+      area.id = 'relatorioPrint';
+      document.body.appendChild(area);
+    }
+
+    area.innerHTML = `
+      <div style="font-family:'Inter',Arial,sans-serif;max-width:800px;margin:0 auto;padding:30px;color:#1e293b">
+        <!-- CABEÇALHO -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1d4ed8">
+          <div>
+            <div style="font-size:24px;font-weight:800;color:#1d4ed8">${Utils.escHtml(cfg.empresa || 'Bikows Engenharia')}</div>
+            <div style="font-size:13px;color:#64748b">Relatório Gerencial — ${periodoLabel}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:#64748b">Gerado em ${new Date().toLocaleDateString('pt-BR')}</div>
+            <div style="font-size:11px;color:#64748b">Bikows CRM</div>
+          </div>
+        </div>
+
+        <!-- RESULTADO COMERCIAL -->
+        <div style="margin-bottom:24px">
+          <h2 style="font-size:15px;font-weight:700;color:#1d4ed8;margin:0 0 12px;border-left:4px solid #1d4ed8;padding-left:8px">📊 Resultado Comercial</h2>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+            ${[
+              { l:'Leads no Período', v:leads.length, u:'', c:'#1d4ed8' },
+              { l:'Receita Fechada', v:Utils.formatCurrency(receitaFechada), u:'', c:'#10b981' },
+              { l:'Pipeline Ativo', v:Utils.formatCurrency(pipeline), u:'', c:'#f59e0b' },
+              { l:'Taxa de Conversão', v:taxa+'%', u:'', c:'#8b5cf6' },
+            ].map(k => `<div style="background:#f8fafc;border-radius:8px;padding:12px;text-align:center;border-top:3px solid ${k.c}">
+              <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${k.l}</div>
+              <div style="font-size:18px;font-weight:800;color:${k.c}">${k.v}</div>
+            </div>`).join('')}
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+            <thead>
+              <tr style="background:#f8fafc">
+                <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Etapa do Pipeline</th>
+                <th style="padding:8px;border:1px solid #e2e8f0;text-align:center">Leads</th>
+                <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${STAGES.map(s => {
+                const ls = ativos.filter(l => l.status === s);
+                if (!ls.length) return '';
+                return `<tr>
+                  <td style="padding:7px 8px;border:1px solid #e2e8f0">${stageNames[s]||s}</td>
+                  <td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center">${ls.length}</td>
+                  <td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:right">${Utils.formatCurrency(ls.reduce((s,l)=>s+(l.valorEstimado||0),0))}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TOP CLIENTES -->
+        ${topClientes.length ? `<div style="margin-bottom:24px">
+          <h2 style="font-size:15px;font-weight:700;color:#1d4ed8;margin:0 0 12px;border-left:4px solid #1d4ed8;padding-left:8px">🏆 Top Clientes</h2>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#f8fafc">
+              <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Cliente</th>
+              <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Receita Fechada</th>
+            </tr></thead>
+            <tbody>${topClientes.map(([n,v]) => `<tr>
+              <td style="padding:7px 8px;border:1px solid #e2e8f0">${Utils.escHtml(n)}</td>
+              <td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:right;font-weight:700;color:#10b981">${Utils.formatCurrency(v)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>` : ''}
+
+        <!-- RESULTADO FINANCEIRO -->
+        <div style="margin-bottom:24px">
+          <h2 style="font-size:15px;font-weight:700;color:#1d4ed8;margin:0 0 12px;border-left:4px solid #1d4ed8;padding-left:8px">💰 Contratos em Vigência</h2>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">
+            <div style="background:#f8fafc;border-radius:8px;padding:12px;text-align:center;border-top:3px solid #10b981">
+              <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Contratos Ativos</div>
+              <div style="font-size:20px;font-weight:800;color:#10b981">${contratos.length}</div>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px;text-align:center;border-top:3px solid #1d4ed8">
+              <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Valor em Carteira</div>
+              <div style="font-size:20px;font-weight:800;color:#1d4ed8">${Utils.formatCurrency(valorContratos)}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROJETOS -->
+        <div>
+          <h2 style="font-size:15px;font-weight:700;color:#1d4ed8;margin:0 0 12px;border-left:4px solid #1d4ed8;padding-left:8px">🔧 Projetos em Andamento</h2>
+          ${projetosAtivos.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#f8fafc">
+              <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Projeto</th>
+              <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Cliente</th>
+              <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Valor</th>
+              <th style="padding:8px;border:1px solid #e2e8f0;text-align:center">Prazo</th>
+            </tr></thead>
+            <tbody>${projetosAtivos.map(p => `<tr>
+              <td style="padding:7px 8px;border:1px solid #e2e8f0">${Utils.escHtml(p.titulo)}</td>
+              <td style="padding:7px 8px;border:1px solid #e2e8f0">${Utils.escHtml(Utils.getClientName(p.clienteId))}</td>
+              <td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:right">${Utils.formatCurrency(p.valor)}</td>
+              <td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center">${Utils.formatDate(p.prazo)}</td>
+            </tr>`).join('')}</tbody>
+          </table>` : '<div style="color:#64748b;font-size:13px">Nenhum projeto em andamento.</div>'}
+        </div>
+
+        <div style="text-align:center;font-size:10px;color:#94a3b8;margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0">
+          ${Utils.escHtml(cfg.empresa || 'Bikows Engenharia')} — Bikows CRM · Gerado em ${new Date().toLocaleDateString('pt-BR')}
+        </div>
+      </div>
+    `;
+
+    area.style.display = 'block';
+    requestAnimationFrame(() => {
+      window.print();
+      area.style.display = 'none';
+    });
+  }
+
+  /* ================================================
+     MELHORIA 11: ABA DE COMISSÕES
+     ================================================ */
+  function renderComissoesTab() {
+    const leads = _filtrarPorPeriodo(DB.getAll('leads'), 'dataEntrada');
+    const ganhos = leads.filter(l => l.status === 'fechado_ganho');
+    const contratos = _filtrarPorPeriodo(DB.getAll('contratos'), 'dataInicio');
+
+    // Agrupa por responsável
+    const porResp = {};
+    ganhos.forEach(l => {
+      const r = l.responsavel || 'Sem responsável';
+      if (!porResp[r]) porResp[r] = { leads: [], contratos: [], totalLeads: 0, totalContratos: 0 };
+      porResp[r].leads.push(l);
+      porResp[r].totalLeads += (l.valorFechado || 0);
+    });
+    contratos.forEach(c => {
+      if (!c.comissaoPerc) return;
+      const r = c.responsavel || 'Sem responsável';
+      if (!porResp[r]) porResp[r] = { leads: [], contratos: [], totalLeads: 0, totalContratos: 0 };
+      porResp[r].contratos.push(c);
+      porResp[r].totalContratos += (c.valor || 0);
+    });
+
+    const rows = Object.entries(porResp).map(([resp, d]) => {
+      const totalBase = d.totalLeads + d.totalContratos;
+      const percMedio = d.leads.reduce((s,l) => s + (l.comissaoPerc || 5), 0) / Math.max(d.leads.length, 1);
+      const comissaoLeads = d.leads.reduce((s,l) => s + (l.valorFechado||0) * ((l.comissaoPerc||5)/100), 0);
+      const comissaoContratos = d.contratos.reduce((s,c) => s + (c.valor||0) * ((c.comissaoPerc||0)/100), 0);
+      const comissaoTotal = comissaoLeads + comissaoContratos;
+      return { resp, fechados: d.leads.length, totalBase, percMedio: percMedio.toFixed(1), comissaoTotal };
+    }).sort((a,b) => b.comissaoTotal - a.comissaoTotal);
+
+    if (!rows.length) return '<div class="empty-state"><div class="empty-icon">💰</div><div class="empty-title">Nenhum dado de comissão</div><div class="empty-sub">Adicione o campo comissão (%) nos leads fechados.</div></div>';
+
+    const totalComissao = rows.reduce((s,r) => s + r.comissaoTotal, 0);
+
+    return `
+      <div class="kpi-grid mb-4">
+        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Total de Comissões</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalComissao)}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Vendedores com Comissão</div><div class="kpi-value">${rows.length}</div><div class="kpi-icon">👤</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">💰 Comissões por Vendedor</div></div>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead><tr><th>Vendedor</th><th>Contratos Fechados</th><th>Valor Total</th><th>Comissão %</th><th>Comissão R$</th></tr></thead>
+            <tbody>
+              ${rows.map(r => `<tr>
+                <td class="font-bold text-sm">${Utils.escHtml(r.resp)}</td>
+                <td class="text-center">${r.fechados}</td>
+                <td class="font-bold text-primary">${Utils.formatCurrency(r.totalBase)}</td>
+                <td class="text-center">${r.percMedio}%</td>
+                <td class="font-bold" style="color:#10b981">${Utils.formatCurrency(r.comissaoTotal)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="text-xs text-muted mt-3">
+        ℹ Os valores de comissão são calculados com base no campo "comissaoPerc" dos leads fechados (padrão 5%). Para ajustar, edite cada lead.
+      </div>
+    `;
+  }
+
+  return { render, setTab, exportarCSV, exportarPDF, setPeriodo };
 })();

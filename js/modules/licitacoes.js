@@ -617,14 +617,13 @@ const Licitacoes = (() => {
             ${lics.filter(l=>l.status==='ganhou').map(l => renderKanbanCard(l)).join('')}
           </div>
           <div style="width:200px;flex-shrink:0">
-            <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #ef4444;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s"
-                 title="Clique para ver perdidas/canceladas"
-                 onclick="Licitacoes.filtrarKanban('perdeu')"
-                 onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'"
-                 onmouseout="this.style.boxShadow='none'">
+            <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #ef4444;margin-bottom:8px;transition:box-shadow .15s">
               <div style="font-size:12px;font-weight:700;color:#ef4444">❌ Perdidas / Canceladas</div>
               <div style="font-size:11px;color:var(--text-muted)">${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).length}</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;opacity:.7">🔍 Ver lista filtrada</div>
+              <div style="display:flex;gap:4px;margin-top:6px">
+                <button class="btn btn-xs btn-secondary" style="flex:1;font-size:10px" onclick="Licitacoes.filtrarKanban('perdeu')">🔍 Ver lista</button>
+                ${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).length > 0 ? `<button class="btn btn-xs btn-danger" style="flex:1;font-size:10px" onclick="Licitacoes.limparEncerradas()">🗑 Limpar tudo</button>` : ''}
+              </div>
             </div>
             ${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).map(l => renderKanbanCard(l)).join('')}
           </div>
@@ -636,13 +635,19 @@ const Licitacoes = (() => {
     const s = STATUS[l.status] || { label: l.status, badge: 'badge-gray', color: '#94a3b8' };
     const dias = Utils.daysUntil(l.dataAbertura);
     const alertStyle = dias != null && dias >= 0 && dias <= 7 ? 'border-left:3px solid #ef4444' : '';
+    const isEncerrada = ['descartada','cancelada','perdeu','deserta'].includes(l.status);
     return `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;cursor:pointer;${alertStyle}" onclick="Licitacoes.view('${l.id}')">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;${isEncerrada?'opacity:.8;':'cursor:pointer;'}${alertStyle}" ${!isEncerrada ? `onclick="Licitacoes.view('${l.id}')"` : ''}>
         <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:3px">${Utils.escHtml(l.numero||'—')}</div>
         <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:6px">${Utils.escHtml(Utils.truncate(l.objeto||'',60))}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">🏛 ${Utils.escHtml(Utils.truncate(l.orgao||'',30))}</div>
         ${l.valorEstimado ? `<div style="font-size:12px;font-weight:700;color:var(--primary)">${Utils.formatCurrency(l.valorEstimado)}</div>` : ''}
         ${dias != null && dias >= 0 ? `<div style="font-size:10px;color:${dias<=3?'#ef4444':dias<=7?'#d97706':'#94a3b8'};margin-top:4px">📅 Abertura em ${dias}d</div>` : ''}
+        ${isEncerrada ? `
+        <div style="display:flex;gap:4px;margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">
+          <button class="btn btn-xs btn-secondary" style="flex:1;font-size:10px" onclick="Licitacoes.view('${l.id}')">Ver</button>
+          <button class="btn btn-xs btn-danger" style="flex:1;font-size:10px" onclick="event.stopPropagation();Licitacoes.deleteLic('${l.id}')">🗑 Excluir</button>
+        </div>` : ''}
       </div>`;
   }
 
@@ -1267,10 +1272,21 @@ const Licitacoes = (() => {
     reader.readAsText(file, 'UTF-8');
   }
 
+  /* ── Limpar licitações encerradas permanentemente ─────────────────────── */
+  function limparEncerradas() {
+    const encerradas = DB.getAll('licitacoes').filter(l => ['perdeu','deserta','cancelada'].includes(l.status));
+    if (!encerradas.length) { Toast.success('Nenhuma licitação encerrada para excluir.'); return; }
+    if (!confirm(`Excluir permanentemente ${encerradas.length} licitação(ões) encerrada(s) (perdida, deserta ou cancelada)?\n\nEsta ação não pode ser desfeita.`)) return;
+    encerradas.forEach(l => DB.remove('licitacoes', l.id));
+    Toast.success(`${encerradas.length} licitação(ões) removida(s) permanentemente.`);
+    render();
+  }
+
   return {
     render, openForm, saveLic, deleteLic, view, setFilter, setTab,
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,
     filtrarKanban, recarregarPncp, moverKanbanPncp, importarPncp,
+    limparEncerradas,
   };
 })();

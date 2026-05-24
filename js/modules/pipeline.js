@@ -534,7 +534,7 @@ const Pipeline = (() => {
           : (['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status)
               ? `<button class="btn btn-xs btn-secondary" onclick="Pipeline.criarPropostaLead('${lead.id}')" title="Criar proposta">📄+</button>`
               : '')}
-        ${lead.status === 'fechado_ganho' ? `<button class="btn btn-xs btn-primary" onclick="Pipeline.abrirContratoLead('${lead.id}')" title="Fechar contrato">🤝</button>` : ''}
+        ${lead.status === 'fechado_ganho' ? `<button class="btn btn-xs btn-primary" onclick="Pipeline.abrirContratoLead('${lead.id}')" title="Preencher condições de pagamento, prazo e criar projeto" style="background:#059669;border-color:#059669;font-size:10px;padding:2px 6px">🤝 Contrato</button>` : ''}
         ${lead.contato ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escHtml(lead.contato)}')" title="WhatsApp">💬</button>` : ''}
         ${frio ? `<button class="btn btn-xs btn-warning" onclick="Pipeline.criarFollowupAutomatico('${lead.id}')" title="Criar follow-up">🔔</button>` : ''}
         <button class="btn btn-xs btn-secondary" onclick="Pipeline.openForm('${lead.id}')">✏</button>
@@ -1298,8 +1298,17 @@ const Pipeline = (() => {
     };
 
     if (id) {
+      const wasNotGanho = existingLead?.status !== 'fechado_ganho';
       DB.update('leads', id, data);
       Toast.success('Lead atualizado');
+      // Ao mudar para Fechado/Ganho via formulário → disparar fluxo de contratação
+      if (data.status === 'fechado_ganho' && wasNotGanho) {
+        Modal.close();
+        render();
+        App.updateNotifBadge();
+        setTimeout(() => _promptContratacao(id), 400);
+        return;
+      }
     } else {
       DB.create('leads', data);
       Toast.success('Lead criado');

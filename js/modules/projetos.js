@@ -3,7 +3,8 @@
    ========================================== */
 const Projetos = (() => {
 
-  let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+  let _periodo = 'tudo'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+  let _tabProjetos = 'andamento'; // 'andamento' | 'concluidos' | 'todos'
 
   function _filtrarPorPeriodo(lista, campo) {
     if (_periodo === 'tudo') return lista;
@@ -29,6 +30,12 @@ const Projetos = (() => {
     render();
   }
 
+  function setTabProjetos(t) {
+    _tabProjetos = t;
+    _filter.status = ''; // limpar filtro de status ao trocar de aba
+    render();
+  }
+
   let _filter = { status: '', responsavel: '' };
 
   function _calcRentabilidade(p) {
@@ -47,7 +54,10 @@ const Projetos = (() => {
     const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
     const projetosFiltrados = _filtrarPorPeriodo(projetos, 'dataInicio');
 
+    // Filtrar por aba principal
     let list = projetos;
+    if (_tabProjetos === 'andamento') list = list.filter(p => !['concluido','cancelado'].includes(p.status));
+    else if (_tabProjetos === 'concluidos') list = list.filter(p => p.status === 'concluido');
     if (_filter.status) list = list.filter(p => p.status === _filter.status);
     if (_filter.responsavel) list = list.filter(p => p.responsavel === _filter.responsavel);
 
@@ -77,6 +87,13 @@ const Projetos = (() => {
           <button class="btn btn-secondary" onclick="Projetos.verRentabilidade()">📊 Rentabilidade</button>
           <button class="btn btn-primary" onclick="Projetos.openForm()">+ Novo Projeto</button>
         </div>
+      </div>
+
+      <!-- Tabs principais -->
+      <div class="fin-tabs" style="margin-bottom:16px">
+        <button class="fin-tab ${_tabProjetos==='andamento'?'active':''}" onclick="Projetos.setTabProjetos('andamento')">🔧 Em Andamento <span style="font-size:11px;opacity:.7">(${projetos.filter(p=>!['concluido','cancelado'].includes(p.status)).length})</span></button>
+        <button class="fin-tab ${_tabProjetos==='concluidos'?'active':''}" onclick="Projetos.setTabProjetos('concluidos')">✅ Concluídos <span style="font-size:11px;opacity:.7">(${projetos.filter(p=>p.status==='concluido').length})</span></button>
+        <button class="fin-tab ${_tabProjetos==='todos'?'active':''}" onclick="Projetos.setTabProjetos('todos')">📋 Todos <span style="font-size:11px;opacity:.7">(${projetos.length})</span></button>
       </div>
 
       <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
@@ -1267,7 +1284,7 @@ const Projetos = (() => {
   return {
     render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew,
     verRentabilidade, addChecklistItem, toggleChecklistItem, aplicarTemplateChecklist,
-    _nextOS, setPeriodo, drillDown,
+    _nextOS, setPeriodo, setTabProjetos, drillDown,
     // Timesheet (Melhoria 2)
     salvarTimesheet, removerTimesheet,
     // ARTs (Melhoria 4)

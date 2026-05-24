@@ -229,9 +229,20 @@ const Config = (() => {
 
         <!-- Google Calendar -->
         <div class="card">
-          <div class="card-header"><div class="card-title">📅 Google Calendar</div></div>
+          <div class="card-header">
+            <div class="card-title">📅 Google Calendar</div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem;font-weight:500">
+              <input type="checkbox" id="gcalEnabledToggle" ${DB.getConfig()?.gcalEnabled ? 'checked' : ''}
+                onchange="Config.toggleGcal(this.checked)"
+                style="width:16px;height:16px;cursor:pointer">
+              Ativar integração
+            </label>
+          </div>
           <div class="card-body" id="gcalStatusCard">
-            <div class="text-sm text-muted">Verificando integração...</div>
+            ${!DB.getConfig()?.gcalEnabled
+              ? `<div class="text-sm text-muted">Integração desativada. Ative o toggle acima para conectar o Google Calendar.</div>`
+              : `<div class="text-sm text-muted">Verificando integração...</div>`
+            }
           </div>
         </div>
 
@@ -271,12 +282,32 @@ const Config = (() => {
     `;
     // Render Google Calendar status after DOM is ready
     setTimeout(() => {
-      if (typeof GoogleCal !== 'undefined') GoogleCal.renderStatus('#gcalStatusCard');
+      if (typeof GoogleCal !== 'undefined' && DB.getConfig()?.gcalEnabled) {
+        GoogleCal.renderStatus('#gcalStatusCard');
+      }
       // Show last backup date
       const lb = localStorage.getItem('crm_last_backup');
       const el = document.getElementById('lastBackupDate');
       if (el && lb) el.textContent = Utils.formatDate(lb.split('T')[0]) + ' às ' + lb.split('T')[1].substring(0, 5);
     }, 50);
+  }
+
+  function toggleGcal(enabled) {
+    DB.saveConfig({ gcalEnabled: enabled });
+    const card = document.getElementById('gcalStatusCard');
+    if (!card) return;
+    if (enabled) {
+      card.innerHTML = '<div class="text-sm text-muted">Verificando integração...</div>';
+      if (typeof GoogleCal !== 'undefined') {
+        GoogleCal.init();
+        setTimeout(() => GoogleCal.renderStatus('#gcalStatusCard'), 500);
+      }
+      Toast.success('Integração com Google Calendar ativada.');
+    } else {
+      if (typeof GoogleCal !== 'undefined') GoogleCal.disconnect();
+      card.innerHTML = '<div class="text-sm text-muted">Integração desativada. Ative o toggle acima para conectar o Google Calendar.</div>';
+      Toast.show('Integração com Google Calendar desativada.');
+    }
   }
 
   function saveEmpresa() {
@@ -581,5 +612,5 @@ const Config = (() => {
     Toast.success('Log de auditoria limpo.');
   }
 
-  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup, filterAudit, clearAudit };
+  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup, filterAudit, clearAudit, toggleGcal };
 })();

@@ -393,6 +393,13 @@ const GoogleCal = (() => {
     // Marcar para re-render automático
     el.setAttribute('data-gcal-status', '1');
 
+    // Se a integração não foi habilitada pelo usuário nas Configurações, não exibe nada
+    const cfg = (typeof DB !== 'undefined') ? DB.getConfig() : null;
+    if (!cfg?.gcalEnabled && !_connected) {
+      el.innerHTML = '';
+      return;
+    }
+
     if (!_isConfigured()) {
       el.innerHTML = `
         <div class="card" style="border-left:4px solid #f59e0b">

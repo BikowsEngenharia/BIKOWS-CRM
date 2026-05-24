@@ -78,9 +78,9 @@ const Folha = (() => {
         <h2 class="sec-title">RH / Folha de Pagamento</h2>
       </div>
       <div class="fin-tabs" id="folhaTabs">
-        ${['socios','funcionarios','folha','holerite','historico'].map(t => `
+        ${['funcionarios','folha','holerite','historico'].map(t => `
           <button class="fin-tab ${_tab === t ? 'active' : ''}" onclick="Folha.setTab('${t}')">
-            ${{ socios:'💼 Sócios', funcionarios:'👥 Funcionários', folha:'📋 Folha Mensal', holerite:'🧾 Holerite', historico:'📊 Histórico' }[t]}
+            ${{ funcionarios:'👥 Funcionários', folha:'📋 Folha Mensal', holerite:'🧾 Holerite', historico:'📊 Histórico' }[t]}
           </button>
         `).join('')}
       </div>
@@ -95,13 +95,12 @@ const Folha = (() => {
     const el = document.getElementById('folhaTabContent');
     if (!el) return;
     const map = {
-      socios: buildSocios,
       funcionarios: buildFuncionarios,
       folha: buildFolhaMensal,
       holerite: buildHolerite,
       historico: buildHistorico,
     };
-    el.innerHTML = (map[_tab] || buildSocios)();
+    el.innerHTML = (map[_tab] || buildFuncionarios)();
   }
 
   /* =========================================================
@@ -504,7 +503,7 @@ const Folha = (() => {
           <div class="form-group">
             <label class="form-label">Regime</label>
             <select class="form-control" id="ffRegime">
-              ${['CLT','PJ','Estágio','Autônomo'].map(r => `<option ${(f?.regimeContratacao||'CLT')===r?'selected':''}>${r}</option>`).join('')}
+              ${['CLT','PJ','Estágio','Autônomo','Parceria','Sócio'].map(r => `<option ${(f?.regimeContratacao||'CLT')===r?'selected':''}>${r}</option>`).join('')}
             </select>
           </div>
         </div>

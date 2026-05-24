@@ -78,9 +78,9 @@ const Folha = (() => {
         <h2 class="sec-title">RH / Folha de Pagamento</h2>
       </div>
       <div class="fin-tabs" id="folhaTabs">
-        ${['funcionarios','folha','holerite','historico'].map(t => `
+        ${['socios','funcionarios','folha','holerite','historico'].map(t => `
           <button class="fin-tab ${_tab === t ? 'active' : ''}" onclick="Folha.setTab('${t}')">
-            ${{ funcionarios:'👥 Funcionários', folha:'📋 Folha Mensal', holerite:'🧾 Holerite', historico:'📊 Histórico' }[t]}
+            ${{ socios:'💼 Sócios', funcionarios:'👥 Funcionários', folha:'📋 Folha Mensal', holerite:'🧾 Holerite', historico:'📊 Histórico' }[t]}
           </button>
         `).join('')}
       </div>
@@ -95,12 +95,13 @@ const Folha = (() => {
     const el = document.getElementById('folhaTabContent');
     if (!el) return;
     const map = {
+      socios: buildSocios,
       funcionarios: buildFuncionarios,
       folha: buildFolhaMensal,
       holerite: buildHolerite,
       historico: buildHistorico,
     };
-    el.innerHTML = (map[_tab] || buildFuncionarios)();
+    el.innerHTML = (map[_tab] || buildSocios)();
   }
 
   /* =========================================================
@@ -741,6 +742,245 @@ const Folha = (() => {
     });
   }
 
+  /* =========================================================
+     TAB SÓCIOS — Pró-labore e Dividendos
+  ========================================================= */
+  function calcProLabore(valor) {
+    // Pró-labore segue tabela INSS e IRRF igual funcionário CLT
+    const inss = calcINSS(valor);
+    const irrf = calcIRRF(valor, inss, 0);
+    return { bruto: valor, inss, irrf, liquido: valor - inss - irrf };
+  }
+
+  function buildSocios() {
+    const socios = DB.getAll('socios');
+    const ativos = socios.filter(s => s.ativo !== false);
+
+    const totalProLabore  = ativos.reduce((s, x) => s + (x.prolabore || 0), 0);
+    const totalDividendos = ativos.reduce((s, x) => s + (x.dividendos || 0), 0);
+    const totalINSS       = ativos.reduce((s, x) => {
+      const { inss } = calcProLabore(x.prolabore || 0);
+      return s + inss;
+    }, 0);
+
+    return `
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+        <div class="kpi-card" style="--kpi-color:#7c3aed"><div class="kpi-label">Sócios Cadastrados</div><div class="kpi-value">${ativos.length}</div><div class="kpi-icon">💼</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Total Pró-labore</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalProLabore)}</div><div class="kpi-icon">💼</div></div>
+        <div class="kpi-card" style="--kpi-color:#059669"><div class="kpi-label">Total Dividendos</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalDividendos)}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:#f59e0b"><div class="kpi-label">INSS s/ Pró-labore</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalINSS)}</div><div class="kpi-icon">🏦</div></div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;font-size:16px;color:var(--text)">Sócios / Retiradas</h3>
+        <button class="btn-primary" onclick="Folha.openFormSocio()">+ Adicionar Sócio</button>
+      </div>
+
+      ${ativos.length === 0 ? `
+        <div class="empty-state" style="padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:12px">💼</div>
+          <p style="color:var(--text-muted)">Nenhum sócio cadastrado. Clique em <strong>+ Adicionar Sócio</strong> para começar.</p>
+        </div>` : `
+        <div style="display:grid;gap:16px">
+          ${ativos.map(s => {
+            const pl = calcProLabore(s.prolabore || 0);
+            const totalRetirada = (s.prolabore || 0) + (s.dividendos || 0);
+            const totalLiquido  = pl.liquido + (s.dividendos || 0);
+            const tipoBadge = s.tipo === 'prolabore'
+              ? '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">Pró-labore</span>'
+              : s.tipo === 'dividendos'
+              ? '<span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">Dividendos</span>'
+              : '<span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">Misto</span>';
+            return `
+            <div class="card" style="padding:20px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+                <div style="flex:1;min-width:220px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                    <span style="font-size:22px">👤</span>
+                    <div>
+                      <div style="font-weight:700;font-size:15px;color:var(--text)">${Utils.escHtml(s.nome)}</div>
+                      <div style="font-size:12px;color:var(--text-muted)">${Utils.escHtml(s.cargo || 'Sócio')} ${s.percentualSociedade ? '· ' + s.percentualSociedade + '% da sociedade' : ''}</div>
+                    </div>
+                  </div>
+                  <div style="margin-top:6px">${tipoBadge}</div>
+                </div>
+                <div style="display:flex;gap:32px;flex-wrap:wrap">
+                  ${s.prolabore ? `
+                  <div style="text-align:center">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Pró-labore Bruto</div>
+                    <div style="font-weight:700;color:#1a56db">${Utils.formatCurrency(s.prolabore)}</div>
+                    <div style="font-size:10px;color:#dc2626;margin-top:2px">INSS: ${Utils.formatCurrency(pl.inss)} · IRRF: ${Utils.formatCurrency(pl.irrf)}</div>
+                    <div style="font-size:11px;color:#059669;font-weight:600">Líquido: ${Utils.formatCurrency(pl.liquido)}</div>
+                  </div>` : ''}
+                  ${s.dividendos ? `
+                  <div style="text-align:center">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Dividendos</div>
+                    <div style="font-weight:700;color:#059669">${Utils.formatCurrency(s.dividendos)}</div>
+                    <div style="font-size:10px;color:#059669;margin-top:2px">Isento de IR</div>
+                  </div>` : ''}
+                  <div style="text-align:center;border-left:2px solid var(--border);padding-left:16px">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Total Bruto</div>
+                    <div style="font-weight:700;font-size:16px;color:var(--text)">${Utils.formatCurrency(totalRetirada)}</div>
+                    <div style="font-size:11px;color:#059669;font-weight:600">Líq: ${Utils.formatCurrency(totalLiquido)}</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button class="btn-secondary btn-sm" onclick="Folha.openFormSocio('${s.id}')">✏️</button>
+                  <button class="btn-secondary btn-sm" onclick="Folha.deleteSocio('${s.id}')" style="color:#dc2626">🗑️</button>
+                </div>
+              </div>
+              ${s.observacoes ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted)">${Utils.escHtml(s.observacoes)}</div>` : ''}
+            </div>`;
+          }).join('')}
+        </div>`}
+    `;
+  }
+
+  function openFormSocio(id) {
+    const s = id ? DB.get('socios', id) : null;
+    Modal.open({
+      title: s ? 'Editar Sócio' : 'Adicionar Sócio / Retiradas',
+      size: 'md',
+      body: `
+        <div style="display:grid;gap:14px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Nome completo *</label>
+              <input class="form-input" id="sNome" value="${Utils.escHtml(s?.nome || '')}" placeholder="Ex: Marcos Israel">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">CPF</label>
+              <input class="form-input" id="sCpf" value="${Utils.escHtml(s?.cpf || '')}" placeholder="000.000.000-00">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Cargo / Função</label>
+              <input class="form-input" id="sCargo" value="${Utils.escHtml(s?.cargo || 'Sócio-Administrador')}" placeholder="Ex: Sócio-Administrador">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">% na Sociedade</label>
+              <input class="form-input" id="sPerc" type="number" min="0" max="100" step="0.01" value="${s?.percentualSociedade || ''}" placeholder="Ex: 100">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Tipo de Retirada *</label>
+            <select class="form-input" id="sTipo" onchange="Folha._toggleSocioTipo()">
+              <option value="prolabore" ${(s?.tipo||'prolabore')==='prolabore'?'selected':''}>Pró-labore (INSS + IRRF)</option>
+              <option value="dividendos" ${s?.tipo==='dividendos'?'selected':''}>Dividendos (isento IR)</option>
+              <option value="misto" ${s?.tipo==='misto'?'selected':''}>Misto (Pró-labore + Dividendos)</option>
+            </select>
+          </div>
+          <div id="sProLaboreRow" style="${s?.tipo === 'dividendos' ? 'display:none' : ''}">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Pró-labore Bruto (R$)</label>
+            <input class="form-input" id="sProLabore" type="number" min="0" step="0.01" value="${s?.prolabore || ''}" placeholder="0,00" oninput="Folha._calcSocioPreview()">
+            <div id="sProLaboreInfo" style="font-size:11px;color:var(--text-muted);margin-top:4px"></div>
+          </div>
+          <div id="sDividendosRow" style="${!s?.tipo || s?.tipo === 'prolabore' ? 'display:none' : ''}">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Dividendos Mensais (R$)</label>
+            <input class="form-input" id="sDividendos" type="number" min="0" step="0.01" value="${s?.dividendos || ''}" placeholder="0,00">
+            <div style="font-size:11px;color:#059669;margin-top:4px">✅ Isento de Imposto de Renda (Lei 9.249/1995)</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Banco</label>
+              <input class="form-input" id="sBanco" value="${Utils.escHtml(s?.banco || '')}" placeholder="Ex: Nubank">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Agência</label>
+              <input class="form-input" id="sAgencia" value="${Utils.escHtml(s?.agencia || '')}" placeholder="0000">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Conta</label>
+              <input class="form-input" id="sConta" value="${Utils.escHtml(s?.conta || '')}" placeholder="00000-0">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Observações</label>
+            <textarea class="form-input" id="sObs" rows="2" placeholder="Notas adicionais...">${Utils.escHtml(s?.observacoes || '')}</textarea>
+          </div>
+        </div>
+      `,
+      actions: [
+        { label: 'Cancelar', class: 'btn-secondary', onclick: 'Modal.close()' },
+        { label: s ? 'Salvar' : 'Adicionar', class: 'btn-primary', onclick: `Folha.saveSocio('${id || ''}')` },
+      ],
+    });
+    // calc preview on open if editing
+    setTimeout(() => Folha._calcSocioPreview(), 100);
+  }
+
+  function _toggleSocioTipo() {
+    const tipo = document.getElementById('sTipo')?.value;
+    const plRow = document.getElementById('sProLaboreRow');
+    const divRow = document.getElementById('sDividendosRow');
+    if (plRow)  plRow.style.display  = (tipo === 'dividendos') ? 'none' : '';
+    if (divRow) divRow.style.display = (tipo === 'prolabore')  ? 'none' : '';
+    _calcSocioPreview();
+  }
+
+  function _calcSocioPreview() {
+    const val = parseFloat(document.getElementById('sProLabore')?.value) || 0;
+    const info = document.getElementById('sProLaboreInfo');
+    if (!info) return;
+    if (val <= 0) { info.textContent = ''; return; }
+    const { inss, irrf, liquido } = calcProLabore(val);
+    info.innerHTML = `INSS: <strong>${Utils.formatCurrency(inss)}</strong> · IRRF: <strong>${Utils.formatCurrency(irrf)}</strong> · <span style="color:#059669">Líquido: <strong>${Utils.formatCurrency(liquido)}</strong></span>`;
+  }
+
+  function saveSocio(id) {
+    const nome = document.getElementById('sNome')?.value?.trim();
+    if (!nome) { Toast.error('Informe o nome do sócio.'); return; }
+
+    const tipo = document.getElementById('sTipo')?.value || 'prolabore';
+    const prolabore  = parseFloat(document.getElementById('sProLabore')?.value)  || 0;
+    const dividendos = parseFloat(document.getElementById('sDividendos')?.value) || 0;
+
+    if (tipo !== 'dividendos' && prolabore <= 0 && tipo !== 'misto') {
+      Toast.error('Informe o valor do pró-labore.'); return;
+    }
+    if (tipo === 'dividendos' && dividendos <= 0) {
+      Toast.error('Informe o valor dos dividendos.'); return;
+    }
+    if (tipo === 'misto' && prolabore <= 0 && dividendos <= 0) {
+      Toast.error('Informe pelo menos um valor (pró-labore ou dividendos).'); return;
+    }
+
+    const data = {
+      nome,
+      cpf:                document.getElementById('sCpf')?.value?.trim()    || '',
+      cargo:              document.getElementById('sCargo')?.value?.trim()  || 'Sócio',
+      percentualSociedade: parseFloat(document.getElementById('sPerc')?.value) || 0,
+      tipo,
+      prolabore:          tipo !== 'dividendos' ? prolabore  : 0,
+      dividendos:         tipo !== 'prolabore'  ? dividendos : 0,
+      banco:              document.getElementById('sBanco')?.value?.trim()   || '',
+      agencia:            document.getElementById('sAgencia')?.value?.trim() || '',
+      conta:              document.getElementById('sConta')?.value?.trim()   || '',
+      observacoes:        document.getElementById('sObs')?.value?.trim()     || '',
+      ativo: true,
+    };
+
+    if (id) {
+      DB.update('socios', id, data);
+      Toast.success('Sócio atualizado com sucesso!');
+    } else {
+      DB.create('socios', data);
+      Toast.success('Sócio adicionado com sucesso!');
+    }
+    Modal.close();
+    setTab('socios');
+  }
+
+  function deleteSocio(id) {
+    const s = DB.get('socios', id);
+    if (!s) return;
+    if (!confirm(`Excluir o sócio "${s.nome}"? Esta ação não pode ser desfeita.`)) return;
+    DB.remove('socios', id);
+    Toast.success('Sócio removido.');
+    setTab('socios');
+  }
+
   function verHolerite(funcId, mes) {
     _holeriteFuncId = funcId;
     _holeirteRef = mes;
@@ -760,5 +1000,7 @@ const Folha = (() => {
     gerarFolha, marcarPago, marcarTodosPagos, excluirFolha,
     verHolerite, setHoleirteFunc, setHoleitreRef,
     addNew, _previewAvatarFunc,
+    openFormSocio, saveSocio, deleteSocio,
+    _toggleSocioTipo, _calcSocioPreview,
   };
 })();

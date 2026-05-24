@@ -109,6 +109,24 @@ const Config = (() => {
           </div>
         </div>
 
+        <!-- Perfis de Usuário -->
+        <div class="card col-span-2">
+          <div class="card-header">
+            <div class="card-title">🔐 Perfis de Acesso da Equipe</div>
+            <button class="btn btn-sm btn-secondary" onclick="Config.addUsuarioPerfil()">+ Adicionar Usuário</button>
+          </div>
+          <div class="card-body">
+            <div class="text-xs text-muted mb-3">
+              Defina o nível de acesso de cada membro da equipe. O perfil é aplicado ao e-mail de login.
+              <strong>Admin</strong> tem acesso total. <strong>Comercial</strong> vê Pipeline, Clientes, Propostas e Atividades.
+              <strong>Técnico</strong> vê Projetos, Atividades e Clientes. <strong>Financeiro</strong> vê Financeiro e Relatórios. <strong>Visualizador</strong> apenas Dashboard.
+            </div>
+            <div id="listUsuariosPerfis">
+              ${_renderUsuariosPerfis(cfg)}
+            </div>
+          </div>
+        </div>
+
         <!-- Regime Tributário -->
         <div class="card">
           <div class="card-header"><div class="card-title">📊 Configurações Financeiras</div></div>
@@ -612,5 +630,116 @@ const Config = (() => {
     Toast.success('Log de auditoria limpo.');
   }
 
-  return { render, saveEmpresa, saveUsuario, saveFinanceiro, addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico, resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup, filterAudit, clearAudit, toggleGcal };
+  /* ====================================================
+     PERFIS DE USUÁRIO — sistema de roles
+     ==================================================== */
+  const ROLES = {
+    admin:      { label: 'Admin',        cor: '#ef4444', desc: 'Acesso total ao sistema' },
+    comercial:  { label: 'Comercial',    cor: '#3b82f6', desc: 'Pipeline, Clientes, Propostas, Atividades' },
+    tecnico:    { label: 'Técnico',      cor: '#10b981', desc: 'Projetos, Atividades, Clientes (leitura)' },
+    financeiro: { label: 'Financeiro',   cor: '#f59e0b', desc: 'Financeiro, Relatórios, Clientes (leitura)' },
+    viewer:     { label: 'Visualizador', cor: '#94a3b8', desc: 'Somente Dashboard e Relatórios' },
+  };
+
+  // Páginas permitidas por perfil
+  const ROLE_PAGES = {
+    admin:      null, // null = tudo
+    comercial:  ['dashboard','pipeline','clientes','contatos','propostas','atividades','calendario','relatorios','metas','config'],
+    tecnico:    ['dashboard','projetos','atividades','clientes','contatos','calendario','relatorios','licitacoes','config'],
+    financeiro: ['dashboard','financeiro','relatorios','clientes','contatos','contratos','config'],
+    viewer:     ['dashboard','relatorios'],
+  };
+
+  function _renderUsuariosPerfis(cfg) {
+    const usuarios = cfg.usuariosPerfis || [];
+    if (usuarios.length === 0) {
+      return `<div class="text-sm text-muted">Nenhum usuário configurado. O admin tem acesso total por padrão.</div>`;
+    }
+    return usuarios.map((u, i) => {
+      const role = ROLES[u.role] || ROLES.viewer;
+      return `
+        <div class="parcela-row" style="align-items:center">
+          <div style="width:36px;height:36px;border-radius:50%;background:${role.cor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0">${(u.nome||'?')[0].toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div class="font-bold text-sm">${Utils.escHtml(u.nome||'—')}</div>
+            <div class="text-xs text-muted">${Utils.escHtml(u.email||'—')}</div>
+          </div>
+          <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;background:${role.cor}20;color:${role.cor};border:1px solid ${role.cor}44">${role.label}</span>
+          <button class="btn btn-xs btn-secondary" onclick="Config.editUsuarioPerfil(${i})">✏</button>
+          <button class="btn btn-xs btn-danger" onclick="Config.removeUsuarioPerfil(${i})">✕</button>
+        </div>`;
+    }).join('');
+  }
+
+  function addUsuarioPerfil() { _formUsuarioPerfil(null); }
+
+  function editUsuarioPerfil(idx) { _formUsuarioPerfil(idx); }
+
+  function _formUsuarioPerfil(idx) {
+    const cfg = DB.getConfig();
+    const usuarios = cfg.usuariosPerfis || [];
+    const u = idx !== null ? usuarios[idx] : null;
+    const roleOpts = Object.entries(ROLES).map(([k,v]) =>
+      `<option value="${k}" ${(u?.role||'comercial')===k?'selected':''}>${v.label} — ${v.desc}</option>`
+    ).join('');
+
+    Modal.open({
+      title: idx !== null ? 'Editar Usuário' : 'Adicionar Usuário',
+      body: `
+        <div class="form-group">
+          <label class="form-label">Nome *</label>
+          <input class="form-control" id="upNome" value="${Utils.escHtml(u?.nome||'')}" placeholder="Nome do usuário" autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail de login *</label>
+          <input class="form-control" id="upEmail" type="email" value="${Utils.escHtml(u?.email||'')}" placeholder="usuario@empresa.com.br">
+          <div class="text-xs text-muted mt-1">Deve corresponder ao e-mail usado no login do Supabase Auth.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Perfil de Acesso</label>
+          <select class="form-control" id="upRole">${roleOpts}</select>
+        </div>
+      `,
+      saveCb: () => {
+        const nome = document.getElementById('upNome').value.trim();
+        const email = document.getElementById('upEmail').value.trim().toLowerCase();
+        const role = document.getElementById('upRole').value;
+        if (!nome || !email) { Toast.error('Nome e e-mail obrigatórios'); return; }
+
+        const arr = [...(DB.getConfig().usuariosPerfis || [])];
+        if (idx !== null) arr[idx] = { nome, email, role };
+        else arr.push({ nome, email, role });
+
+        DB.saveConfig({ usuariosPerfis: arr });
+        Toast.success(idx !== null ? 'Usuário atualizado!' : 'Usuário adicionado!');
+        const el = document.getElementById('listUsuariosPerfis');
+        if (el) el.innerHTML = _renderUsuariosPerfis(DB.getConfig());
+        // Reaplicar restrições de navegação ao usuário atual
+        App.aplicarPermissoesNavegacao();
+      },
+    });
+  }
+
+  function removeUsuarioPerfil(idx) {
+    const arr = [...(DB.getConfig().usuariosPerfis || [])];
+    arr.splice(idx, 1);
+    DB.saveConfig({ usuariosPerfis: arr });
+    const el = document.getElementById('listUsuariosPerfis');
+    if (el) el.innerHTML = _renderUsuariosPerfis(DB.getConfig());
+    Toast.success('Usuário removido');
+    App.aplicarPermissoesNavegacao();
+  }
+
+  // Expor ROLE_PAGES para o App.js
+  function getRolePages() { return ROLE_PAGES; }
+  function getRoles() { return ROLES; }
+
+  return {
+    render, saveEmpresa, saveUsuario, saveFinanceiro,
+    addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico,
+    resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup,
+    filterAudit, clearAudit, toggleGcal,
+    addUsuarioPerfil, editUsuarioPerfil, removeUsuarioPerfil,
+    getRolePages, getRoles,
+  };
 })();

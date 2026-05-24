@@ -196,6 +196,7 @@ const Clientes = (() => {
           <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">✅ Atividades (${atividades.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">👤 Contatos (${contatos.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabTimeline360')">🕐 Interações</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabDocs360');Documentos.renderLista('docsCliente',{clienteId:'${id}'})">📎 Documentos</button>
           <button class="tab-btn" onclick="switchTab(this,'tabAudit360')">📜 Alterações</button>
         </div>
 
@@ -318,6 +319,11 @@ const Clientes = (() => {
               </div>`).join('')}
             </div>`;
           })()}
+        </div>
+
+        <!-- DOCUMENTOS -->
+        <div id="tabDocs360" class="hidden">
+          <div id="docsCliente" style="min-height:80px"></div>
         </div>
 
         <!-- AUDIT LOG -->
@@ -810,4 +816,11 @@ function switchTab(btn, tabId) {
   const parent = btn.closest('.modal-body') || document.getElementById('pageContent');
   parent.querySelectorAll('[id^="tab"]').forEach(t => t.classList.add('hidden'));
   document.getElementById(tabId)?.classList.remove('hidden');
+  // Lazy-load documentos ao abrir a aba
+  if (tabId === 'tabDocs360') {
+    const clienteId = btn.closest('.modal-body')?.dataset?.clienteId;
+    if (clienteId && typeof Documentos !== 'undefined') {
+      Documentos.renderLista('docsCliente', { clienteId });
+    }
+  }
 }

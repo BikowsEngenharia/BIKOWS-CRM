@@ -94,6 +94,7 @@ const Projetos = (() => {
         <button class="fin-tab ${_tabProjetos==='andamento'?'active':''}" onclick="Projetos.setTabProjetos('andamento')">🔧 Em Andamento <span style="font-size:11px;opacity:.7">(${projetos.filter(p=>!['concluido','cancelado'].includes(p.status)).length})</span></button>
         <button class="fin-tab ${_tabProjetos==='concluidos'?'active':''}" onclick="Projetos.setTabProjetos('concluidos')">✅ Concluídos <span style="font-size:11px;opacity:.7">(${projetos.filter(p=>p.status==='concluido').length})</span></button>
         <button class="fin-tab ${_tabProjetos==='todos'?'active':''}" onclick="Projetos.setTabProjetos('todos')">📋 Todos <span style="font-size:11px;opacity:.7">(${projetos.length})</span></button>
+        <button class="fin-tab ${_tabProjetos==='arts'?'active':''}" onclick="Projetos.setTabProjetos('arts')">📜 ARTs <span style="font-size:11px;opacity:.7">(${DB.getAll('arts').length})</span></button>
       </div>
 
       <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
@@ -108,6 +109,7 @@ const Projetos = (() => {
         </div>
       </div>
 
+      ${_tabProjetos === 'arts' ? _renderArtsGlobal() : `
       <div class="card">
         <div class="card-header">
           <div class="filters">
@@ -166,6 +168,85 @@ const Projetos = (() => {
             </tbody>
           </table>`}
         </div>
+      </div>`}
+    `;
+  }
+
+  /* ====================================================
+     ARTs VISÃO GLOBAL — todas as ARTs de todos os projetos
+     ==================================================== */
+  function _renderArtsGlobal() {
+    const arts = DB.getAll('arts');
+    const projetos = DB.getAll('projetos');
+    const artStatusLabel = { pendente:'⏳ Pendente', registrada:'✅ Registrada', baixada:'🏁 Baixada', cancelada:'❌ Cancelada' };
+    const artStatusColor = { pendente:'#f59e0b', registrada:'#10b981', baixada:'#3b82f6', cancelada:'#ef4444' };
+
+    const porStatus = { pendente: 0, registrada: 0, baixada: 0, cancelada: 0 };
+    arts.forEach(a => { if (porStatus[a.status] !== undefined) porStatus[a.status]++; });
+
+    // Projetos em andamento sem ART
+    const projSemArt = projetos.filter(p => p.status === 'em_andamento' && !DB.getAll('arts').some(a => a.projetoId === p.id) && !p.art?.numero);
+
+    return `
+      <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
+        <div class="kpi-card" style="--kpi-color:#64748b"><div class="kpi-label">Total ARTs</div><div class="kpi-value">${arts.length}</div><div class="kpi-icon">📜</div></div>
+        <div class="kpi-card" style="--kpi-color:#10b981"><div class="kpi-label">Registradas</div><div class="kpi-value">${porStatus.registrada}</div><div class="kpi-icon">✅</div></div>
+        <div class="kpi-card" style="--kpi-color:#f59e0b"><div class="kpi-label">Pendentes</div><div class="kpi-value">${porStatus.pendente}</div><div class="kpi-icon">⏳</div></div>
+        <div class="kpi-card" style="--kpi-color:#3b82f6"><div class="kpi-label">Baixadas</div><div class="kpi-value">${porStatus.baixada}</div><div class="kpi-icon">🏁</div></div>
+        <div class="kpi-card" style="--kpi-color:${projSemArt.length > 0 ? '#ef4444' : '#10b981'}"><div class="kpi-label">Proj. sem ART</div><div class="kpi-value">${projSemArt.length}</div><div class="kpi-icon">⚠</div></div>
+      </div>
+
+      ${projSemArt.length > 0 ? `
+      <div class="card mb-4" style="border-left:4px solid #ef4444">
+        <div class="card-header"><div class="card-title" style="color:#ef4444">⚠ Projetos em Andamento sem ART (${projSemArt.length})</div></div>
+        <div class="card-body" style="padding:0 16px 16px">
+          ${projSemArt.map(p => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+              <div>
+                <div class="font-bold text-sm">${Utils.escHtml(p.titulo)}</div>
+                <div class="text-xs text-muted">${Utils.escHtml(Utils.getClientName(p.clienteId))} · Prazo: ${Utils.formatDate(p.prazo)}</div>
+              </div>
+              <button class="btn btn-xs btn-primary" onclick="Projetos.view('${p.id}','arts')">+ Registrar ART</button>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📜 Todas as ARTs</div>
+          <span class="text-sm text-muted">${arts.length} registros</span>
+        </div>
+        ${arts.length === 0 ? `
+          <div class="card-body"><div class="empty-state"><div class="empty-icon">📜</div><div class="empty-title">Nenhuma ART cadastrada</div><div class="empty-sub">Abra um projeto e registre as ARTs na aba "ARTs"</div></div></div>` : `
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead><tr><th>Número ART</th><th>Tipo</th><th>Projeto</th><th>Cliente</th><th>Responsável</th><th>Emissão</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody>
+              ${arts.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||'')).map(a => {
+                const proj = projetos.find(p => p.id === a.projetoId);
+                const cor = artStatusColor[a.status] || '#94a3b8';
+                return `<tr>
+                  <td class="font-bold text-sm" style="color:var(--primary)">${Utils.escHtml(a.numero||'—')}</td>
+                  <td class="text-sm">${Utils.escHtml(a.tipo||'—')}</td>
+                  <td class="text-sm">${proj ? Utils.escHtml(Utils.truncate(proj.titulo, 30)) : '—'}</td>
+                  <td class="text-sm">${proj ? Utils.escHtml(Utils.getClientName(proj.clienteId)||'—') : '—'}</td>
+                  <td class="text-sm">${Utils.escHtml(a.responsavel||'—')}</td>
+                  <td class="text-sm text-muted">${Utils.formatDate(a.dataEmissao)}</td>
+                  <td class="text-sm">${a.valor ? Utils.formatCurrency(a.valor) : '—'}</td>
+                  <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:${cor}20;color:${cor};border:1px solid ${cor}44">${artStatusLabel[a.status]||a.status}</span></td>
+                  <td>
+                    <div class="tbl-actions">
+                      ${a.link ? `<a href="${Utils.escHtml(a.link)}" target="_blank" class="btn btn-xs btn-secondary">🔗</a>` : ''}
+                      ${proj ? `<button class="btn btn-xs btn-secondary" onclick="Projetos.view('${proj.id}','arts')">Ver Projeto</button>` : ''}
+                      <button class="btn btn-xs btn-secondary" onclick="Projetos.abrirFormART('${a.projetoId}','${a.id}')">✏</button>
+                      <button class="btn btn-xs btn-danger" onclick="Projetos.removerART('${a.projetoId}','${a.id}');Projetos.setTabProjetos('arts')">🗑</button>
+                    </div>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`}
       </div>
     `;
   }
@@ -593,6 +674,7 @@ const Projetos = (() => {
           <button ${tabStyle('overview')} onclick="Projetos._switchViewTab('${id}','overview')">📋 Overview</button>
           <button ${tabStyle('horas')} onclick="Projetos._switchViewTab('${id}','horas')">⏱ Horas ${tsHoras > 0 ? `<span style="background:var(--primary);color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${tsHoras.toFixed(0)}h</span>` : ''}</button>
           <button ${tabStyle('arts')} onclick="Projetos._switchViewTab('${id}','arts')">📜 ARTs ${artsEntity.length > 0 ? `<span style="background:#10b981;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${artsEntity.length}</span>` : ''}</button>
+          <button ${tabStyle('docs')} onclick="Projetos._switchViewTab('${id}','docs')">📎 Documentos ${(() => { const nd = DB.getAll('documentos').filter(d => d.projetoId === id).length; return nd > 0 ? `<span style="background:#8b5cf6;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${nd}</span>` : ''; })()}</button>
         </div>
 
         <div id="viewProjetoTabContent">
@@ -610,6 +692,7 @@ const Projetos = (() => {
     // Se abaInicial não é 'overview', renderiza a aba correta
     if (abaInicial === 'horas') setTimeout(() => _renderTimesheetTab(id), 50);
     if (abaInicial === 'arts') setTimeout(() => _renderArtsTab(id), 50);
+    if (abaInicial === 'docs') setTimeout(() => _renderDocsTab(id), 50);
   }
 
   function _switchViewTab(projetoId, aba) {
@@ -642,6 +725,17 @@ const Projetos = (() => {
       _renderTimesheetTab(projetoId);
     } else if (aba === 'arts') {
       _renderArtsTab(projetoId);
+    } else if (aba === 'docs') {
+      _renderDocsTab(projetoId);
+    }
+  }
+
+  function _renderDocsTab(projetoId) {
+    const el = document.getElementById('viewProjetoTabContent');
+    if (!el) return;
+    el.innerHTML = '<div id="docsProjeto" style="min-height:80px;padding:4px 0"></div>';
+    if (typeof Documentos !== 'undefined') {
+      Documentos.renderLista('docsProjeto', { projetoId });
     }
   }
 

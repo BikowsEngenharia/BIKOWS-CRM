@@ -34,8 +34,10 @@ const Auth = (() => {
         clearTimeout(fallbackTimeout);
         clearTimeout(loadingTimeout);
         if (session) {
+          _currentEmail = session.user?.email?.toLowerCase() || '';
           _bootApp();
         } else {
+          _currentEmail = '';
           _hideLoading();
           _showLogin();
         }
@@ -100,9 +102,17 @@ const Auth = (() => {
     }
   }
 
+  // Cache síncrono do email logado
+  let _currentEmail = '';
+
   /* ---- Obter usuário atual ---- */
   function getUser() {
     return _supabase.auth.getUser ? _supabase.auth.getUser() : null;
+  }
+
+  /* ---- Obter e-mail do usuário atual (síncrono) ---- */
+  function getCurrentEmail() {
+    return _currentEmail;
   }
 
   /* ---- Boot da aplicação após login ---- */
@@ -186,5 +196,5 @@ const Auth = (() => {
     if (e.key === 'Enter') login();
   }
 
-  return { init, login, logout, resetPassword, getUser, handleKeydown };
+  return { init, login, logout, resetPassword, getUser, getCurrentEmail, handleKeydown };
 })();

@@ -17,6 +17,7 @@ const App = (() => {
     calendario:  { title: 'Calendário',      module: Calendario,   addLabel: '+ Nova Atividade' },
     licitacoes:  { title: 'Licitações',      module: Licitacoes,   addLabel: '+ Nova Licitação' },
     relatorios:  { title: 'Relatórios',      module: Relatorios,   addLabel: null },
+    documentos:  { title: 'Documentos',      module: Documentos,   addLabel: '+ Novo Documento' },
     metas:      { title: 'Metas & KPIs',    module: Metas,       addLabel: '+ Nova Meta' },
     marketing:  { title: 'Marketing',       module: Marketing,   addLabel: '+ Novo Conteúdo' },
     trafego:    { title: 'Tráfego Pago',    module: Trafego,     addLabel: '+ Nova Campanha' },
@@ -40,6 +41,7 @@ const App = (() => {
     marketing_posts: 'marketing', marketing_campanhas: 'marketing',
     marketing_ideias: 'marketing', marketing_kpis: 'marketing',
     trafego_campanhas: 'trafego', trafego_metas: 'trafego',
+    documentos: 'documentos',
   };
 
   function refreshIfNeeded(entity) {
@@ -67,6 +69,8 @@ const App = (() => {
 
     navigate('dashboard');
     updateNotifBadge();
+    // Aplicar restrições de navegação após carregamento inicial
+    setTimeout(() => aplicarPermissoesNavegacao(), 200);
 
     // Restaurar estado collapsed da sidebar (desktop)
     const savedCollapsed = localStorage.getItem('crm_sidebar_collapsed') === '1';
@@ -151,6 +155,19 @@ const App = (() => {
 
   function navigate(page) {
     if (!PAGES[page]) page = 'dashboard';
+    // Verificar permissão para a página
+    try {
+      const emailLogado = typeof Auth !== 'undefined' ? (Auth.getCurrentEmail?.() || '') : '';
+      const cfg = DB.getConfig();
+      const perfil = (cfg.usuariosPerfis || []).find(u => u.email?.toLowerCase() === emailLogado);
+      const role = perfil?.role || 'admin';
+      const rolePages = typeof Config !== 'undefined' ? Config.getRolePages?.() : null;
+      const paginasPermitidas = rolePages?.[role];
+      if (paginasPermitidas && !paginasPermitidas.includes(page)) {
+        Toast.error('Você não tem permissão para acessar esta seção.');
+        page = 'dashboard';
+      }
+    } catch(e) { /* silencioso */ }
     _currentPage = page;
 
     // Update active nav link (sidebar + bottom-nav mobile)
@@ -254,7 +271,20 @@ const App = (() => {
       return d != null && d >= 0 && d <= 3;
     }).length;
 
-    const total = followupsVencidos + vencidos + licsUrgentes;
+    // Projetos atrasados
+    const projetos = DB.getAll('projetos');
+    const projetosAtrasados = projetos.filter(p =>
+      p.status === 'em_andamento' && Utils.isOverdue(p.prazo)
+    ).length;
+
+    // ARTs pendentes em projetos em andamento
+    const artsPendentes = projetos.filter(p =>
+      p.status === 'em_andamento' &&
+      !DB.getAll('arts').some(a => a.projetoId === p.id && a.status === 'registrada') &&
+      !p.art?.numero
+    ).length;
+
+    const total = followupsVencidos + vencidos + licsUrgentes + projetosAtrasados + artsPendentes;
     const badge = document.getElementById('notifBadge');
     if (badge) {
       badge.textContent = total;
@@ -347,7 +377,48 @@ const App = (() => {
           }).join('')}
         ` : ''}
 
-        ${followups.length === 0 && atrasadas.length === 0 && parcelasVencidas.length === 0 && licitacoes.length === 0 ?
+        ${(() => {
+          // Projetos atrasados
+          const projetosAtrasados = DB.getAll('projetos').filter(p =>
+            p.status === 'em_andamento' && Utils.isOverdue(p.prazo)
+          );
+          if (!projetosAtrasados.length) return '';
+          return `
+            <div class="detail-label mb-2 mt-3">Projetos Atrasados (${projetosAtrasados.length})</div>
+            ${projetosAtrasados.map(p => `<div class="followup-item urgent mb-2">
+              <div style="flex:1">
+                <div class="font-bold text-sm">🔧 ${Utils.escHtml(p.titulo)}</div>
+                <div class="text-xs">${Utils.escHtml(Utils.getClientName(p.clienteId))} · Prazo: ${Utils.formatDate(p.prazo)}</div>
+              </div>
+              <span class="badge badge-red">${Math.abs(Utils.daysUntil(p.prazo))}d atraso</span>
+              <button class="btn btn-xs btn-secondary" onclick="App.navigate('projetos');Modal.close()">Ver</button>
+            </div>`).join('')}`;
+        })()}
+
+        ${(() => {
+          // ARTs sem número em projetos em andamento
+          const artsAll = DB.getAll('arts');
+          const projSemArt = DB.getAll('projetos').filter(p =>
+            p.status === 'em_andamento' &&
+            !artsAll.some(a => a.projetoId === p.id && a.status === 'registrada') &&
+            !p.art?.numero
+          );
+          if (!projSemArt.length) return '';
+          return `
+            <div class="detail-label mb-2 mt-3">Projetos sem ART Registrada (${projSemArt.length})</div>
+            ${projSemArt.map(p => `<div class="followup-item urgent mb-2">
+              <div style="flex:1">
+                <div class="font-bold text-sm">📜 ${Utils.escHtml(p.titulo)}</div>
+                <div class="text-xs">${Utils.escHtml(Utils.getClientName(p.clienteId))}</div>
+              </div>
+              <span class="badge badge-yellow">Sem ART</span>
+              <button class="btn btn-xs btn-primary" onclick="Projetos.view('${p.id}','arts');Modal.close()">+ ART</button>
+            </div>`).join('')}`;
+        })()}
+
+        ${followups.length === 0 && atrasadas.length === 0 && parcelasVencidas.length === 0 && licitacoes.length === 0 &&
+          DB.getAll('projetos').filter(p => p.status === 'em_andamento' && Utils.isOverdue(p.prazo)).length === 0 &&
+          DB.getAll('projetos').filter(p => p.status === 'em_andamento' && !DB.getAll('arts').some(a => a.projetoId === p.id && a.status === 'registrada') && !p.art?.numero).length === 0 ?
           '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Tudo em dia!</div><div class="empty-sub">Nenhuma pendência no momento.</div></div>' : ''}
       `,
     });
@@ -758,7 +829,49 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture };
+  /* ================================================
+     PERMISSÕES DE NAVEGAÇÃO (sistema de perfis)
+     ================================================ */
+  function aplicarPermissoesNavegacao() {
+    try {
+      // Obter e-mail do usuário logado
+      const emailLogado = typeof Auth !== 'undefined' ? (Auth.getCurrentEmail?.() || '') : '';
+
+      const cfg = DB.getConfig();
+      const usuariosPerfis = cfg.usuariosPerfis || [];
+
+      // Encontrar perfil do usuário atual
+      const perfil = usuariosPerfis.find(u => u.email?.toLowerCase() === emailLogado);
+      const role = perfil?.role || 'admin'; // padrão: admin (caso não configurado)
+
+      const rolePages = typeof Config !== 'undefined' ? Config.getRolePages?.() : null;
+      if (!rolePages) return; // Config não carregado ainda
+
+      const paginasPermitidas = rolePages[role]; // null = tudo
+
+      // Aplicar visibilidade nos links do sidebar
+      document.querySelectorAll('.nav-link[data-page]').forEach(link => {
+        const page = link.dataset.page;
+        if (!paginasPermitidas || paginasPermitidas.includes(page)) {
+          link.style.display = '';
+        } else {
+          link.style.display = 'none';
+        }
+      });
+
+      // Atualizar role visível no sidebar
+      const roleEl = document.getElementById('sidebarRole');
+      if (roleEl && perfil) {
+        const roles = Config.getRoles?.() || {};
+        roleEl.textContent = roles[role]?.label || role;
+      }
+    } catch(e) {
+      // silencioso — não bloqueia o sistema
+      console.warn('[App] aplicarPermissoesNavegacao:', e);
+    }
+  }
+
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

@@ -11,7 +11,7 @@ const DB = (() => {
     'contaspagar','folha','licitacoes','metas','contratos',
     'marketing_posts','marketing_campanhas','marketing_ideias','marketing_kpis',
     'trafego_campanhas','trafego_metas',
-    'timesheet','arts','socios',
+    'timesheet','arts','socios','documentos',
   ];
 
   // Cache em memória — populado por loadAll()

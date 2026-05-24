@@ -471,7 +471,7 @@ const Pipeline = (() => {
 
   function renderCard(lead, color) {
     const client = DB.get('clientes', lead.clienteId);
-    const empresa = client ? client.nome : '—';
+    const empresa = client ? (client.razaoSocial || client.nome || lead.empresa || '—') : (lead.empresa || '—');
     const alert = Utils.dateAlert(lead.dataProximaAcao, '');
     const dias = Utils.daysUntil(lead.dataProximaAcao);
     const dateClass = dias != null && dias < 0 ? 'text-danger' : 'text-muted';
@@ -505,7 +505,7 @@ const Pipeline = (() => {
       ondragstart="Pipeline.dragStart(event,'${lead.id}')"
       ondragend="Pipeline.dragEnd(event)">
       <div class="kc-name" style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">
-        <span>${frio ? `<span title="Lead frio: ${diasSemAtualizar}d sem atualização" style="cursor:help">🧊</span> ` : ''}${Utils.escHtml(lead.titulo)}</span>
+        <span>${frio ? `<span title="Lead frio: ${diasSemAtualizar}d sem atualização" style="cursor:help">🧊</span> ` : ''}${Utils.escHtml(lead.titulo || lead.empresa || "")}</span>
         ${scoreEl}
       </div>
       <div class="kc-empresa" style="display:flex;align-items:center;justify-content:space-between;gap:4px">

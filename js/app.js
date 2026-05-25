@@ -412,7 +412,7 @@ const App = (() => {
                 <div class="text-xs">${Utils.escHtml(Utils.getClientName(p.clienteId))}</div>
               </div>
               <span class="badge badge-yellow">Sem ART</span>
-              <button class="btn btn-xs btn-primary" onclick="Projetos.view('${p.id}','arts');Modal.close()">+ ART</button>
+              <button class="btn btn-xs btn-primary" onclick="Projetos.view('${p.id}','arts')">+ ART</button>
             </div>`).join('')}`;
         })()}
 

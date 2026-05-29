@@ -47,15 +47,50 @@ const Calendario = (() => {
     DB.getAll('atividades').forEach(a => {
       if (!a.data) return;
       const tipo = (Utils.ATIV_TIPO && Utils.ATIV_TIPO[a.tipo]) || { icon: '📌', label: a.tipo || 'Atividade' };
-      addEvent(a.data, {
+
+      // Sufixo de horário para chips
+      let timeSuffix = '';
+      if (!a.diaInteiro && a.hora) {
+        timeSuffix = ` ${a.hora}${a.horaFim ? `–${a.horaFim}` : ''}`;
+      }
+
+      const titulo = Utils.escHtml(a.titulo || 'Atividade');
+      const baseEvent = {
         type: 'atividade',
-        label: `${tipo.icon} ${Utils.escHtml(a.titulo || 'Atividade')}`,
         color: '#fff',
         bg: '#7c3aed',
         entityId: a.id,
         entityType: 'atividades',
         raw: a,
-      });
+        isAllDay: !!a.diaInteiro,
+      };
+
+      // Evento multi-dia: espalha pelo intervalo
+      if (a.diaInteiro && a.dataFim && a.dataFim > a.data) {
+        let cur = new Date(a.data + 'T00:00:00');
+        const endDate = new Date(a.dataFim + 'T00:00:00');
+        let count = 0;
+        while (cur <= endDate && count < 60) {
+          const ds = toDateStr(cur);
+          const isFirst = ds === a.data;
+          const isLast  = ds === a.dataFim;
+          addEvent(ds, {
+            ...baseEvent,
+            label: isFirst ? `${tipo.icon} ▷ ${titulo}`
+                 : isLast  ? `${tipo.icon} ◁ ${titulo}`
+                 :            `${tipo.icon} — ${titulo}`,
+            bg: isFirst ? '#7c3aed' : isLast ? '#5b21b6' : '#6d28d9',
+          });
+          cur.setDate(cur.getDate() + 1);
+          count++;
+        }
+      } else {
+        // Evento de dia único (com ou sem horário)
+        const label = a.diaInteiro
+          ? `${tipo.icon} 📅 ${titulo}`
+          : `${tipo.icon}${timeSuffix} ${titulo}`;
+        addEvent(a.data, { ...baseEvent, label });
+      }
     });
 
     // ── Leads — próxima ação (follow-up) ──────────────────────────────────
@@ -238,7 +273,14 @@ const Calendario = (() => {
               <span class="badge badge-gray text-xs">${typeBadge}</span>
             </div>
             ${clienteNome ? `<div class="text-xs text-muted mt-1">Cliente: ${clienteNome}</div>` : ''}
-            ${ev.raw && ev.raw.hora ? `<div class="text-xs text-muted">Horário: ${ev.raw.hora}</div>` : ''}
+            ${ev.raw && ev.raw.diaInteiro
+              ? (ev.raw.dataFim && ev.raw.dataFim !== ev.raw.data
+                ? `<div class="text-xs text-muted">📅 ${Utils.formatDate(ev.raw.data)} → ${Utils.formatDate(ev.raw.dataFim)}</div>`
+                : `<div class="text-xs text-muted">📅 Dia inteiro</div>`)
+              : (ev.raw && ev.raw.hora
+                ? `<div class="text-xs text-muted">🕐 ${ev.raw.hora}${ev.raw.horaFim ? ` – ${ev.raw.horaFim}` : ''}</div>`
+                : '')
+            }
             ${ev.raw && ev.raw.status ? `<div class="text-xs text-muted">Status: ${Utils.escHtml(ev.raw.status)}</div>` : ''}
             ${ev.raw && ev.raw.valor !== undefined && ev.type !== 'parcela' ? `<div class="text-xs text-muted">Valor: ${Utils.formatCurrency(ev.raw.valor)}</div>` : ''}
           </div>
@@ -256,7 +298,8 @@ const Calendario = (() => {
             : rows}
         </div>
         <div style="margin-top:16px;display:flex;gap:8px">
-          <button class="btn btn-primary btn-sm" onclick="Atividades.openForm();Modal.close()">+ Nova Atividade</button>
+          <button class="btn btn-primary btn-sm" onclick="Atividades.openForm(null,'${dateStr}')">+ Nova Atividade</button>
+          <button class="btn btn-secondary btn-sm" onclick="Atividades.openForm(null,'${dateStr}');document.getElementById('faDiaInteiro').checked=true;Atividades._toggleDiaInteiro(true)">📅 Dia inteiro</button>
         </div>
       `,
     });

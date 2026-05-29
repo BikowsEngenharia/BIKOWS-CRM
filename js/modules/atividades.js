@@ -119,7 +119,13 @@ const Atividades = (() => {
                   </td>
                   <td><div class="font-bold" style="max-width:200px">${Utils.escHtml(a.titulo)}</div>${a.descricao ? `<div class="text-xs text-muted">${Utils.escHtml(Utils.truncate(a.descricao,60))}</div>` : ''}</td>
                   <td class="text-sm">${Utils.escHtml(client)}</td>
-                  <td class="text-sm">${Utils.formatDate(a.data)} ${a.hora||''}<br>${alert}</td>
+                  <td class="text-sm">
+                    ${a.diaInteiro
+                      ? `📅 ${Utils.formatDate(a.data)}${a.dataFim && a.dataFim !== a.data ? `<br>↳ ${Utils.formatDate(a.dataFim)}` : ''}<br><span style="font-size:10px;background:#7c3aed20;color:#7c3aed;padding:1px 6px;border-radius:3px;font-weight:600">Dia inteiro</span>`
+                      : `${Utils.formatDate(a.data)}<br>${a.hora ? `🕐 ${a.hora}${a.horaFim ? `–${a.horaFim}` : ''}` : '—'}`
+                    }
+                    <br>${alert}
+                  </td>
                   <td class="text-sm">${Utils.escHtml(a.responsavel||'—')}</td>
                   <td>${a.prioridade ? `<span class="badge ${prioColors[a.prioridade]||'badge-gray'}">${a.prioridade}</span>` : '—'}</td>
                   <td>${Utils.activBadge(a.status)}</td>
@@ -145,16 +151,18 @@ const Atividades = (() => {
 
   function setFilter(k, v) { _filter[k] = v; render(); }
 
-  function openForm(id = null) {
+  function openForm(id = null, prefilledDate = null) {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const leads = DB.getAll('leads').filter(l => !['fechado_perdido'].includes(l.status));
     const a = id ? DB.get('atividades', id) : null;
+    const isDiaInteiro = a?.diaInteiro || false;
+    const defaultDate  = prefilledDate || a?.data || Utils.todayStr();
 
     const clientOpts = clientes.map(c => `<option value="${c.id}" ${a?.clienteId===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
-    const leadOpts = leads.map(l => `<option value="${l.id}" ${a?.leadId===l.id?'selected':''}>${Utils.escHtml(l.titulo)}</option>`).join('');
-    const tipoOpts = Object.entries(Utils.ATIV_TIPO).map(([k,v]) => `<option value="${k}" ${a?.tipo===k?'selected':''}>${v.icon} ${v.label}</option>`).join('');
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${a?.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const leadOpts   = leads.map(l => `<option value="${l.id}" ${a?.leadId===l.id?'selected':''}>${Utils.escHtml(l.titulo)}</option>`).join('');
+    const tipoOpts   = Object.entries(Utils.ATIV_TIPO).map(([k,v]) => `<option value="${k}" ${a?.tipo===k?'selected':''}>${v.icon} ${v.label}</option>`).join('');
+    const respOpts   = cfg.responsaveis.map(r => `<option value="${r}" ${a?.responsavel===r?'selected':''}>${r}</option>`).join('');
     const statusOpts = Object.entries(Utils.ATIV_STATUS).map(([k,v]) => `<option value="${k}" ${(a?.status||'pendente')===k?'selected':''}>${v.label}</option>`).join('');
 
     Modal.open({
@@ -182,21 +190,47 @@ const Atividades = (() => {
             <select class="form-control" id="faStatus">${statusOpts}</select>
           </div>
         </div>
+
+        <!-- Bloco de período / horário -->
+        <div style="background:var(--surface-2,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:14px 16px 10px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);user-select:none">
+              <input type="checkbox" id="faDiaInteiro" ${isDiaInteiro?'checked':''}
+                onchange="Atividades._toggleDiaInteiro(this.checked)"
+                style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary)">
+              📅 Dia inteiro / Período de dias
+            </label>
+            <span id="faDuracaoInfo" style="font-size:12px;color:var(--primary);font-weight:600;margin-left:auto;background:var(--primary-light,#eff6ff);padding:2px 8px;border-radius:12px;display:none"></span>
+          </div>
+          <div class="form-row" style="margin-bottom:0;gap:10px">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Data início</label>
+              <input class="form-control" id="faData" type="date" value="${defaultDate}"
+                onchange="Atividades._calcDuracao()">
+            </div>
+            <div class="form-group" id="grpDataFim" style="${isDiaInteiro?'':'display:none'};margin-bottom:0">
+              <label class="form-label">Data fim</label>
+              <input class="form-control" id="faDataFim" type="date" value="${a?.dataFim||defaultDate}"
+                onchange="Atividades._calcDuracao()">
+            </div>
+            <div class="form-group" id="grpHora" style="${isDiaInteiro?'display:none':''};margin-bottom:0">
+              <label class="form-label">Hora início</label>
+              <input class="form-control" id="faHora" type="time" value="${a?.hora||'09:00'}"
+                onchange="Atividades._calcDuracao()">
+            </div>
+            <div class="form-group" id="grpHoraFim" style="${isDiaInteiro?'display:none':''};margin-bottom:0">
+              <label class="form-label">Hora fim <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(opcional)</span></label>
+              <input class="form-control" id="faHoraFim" type="time" value="${a?.horaFim||''}"
+                onchange="Atividades._calcDuracao()">
+            </div>
+          </div>
+        </div>
+
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Data</label>
-            <input class="form-control" id="faData" type="date" value="${a?.data||Utils.todayStr()}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Hora</label>
-            <input class="form-control" id="faHora" type="time" value="${a?.hora||'09:00'}">
-          </div>
           <div class="form-group">
             <label class="form-label">Responsável</label>
             <select class="form-control" id="faResp"><option value="">—</option>${respOpts}</select>
           </div>
-        </div>
-        <div class="form-row">
           <div class="form-group">
             <label class="form-label">Cliente (opcional)</label>
             <select class="form-control" id="faCliente"><option value="">—</option>${clientOpts}</select>
@@ -213,22 +247,92 @@ const Atividades = (() => {
       `,
       saveCb: () => saveAtividade(id),
     });
+    setTimeout(() => Atividades._calcDuracao(), 50);
+  }
+
+  /* Alterna visibilidade dos campos de hora / data fim */
+  function _toggleDiaInteiro(checked) {
+    const grpHora    = document.getElementById('grpHora');
+    const grpHoraFim = document.getElementById('grpHoraFim');
+    const grpDataFim = document.getElementById('grpDataFim');
+    if (grpHora)    grpHora.style.display    = checked ? 'none' : '';
+    if (grpHoraFim) grpHoraFim.style.display = checked ? 'none' : '';
+    if (grpDataFim) grpDataFim.style.display = checked ? '' : 'none';
+    _calcDuracao();
+  }
+
+  /* Calcula e exibe duração em tempo real */
+  function _calcDuracao() {
+    const info = document.getElementById('faDuracaoInfo');
+    if (!info) return;
+    const diaInteiro  = document.getElementById('faDiaInteiro')?.checked;
+    const dataInicio  = document.getElementById('faData')?.value;
+    if (!dataInicio) { info.style.display = 'none'; return; }
+
+    if (diaInteiro) {
+      const dataFim = document.getElementById('faDataFim')?.value;
+      if (dataFim && dataFim >= dataInicio) {
+        const d1   = new Date(dataInicio + 'T00:00:00');
+        const d2   = new Date(dataFim + 'T00:00:00');
+        const dias = Math.round((d2 - d1) / 86400000) + 1;
+        info.textContent  = dias === 1 ? '1 dia' : `${dias} dias`;
+        info.style.display = '';
+      } else {
+        info.textContent  = '1 dia';
+        info.style.display = '';
+      }
+    } else {
+      const horaInicio = document.getElementById('faHora')?.value;
+      const horaFim    = document.getElementById('faHoraFim')?.value;
+      if (horaInicio && horaFim && horaFim > horaInicio) {
+        const [h1, m1] = horaInicio.split(':').map(Number);
+        const [h2, m2] = horaFim.split(':').map(Number);
+        const totalMin = (h2 * 60 + m2) - (h1 * 60 + m1);
+        if (totalMin > 0) {
+          const h = Math.floor(totalMin / 60);
+          const m = totalMin % 60;
+          info.textContent  = h > 0 && m > 0 ? `${h}h ${m}min` : h > 0 ? `${h}h` : `${m}min`;
+          info.style.display = '';
+        } else {
+          info.style.display = 'none';
+        }
+      } else {
+        info.style.display = 'none';
+      }
+    }
   }
 
   function saveAtividade(id) {
     const titulo = document.getElementById('faTitulo').value.trim();
     if (!titulo) { Toast.error('Título obrigatório'); return; }
+
+    const diaInteiro = document.getElementById('faDiaInteiro')?.checked || false;
+    const dataInicio = document.getElementById('faData').value;
+    const dataFim    = diaInteiro ? (document.getElementById('faDataFim')?.value || '') : '';
+    const hora       = !diaInteiro ? (document.getElementById('faHora')?.value || '') : '';
+    const horaFim    = !diaInteiro ? (document.getElementById('faHoraFim')?.value || '') : '';
+
+    if (diaInteiro && dataFim && dataFim < dataInicio) {
+      Toast.error('Data fim deve ser igual ou posterior à data início'); return;
+    }
+    if (!diaInteiro && hora && horaFim && horaFim <= hora) {
+      Toast.error('Hora fim deve ser posterior à hora início'); return;
+    }
+
     const data = {
       titulo,
-      tipo: document.getElementById('faTipo').value,
-      prioridade: document.getElementById('faPrioridade').value,
-      status: document.getElementById('faStatus').value,
-      data: document.getElementById('faData').value,
-      hora: document.getElementById('faHora').value,
+      tipo:        document.getElementById('faTipo').value,
+      prioridade:  document.getElementById('faPrioridade').value,
+      status:      document.getElementById('faStatus').value,
+      data:        dataInicio,
+      hora,
+      horaFim,
+      diaInteiro,
+      dataFim,
       responsavel: document.getElementById('faResp').value,
-      clienteId: document.getElementById('faCliente').value,
-      leadId: document.getElementById('faLead').value,
-      descricao: document.getElementById('faDescricao').value,
+      clienteId:   document.getElementById('faCliente').value,
+      leadId:      document.getElementById('faLead').value,
+      descricao:   document.getElementById('faDescricao').value,
     };
     if (id) { DB.update('atividades', id, data); Toast.success('Atividade atualizada'); }
     else { DB.create('atividades', data); Toast.success('Atividade criada'); }
@@ -378,5 +482,5 @@ const Atividades = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir, setPeriodo, drillDown };
+  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir, setPeriodo, drillDown, _toggleDiaInteiro, _calcDuracao };
 })();

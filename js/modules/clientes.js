@@ -98,7 +98,7 @@ const Clientes = (() => {
           <table class="tbl">
             <thead><tr>
               <th>Código</th><th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Porte</th>
-              <th>Cidade/UF</th><th>Leads</th><th>OS</th><th>Faturado</th><th>Status</th><th>Ações</th>
+              <th>Cidade/UF</th><th>Leads</th><th>OS</th><th>Faturado</th><th>Últ. Contato</th><th>Status</th><th>Ações</th>
             </tr></thead>
             <tbody>
             ${list.map(c => {
@@ -119,6 +119,7 @@ const Clientes = (() => {
                 <td><span class="badge badge-purple">${cLeads}</span></td>
                 <td><span class="badge badge-blue">${cProj.length}</span></td>
                 <td class="text-sm font-bold ${faturado>0?'text-primary':''}">${faturado>0?Utils.formatCurrency(faturado):'—'}</td>
+                <td class="text-sm text-muted">${(()=>{const ui=getUltimaInteracao(c.id);return ui?Utils.formatDate(ui):'Nunca';})()}</td>
                 <td>${c.ativo !== false ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
                 <td>
                   <div class="tbl-actions">
@@ -806,7 +807,44 @@ const Clientes = (() => {
     Modal.close();
   }
 
-  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo, gerarLinkPortal, verTokensPortal, revogarToken, _previewAvatar };
+  function calcScore(clienteId) {
+    var score = 20;
+    var detalhes = [];
+    var projetos = DB.getAll('projetos').filter(function(p) { return p.clienteId === clienteId; });
+    var projetosAtivos = projetos.filter(function(p) { return p.status === 'em_andamento'; });
+    if (projetosAtivos.length > 0) { score += 20; detalhes.push('+20 Projeto ativo'); }
+    var propostas = DB.getAll('propostas').filter(function(p) { return p.clienteId === clienteId && !['reprovada','cancelada'].includes(p.status); });
+    if (propostas.length > 0) { score += 15; detalhes.push('+15 Proposta ativa'); }
+    var hoje = Utils.todayStr();
+    var recVencidas = [];
+    DB.getAll('recebiveis').filter(function(r) { return r.clienteId === clienteId; }).forEach(function(r) {
+      (r.parcelas || []).forEach(function(p) { if (p.status !== 'recebido' && p.vencimento < hoje) recVencidas.push(p); });
+    });
+    if (recVencidas.length > 0) { score -= 20; detalhes.push('-20 Parcela(s) vencida(s)'); }
+    var atividades = DB.getAll('atividades').filter(function(a) { return a.clienteId === clienteId; });
+    var dataCorte30 = new Date(); dataCorte30.setDate(dataCorte30.getDate() - 30);
+    var corte30Str = dataCorte30.toISOString().split('T')[0];
+    var dataCorte90 = new Date(); dataCorte90.setDate(dataCorte90.getDate() - 90);
+    var corte90Str = dataCorte90.toISOString().split('T')[0];
+    var recente = atividades.some(function(a) { return (a.data || '') >= corte30Str; });
+    if (recente) { score += 10; detalhes.push('+10 Contato recente (<30d)'); }
+    else {
+      var inativo90 = !atividades.some(function(a) { return (a.data || '') >= corte90Str; });
+      if (inativo90) { score -= 10; detalhes.push('-10 Sem contato >90 dias'); }
+    }
+    score = Math.max(0, Math.min(100, score));
+    var label = score >= 80 ? 'Saudável' : score >= 50 ? 'Atenção' : 'Risco';
+    var color = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#dc2626';
+    return { score: score, label: label, color: color, detalhes: detalhes };
+  }
+
+  function getUltimaInteracao(clienteId) {
+    var atividades = DB.getAll('atividades').filter(function(a) { return a.clienteId === clienteId && a.data; });
+    if (!atividades.length) return null;
+    return atividades.sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); })[0].data;
+  }
+
+  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo, gerarLinkPortal, verTokensPortal, revogarToken, _previewAvatar, calcScore, getUltimaInteracao };
 })();
 
 // Tab switcher helper

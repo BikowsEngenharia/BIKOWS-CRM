@@ -21,7 +21,7 @@ const Financeiro = (() => {
         </div>
       </div>
       <div class="tabs mb-4">
-        ${[['visao_geral','📊 Visão Geral'],['lancamentos','📋 Lançamentos'],['receber','💰 Contas a Receber'],['pagar','📤 Contas a Pagar'],['dre','📈 DRE'],['fluxo','🔄 Fluxo de Caixa']].map(([id,lb])=>`<button class="tab-btn ${_tab===id?'active':''}" onclick="Financeiro.setTab('${id}')">${lb}</button>`).join('')}
+        ${[['visao_geral','📊 Visão Geral'],['lancamentos','📋 Lançamentos'],['receber','💰 Contas a Receber'],['pagar','📤 Contas a Pagar'],['dre','📈 DRE'],['fluxo','🔄 Fluxo de Caixa'],['despesas_fixas','📌 Despesas Fixas'],['dividas','💳 Dívidas'],['ativos','🏭 Ativos']].map(([id,lb])=>`<button class="tab-btn ${_tab===id?'active':''}" onclick="Financeiro.setTab('${id}')">${lb}</button>`).join('')}
       </div>
       <div id="finContent"></div>`;
     renderTab();
@@ -37,7 +37,10 @@ const Financeiro = (() => {
       case 'receber':     el.innerHTML=buildReceber(); break;
       case 'pagar':       el.innerHTML=buildPagar(); break;
       case 'dre':         el.innerHTML=buildDRE(); setTimeout(renderDREChart,50); break;
-      case 'fluxo':       el.innerHTML=buildFluxo(); setTimeout(renderFluxoChart,50); break;
+      case 'fluxo':          el.innerHTML=buildFluxo(); setTimeout(renderFluxoChart,50); break;
+      case 'despesas_fixas': el.innerHTML=buildDespesasFixas(); break;
+      case 'dividas':        el.innerHTML=buildDividas(); break;
+      case 'ativos':         el.innerHTML=buildAtivos(); break;
     }
   }
 
@@ -561,5 +564,204 @@ const Financeiro = (() => {
     setTimeout(()=>{ const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; },0);
   }
 
-  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew,drillDown};
+  /* ---- DESPESAS FIXAS ---- */
+  function buildDespesasFixas() {
+    const list = DB.getAll('despesas_fixas');
+    const MULT = { Mensal:1, Bimestral:0.5, Trimestral:1/3, Semestral:1/6, Anual:1/12 };
+    const totalMensal = list.filter(d=>d.ativo!==false).reduce((s,d)=>s+(d.valor||0)*(MULT[d.periodicidade]||1),0);
+    const totalAnual = totalMensal * 12;
+    const CATS_DF = ['Infraestrutura','Comunicação','Pessoal','Tecnologia','Administrativo','Outros'];
+    const CAT_COLORS = { Infraestrutura:'badge-blue', Comunicação:'badge-purple', Pessoal:'badge-green', Tecnologia:'badge-gray', Administrativo:'badge-yellow', Outros:'badge-gray' };
+    return `
+      <div class="fin-kpi">
+        <div class="fin-kpi-cell"><div class="fin-kpi-label">Total Mensal Fixo</div><div class="fin-kpi-val text-danger">${Utils.formatCurrency(totalMensal)}</div><div class="fk-sub">${list.filter(d=>d.ativo!==false).length} ativas</div></div>
+        <div class="fin-kpi-cell"><div class="fin-kpi-label">Total Anual Estimado</div><div class="fin-kpi-val text-warning">${Utils.formatCurrency(totalAnual)}</div><div class="fk-sub">Projeção 12 meses</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📌 Despesas Fixas Recorrentes</div>
+          <button class="btn btn-sm btn-primary" onclick="Financeiro.openFormDespFixa(null)">+ Despesa Fixa</button>
+        </div>
+        ${list.length===0?'<div class="card-body"><div class="empty-state"><div class="empty-icon">📌</div><div class="empty-title">Nenhuma despesa fixa cadastrada</div></div></div>':`
+        <div class="table-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Categoria</th><th>Valor</th><th>Periodicidade</th><th>Dia Venc.</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>${list.map(d=>`<tr>
+          <td class="font-semibold text-sm">${Utils.escHtml(d.nome||'—')}</td>
+          <td><span class="badge ${CAT_COLORS[d.categoria]||'badge-gray'}">${Utils.escHtml(d.categoria||'—')}</span></td>
+          <td class="font-bold">${Utils.formatCurrency(d.valor||0)}</td>
+          <td class="text-sm text-muted">${Utils.escHtml(d.periodicidade||'Mensal')}</td>
+          <td class="text-sm">${d.vencimento_dia||'—'}</td>
+          <td><span class="badge ${d.ativo!==false?'badge-green':'badge-gray'}">${d.ativo!==false?'Ativa':'Inativa'}</span></td>
+          <td><div class="tbl-actions">
+            <button class="btn btn-xs btn-secondary" onclick="Financeiro.openFormDespFixa('${d.id}')">✏</button>
+            <button class="btn btn-xs ${d.ativo!==false?'btn-ghost':'btn-success'}" onclick="Financeiro.toggleDespFixa('${d.id}')">${d.ativo!==false?'Desativar':'Ativar'}</button>
+            <button class="btn btn-xs btn-danger" onclick="Financeiro.deleteDespFixa('${d.id}')">🗑</button>
+          </div></td>
+        </tr>`).join('')}</tbody></table></div>`}
+      </div>`;
+  }
+
+  function openFormDespFixa(id) {
+    const d = id ? DB.get('despesas_fixas', id) : null;
+    const CATS_DF = ['Infraestrutura','Comunicação','Pessoal','Tecnologia','Administrativo','Outros'];
+    Modal.open({ title: id ? 'Editar Despesa Fixa' : '+ Nova Despesa Fixa', body: `
+      <div class="form-group"><label class="form-label">Nome *</label><input class="form-control" id="dfNome" value="${Utils.escHtml(d?.nome||'')}"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Categoria</label><select class="form-control" id="dfCat">${CATS_DF.map(c=>`<option value="${c}" ${d?.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="dfValor" type="number" value="${d?.valor||''}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Periodicidade</label><select class="form-control" id="dfPer"><option value="Mensal" ${d?.periodicidade==='Mensal'?'selected':''}>Mensal</option><option value="Bimestral" ${d?.periodicidade==='Bimestral'?'selected':''}>Bimestral</option><option value="Trimestral" ${d?.periodicidade==='Trimestral'?'selected':''}>Trimestral</option><option value="Semestral" ${d?.periodicidade==='Semestral'?'selected':''}>Semestral</option><option value="Anual" ${d?.periodicidade==='Anual'?'selected':''}>Anual</option></select></div>
+        <div class="form-group"><label class="form-label">Dia Vencimento</label><input class="form-control" id="dfDia" type="number" min="1" max="31" value="${d?.vencimento_dia||''}"></div>
+      </div>
+      <div class="form-group"><label class="form-label"><input type="checkbox" id="dfAtivo" ${d?.ativo!==false?'checked':''}> Ativa</label></div>
+      <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="dfObs" rows="2">${Utils.escHtml(d?.obs||'')}</textarea></div>`,
+      saveCb: () => {
+        const nome = document.getElementById('dfNome').value.trim(); if(!nome){Toast.error('Nome obrigatório');return;}
+        const valor = Number(document.getElementById('dfValor').value); if(!valor){Toast.error('Informe o valor');return;}
+        const data = { nome, categoria:document.getElementById('dfCat').value, valor, periodicidade:document.getElementById('dfPer').value, vencimento_dia:Number(document.getElementById('dfDia').value)||null, ativo:document.getElementById('dfAtivo').checked, obs:document.getElementById('dfObs').value };
+        if(id){DB.update('despesas_fixas',id,data);Toast.success('Atualizado');}else{DB.create('despesas_fixas',data);Toast.success('Despesa fixa criada');}
+        Modal.close(); renderTab();
+      }
+    });
+  }
+  function toggleDespFixa(id){const d=DB.get('despesas_fixas',id);if(!d)return;DB.update('despesas_fixas',id,{ativo:d.ativo===false});Toast.success('Status alterado');renderTab();}
+  function deleteDespFixa(id){Utils.confirmDelete('esta despesa fixa',()=>{DB.remove('despesas_fixas',id);Toast.success('Removida');renderTab();});}
+
+  /* ---- DÍVIDAS ---- */
+  function buildDividas() {
+    const list = DB.getAll('dividas');
+    const totalAberto = list.reduce((s,d)=>s+(d.valor_restante||0),0);
+    const proxVenc = list.filter(d=>d.vencimento).sort((a,b)=>(a.vencimento).localeCompare(b.vencimento))[0];
+    const TIPOS_DIV = ['Financiamento','Empréstimo','Parcelamento','Cartão Corporativo','Outro'];
+    const COR_TIPO = { Financiamento:'badge-blue', Empréstimo:'badge-purple', Parcelamento:'badge-yellow', 'Cartão Corporativo':'badge-red', Outro:'badge-gray' };
+    return `
+      <div class="fin-kpi">
+        <div class="fin-kpi-cell"><div class="fin-kpi-label">Total em Aberto</div><div class="fin-kpi-val text-danger">${Utils.formatCurrency(totalAberto)}</div><div class="fk-sub">${list.length} dívida(s)</div></div>
+        <div class="fin-kpi-cell"><div class="fin-kpi-label">Próximo Vencimento</div><div class="fin-kpi-val text-warning">${proxVenc?Utils.formatDate(proxVenc.vencimento):'—'}</div><div class="fk-sub">${proxVenc?Utils.escHtml(Utils.truncate(proxVenc.credor||'',20)):'Sem vencimentos'}</div></div>
+        <div class="fin-kpi-cell"><div class="fin-kpi-label">Total Credores</div><div class="fin-kpi-val">${list.length}</div><div class="fk-sub">dívidas ativas</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">💳 Dívidas e Financiamentos</div>
+          <button class="btn btn-sm btn-primary" onclick="Financeiro.openFormDivida(null)">+ Dívida</button>
+        </div>
+        ${list.length===0?'<div class="card-body"><div class="empty-state"><div class="empty-icon">💳</div><div class="empty-title">Nenhuma dívida cadastrada</div></div></div>':`
+        <div class="table-wrap"><table class="tbl"><thead><tr><th>Credor</th><th>Tipo</th><th>Valor Restante</th><th>Próx. Parcela</th><th>Juros %</th><th>Progresso</th><th>Ações</th></tr></thead>
+        <tbody>${list.map(d=>{
+          const total = d.parcelas_total||1;
+          const pagas = d.parcelas_pagas||0;
+          const pct = Math.round((pagas/total)*100);
+          return `<tr>
+            <td class="font-semibold text-sm">${Utils.escHtml(d.credor||'—')}</td>
+            <td><span class="badge ${COR_TIPO[d.tipo]||'badge-gray'}">${Utils.escHtml(d.tipo||'—')}</span></td>
+            <td class="font-bold text-danger">${Utils.formatCurrency(d.valor_restante||0)}</td>
+            <td class="${Utils.isOverdue(d.vencimento)?'text-danger font-bold':'text-sm'}">${Utils.formatDate(d.vencimento)}</td>
+            <td class="text-sm">${d.taxa_juros?d.taxa_juros+'%':'—'}</td>
+            <td style="min-width:100px"><div style="display:flex;align-items:center;gap:4px"><div style="flex:1;height:6px;background:var(--border);border-radius:4px"><div style="width:${pct}%;height:100%;background:${pct===100?'#10b981':'#2563eb'};border-radius:4px"></div></div><span class="text-xs">${pagas}/${total}</span></div></td>
+            <td><div class="tbl-actions">
+              <button class="btn btn-xs btn-secondary" onclick="Financeiro.openFormDivida('${d.id}')">✏</button>
+              <button class="btn btn-xs btn-danger" onclick="Financeiro.deleteDivida('${d.id}')">🗑</button>
+            </div></td>
+          </tr>`;
+        }).join('')}</tbody></table></div>`}
+      </div>`;
+  }
+
+  function openFormDivida(id) {
+    const d = id ? DB.get('dividas', id) : null;
+    Modal.open({ title: id ? 'Editar Dívida' : '+ Nova Dívida', body: `
+      <div class="form-row">
+        <div class="form-group" style="flex:2"><label class="form-label">Credor *</label><input class="form-control" id="dvCred" value="${Utils.escHtml(d?.credor||'')}"></div>
+        <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="dvTipo"><option value="Financiamento" ${d?.tipo==='Financiamento'?'selected':''}>Financiamento</option><option value="Empréstimo" ${d?.tipo==='Empréstimo'?'selected':''}>Empréstimo</option><option value="Parcelamento" ${d?.tipo==='Parcelamento'?'selected':''}>Parcelamento</option><option value="Cartão Corporativo" ${d?.tipo==='Cartão Corporativo'?'selected':''}>Cartão Corporativo</option><option value="Outro" ${d?.tipo==='Outro'?'selected':''}>Outro</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Valor Total (R$) *</label><input class="form-control" id="dvTotal" type="number" value="${d?.valor_total||''}"></div>
+        <div class="form-group"><label class="form-label">Valor Restante (R$) *</label><input class="form-control" id="dvRest" type="number" value="${d?.valor_restante||''}"></div>
+        <div class="form-group"><label class="form-label">Valor Parcela (R$)</label><input class="form-control" id="dvParc" type="number" value="${d?.valor_parcela||''}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Parcelas Total</label><input class="form-control" id="dvPtotal" type="number" value="${d?.parcelas_total||''}"></div>
+        <div class="form-group"><label class="form-label">Parcelas Pagas</label><input class="form-control" id="dvPpagas" type="number" value="${d?.parcelas_pagas||''}"></div>
+        <div class="form-group"><label class="form-label">Próx. Parcela</label><input class="form-control" id="dvVenc" type="date" value="${d?.vencimento||''}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Taxa Juros (%)</label><input class="form-control" id="dvJuros" type="number" step="0.01" value="${d?.taxa_juros||''}"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="dvObs" rows="2">${Utils.escHtml(d?.obs||'')}</textarea></div>`,
+      saveCb: () => {
+        const credor = document.getElementById('dvCred').value.trim(); if(!credor){Toast.error('Credor obrigatório');return;}
+        const valor_total = Number(document.getElementById('dvTotal').value); if(!valor_total){Toast.error('Valor total obrigatório');return;}
+        const valor_restante = Number(document.getElementById('dvRest').value); if(!valor_restante){Toast.error('Valor restante obrigatório');return;}
+        const data = { credor, tipo:document.getElementById('dvTipo').value, valor_total, valor_restante, valor_parcela:Number(document.getElementById('dvParc').value)||0, parcelas_total:Number(document.getElementById('dvPtotal').value)||0, parcelas_pagas:Number(document.getElementById('dvPpagas').value)||0, vencimento:document.getElementById('dvVenc').value, taxa_juros:Number(document.getElementById('dvJuros').value)||0, obs:document.getElementById('dvObs').value };
+        if(id){DB.update('dividas',id,data);Toast.success('Atualizado');}else{DB.create('dividas',data);Toast.success('Dívida criada');}
+        Modal.close(); renderTab();
+      }
+    });
+  }
+  function deleteDivida(id){Utils.confirmDelete('esta dívida',()=>{DB.remove('dividas',id);Toast.success('Removida');renderTab();});}
+
+  /* ---- ATIVOS ---- */
+  function buildAtivos() {
+    const list = DB.getAll('ativos_empresa');
+    const patrimonio = list.reduce((s,a)=>s+(a.valor_atual||0),0);
+    const deprAnual = list.reduce((s,a)=>s+((a.valor_atual||0)*(a.depreciacao_anual||0)/100),0);
+    const TIPOS_AT = ['Veículo','Equipamento','Imóvel','Software','Ferramentas','Outro'];
+    const COR_AT = { Veículo:'badge-blue', Equipamento:'badge-purple', Imóvel:'badge-green', Software:'badge-gray', Ferramentas:'badge-yellow', Outro:'badge-gray' };
+    return `
+      <div class="fin-kpi">
+        <div class="fin-kpi-cell"><div class="fin-kpi-label">Patrimônio Total</div><div class="fin-kpi-val text-success">${Utils.formatCurrency(patrimonio)}</div><div class="fk-sub">${list.length} ativo(s)</div></div>
+        <div class="fin-kpi-cell"><div class="fin-kpi-label">Depreciação Anual</div><div class="fin-kpi-val text-warning">${Utils.formatCurrency(deprAnual)}</div><div class="fk-sub">Total estimado</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🏭 Ativos da Empresa</div>
+          <button class="btn btn-sm btn-primary" onclick="Financeiro.openFormAtivo(null)">+ Ativo</button>
+        </div>
+        ${list.length===0?'<div class="card-body"><div class="empty-state"><div class="empty-icon">🏭</div><div class="empty-title">Nenhum ativo cadastrado</div></div></div>':`
+        <div class="table-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Tipo</th><th>Valor Aquisição</th><th>Valor Atual</th><th>Data Aquisição</th><th>Depr. Anual</th><th>Ações</th></tr></thead>
+        <tbody>${list.map(a=>`<tr>
+          <td class="font-semibold text-sm">${Utils.escHtml(a.nome||'—')}</td>
+          <td><span class="badge ${COR_AT[a.tipo]||'badge-gray'}">${Utils.escHtml(a.tipo||'—')}</span></td>
+          <td class="text-sm">${Utils.formatCurrency(a.valor_aquisicao||0)}</td>
+          <td class="font-bold text-primary">${Utils.formatCurrency(a.valor_atual||0)}</td>
+          <td class="text-sm text-muted">${Utils.formatDate(a.data_aquisicao)}</td>
+          <td class="text-sm">${a.depreciacao_anual?a.depreciacao_anual+'%':'—'}</td>
+          <td><div class="tbl-actions">
+            <button class="btn btn-xs btn-secondary" onclick="Financeiro.openFormAtivo('${a.id}')">✏</button>
+            <button class="btn btn-xs btn-danger" onclick="Financeiro.deleteAtivo('${a.id}')">🗑</button>
+          </div></td>
+        </tr>`).join('')}</tbody></table></div>`}
+      </div>`;
+  }
+
+  function openFormAtivo(id) {
+    const a = id ? DB.get('ativos_empresa', id) : null;
+    const TIPOS_AT = ['Veículo','Equipamento','Imóvel','Software','Ferramentas','Outro'];
+    Modal.open({ title: id ? 'Editar Ativo' : '+ Novo Ativo', body: `
+      <div class="form-row">
+        <div class="form-group" style="flex:2"><label class="form-label">Nome *</label><input class="form-control" id="atNome" value="${Utils.escHtml(a?.nome||'')}"></div>
+        <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="atTipo">${TIPOS_AT.map(t=>`<option value="${t}" ${a?.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Valor Aquisição (R$) *</label><input class="form-control" id="atAquisicao" type="number" value="${a?.valor_aquisicao||''}"></div>
+        <div class="form-group"><label class="form-label">Valor Atual (R$) *</label><input class="form-control" id="atAtual" type="number" value="${a?.valor_atual||''}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Data Aquisição</label><input class="form-control" id="atData" type="date" value="${a?.data_aquisicao||''}"></div>
+        <div class="form-group"><label class="form-label">Depreciação Anual (%)</label><input class="form-control" id="atDepr" type="number" step="0.1" value="${a?.depreciacao_anual||''}"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="atObs" rows="2">${Utils.escHtml(a?.obs||'')}</textarea></div>`,
+      saveCb: () => {
+        const nome = document.getElementById('atNome').value.trim(); if(!nome){Toast.error('Nome obrigatório');return;}
+        const valor_aquisicao = Number(document.getElementById('atAquisicao').value); if(!valor_aquisicao){Toast.error('Valor de aquisição obrigatório');return;}
+        const valor_atual = Number(document.getElementById('atAtual').value); if(!valor_atual){Toast.error('Valor atual obrigatório');return;}
+        const data = { nome, tipo:document.getElementById('atTipo').value, valor_aquisicao, valor_atual, data_aquisicao:document.getElementById('atData').value, depreciacao_anual:Number(document.getElementById('atDepr').value)||0, obs:document.getElementById('atObs').value };
+        if(id){DB.update('ativos_empresa',id,data);Toast.success('Atualizado');}else{DB.create('ativos_empresa',data);Toast.success('Ativo criado');}
+        Modal.close(); renderTab();
+      }
+    });
+  }
+  function deleteAtivo(id){Utils.confirmDelete('este ativo',()=>{DB.remove('ativos_empresa',id);Toast.success('Removido');renderTab();});}
+
+  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew,drillDown,openFormDespFixa,toggleDespFixa,deleteDespFixa,openFormDivida,deleteDivida,openFormAtivo,deleteAtivo};
 })();

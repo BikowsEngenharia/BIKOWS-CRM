@@ -95,6 +95,7 @@ const Projetos = (() => {
         <button class="fin-tab ${_tabProjetos==='concluidos'?'active':''}" onclick="Projetos.setTabProjetos('concluidos')">✅ Concluídos <span style="font-size:11px;opacity:.7">(${projetos.filter(p=>p.status==='concluido').length})</span></button>
         <button class="fin-tab ${_tabProjetos==='todos'?'active':''}" onclick="Projetos.setTabProjetos('todos')">📋 Todos <span style="font-size:11px;opacity:.7">(${projetos.length})</span></button>
         <button class="fin-tab ${_tabProjetos==='arts'?'active':''}" onclick="Projetos.setTabProjetos('arts')">📜 ARTs <span style="font-size:11px;opacity:.7">(${DB.getAll('arts').length})</span></button>
+        <button class="fin-tab ${_tabProjetos==='gantt'?'active':''}" onclick="Projetos.setTabProjetos('gantt')">📊 Gantt</button>
       </div>
 
       <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
@@ -109,7 +110,7 @@ const Projetos = (() => {
         </div>
       </div>
 
-      ${_tabProjetos === 'arts' ? _renderArtsGlobal() : `
+      ${_tabProjetos === 'arts' ? _renderArtsGlobal() : _tabProjetos === 'gantt' ? _renderGantt() : `
       <div class="card">
         <div class="card-header">
           <div class="filters">
@@ -1373,6 +1374,67 @@ const Projetos = (() => {
     setTimeout(() => { const f=document.getElementById('modalFoot'); if(f) f.style.display='none'; }, 0);
   }
 
+  /* ---- Gantt ---- */
+  function _renderGantt() {
+    const projetos = DB.getAll('projetos').filter(function(p){return p.dataInicio||p.prazo;});
+    if (!projetos.length) return '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Nenhum projeto com datas</div><div class="empty-sub">Adicione data de início e prazo nos projetos para visualizar o Gantt</div></div>';
+    const hoje = new Date();
+    const inicioRange = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
+    const fimRange = new Date(hoje.getFullYear(), hoje.getMonth() + 3, 0);
+    const totalMs = fimRange - inicioRange;
+    const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const mesesHeader = [];
+    let cur = new Date(inicioRange);
+    while (cur <= fimRange) {
+      const diasNoMes = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+      const diasVisiveis = Math.min(diasNoMes, Math.round((fimRange - cur) / 86400000) + 1);
+      const pct = (diasVisiveis * 86400000 / totalMs * 100).toFixed(1);
+      mesesHeader.push('<div style="width:'+pct+'%;text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px 0;border-right:1px solid var(--border)">'+MESES[cur.getMonth()]+' '+cur.getFullYear()+'</div>');
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    }
+    const hojePct = ((hoje - inicioRange) / totalMs * 100).toFixed(1);
+    const COR_STATUS = { em_andamento:'#2563eb', concluido:'#10b981', cancelado:'#94a3b8', planejado:'#f59e0b' };
+    const linhas = projetos.map(function(p){
+      const ini = p.dataInicio ? new Date(p.dataInicio + 'T00:00:00') : null;
+      const fim = p.prazo ? new Date(p.prazo + 'T00:00:00') : null;
+      if (!ini && !fim) return '';
+      const iniEf = ini || fim;
+      const fimEf = fim || ini;
+      const left = Math.max(0, Math.min(100, ((iniEf - inicioRange) / totalMs * 100)));
+      const right = Math.max(0, Math.min(100, ((fimRange - fimEf) / totalMs * 100)));
+      const width = Math.max(1, 100 - left - right);
+      const cor = Utils.isOverdue(p.prazo) && p.status === 'em_andamento' ? '#dc2626' : (COR_STATUS[p.status] || '#7c3aed');
+      const clienteNome = Utils.getClientName(p.clienteId);
+      const etapas = p.etapas || [];
+      const pctEtapas = etapas.length ? Math.round(etapas.filter(function(e){return e.status==='concluida'||e.concluida;}).length / etapas.length * 100) : null;
+      return '<div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);min-height:40px" onmouseover="this.style.background=\'var(--surface-2)\'" onmouseout="this.style.background=\'\'"><div style="width:220px;flex-shrink:0;padding:8px 12px;font-size:12px;border-right:1px solid var(--border)"><div class="font-bold" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px" title="'+Utils.escHtml(p.titulo)+'">'+Utils.escHtml(Utils.truncate(p.titulo, 28))+'</div><div style="font-size:10px;color:var(--text-muted)">'+Utils.escHtml(Utils.truncate(clienteNome, 28))+'</div>'+(pctEtapas!==null?'<div style="font-size:10px;color:var(--text-muted)">'+pctEtapas+'% etapas</div>':'')+'</div><div style="flex:1;position:relative;height:40px;cursor:pointer" onclick="Projetos.view(\''+p.id+'\')"><div style="position:absolute;left:'+left.toFixed(1)+'%;width:'+width.toFixed(1)+'%;height:24px;top:50%;transform:translateY(-50%);background:'+cor+';border-radius:4px;display:flex;align-items:center;padding:0 6px;min-width:4px;opacity:'+(p.status==='cancelado'?'0.5':'1')+'" title="'+Utils.escHtml(p.titulo)+' — '+Utils.formatDate(p.dataInicio)+' → '+Utils.formatDate(p.prazo)+'"><span style="font-size:10px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(width > 8 ? Utils.escHtml(Utils.truncate(p.titulo, 20)) : '')+'</span></div><div style="position:absolute;left:'+hojePct+'%;top:0;bottom:0;width:2px;background:#dc2626;opacity:.5;pointer-events:none"></div></div></div>';
+    }).filter(Boolean).join('');
+    return '<div class="card" style="overflow:hidden"><div class="card-header" style="border-bottom:1px solid var(--border)"><div class="card-title">📊 Gantt — Linha do Tempo dos Projetos</div><div class="text-xs text-muted">Linha vermelha = hoje · Clique na barra para abrir o projeto</div></div><div style="overflow-x:auto"><div style="min-width:700px"><div style="display:flex;border-bottom:2px solid var(--border)"><div style="width:220px;flex-shrink:0;background:var(--surface-2);padding:6px 12px;font-size:11px;font-weight:700;color:var(--text-muted);border-right:1px solid var(--border)">PROJETO</div><div style="flex:1;display:flex;background:var(--surface-2)">'+mesesHeader.join('')+'</div></div>'+(linhas || '<div style="padding:32px;text-align:center;color:var(--text-muted)">Nenhum projeto com datas definidas</div>')+'</div></div><div style="padding:8px 12px;display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid var(--border)"><span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#2563eb;border-radius:2px;display:inline-block"></span>Em andamento</span><span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#dc2626;border-radius:2px;display:inline-block"></span>Atrasado</span><span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#10b981;border-radius:2px;display:inline-block"></span>Concluído</span><span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px;display:inline-block"></span>Planejado</span><span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#94a3b8;border-radius:2px;display:inline-block"></span>Cancelado</span></div></div>';
+  }
+
+  function _etapaRowHtml(e, i) {
+    return '<div class="etapa-row" data-i="'+i+'" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px;background:var(--surface-2,#f8fafc);border-radius:6px"><input type="checkbox" class="etapa-concluida" '+(e.concluida?'checked':'')+' style="width:16px;height:16px;accent-color:var(--success)"><input class="form-control etapa-nome" value="'+Utils.escHtml(e.nome||'')+'" placeholder="Nome da etapa" style="flex:2;margin:0"><input class="form-control etapa-prazo" type="date" value="'+(e.prazo||'')+'" style="flex:1;margin:0"><button type="button" class="btn btn-xs btn-danger" onclick="this.closest(\'.etapa-row\').remove()">✕</button></div>';
+  }
+
+  function _addEtapaRow() {
+    const container = document.getElementById('etapasContainer');
+    if (!container) return;
+    const vazio = document.getElementById('etapasVazio');
+    if (vazio) vazio.remove();
+    const div = document.createElement('div');
+    div.innerHTML = _etapaRowHtml({}, container.querySelectorAll('.etapa-row').length);
+    container.appendChild(div.firstElementChild);
+  }
+
+  function _renderProgressoEtapas(proj) {
+    const etapas = proj.etapas || [];
+    if (!etapas.length) return '';
+    const total = etapas.length;
+    const concluidas = etapas.filter(function(e){return e.concluida || e.status==='concluida';}).length;
+    const pct = Math.round((concluidas / total) * 100);
+    return '<div style="margin:8px 0 4px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:4px"><span>📋 Etapas: '+concluidas+'/'+total+' concluídas</span><span>'+pct+'%</span></div><div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct===100?'#10b981':'#2563eb')+';border-radius:4px;transition:width .3s"></div></div></div>';
+  }
+
   function addNew() { openForm(); }
 
   return {
@@ -1385,5 +1447,7 @@ const Projetos = (() => {
     abrirFormART, removerART,
     // Tab switching
     _switchViewTab,
+    // Gantt + progresso
+    _renderGantt, _etapaRowHtml, _addEtapaRow, _renderProgressoEtapas,
   };
 })();

@@ -186,6 +186,7 @@ const Propostas = (() => {
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.view('${p.id}')">Ver</button>
                       <button class="btn btn-xs btn-success" onclick="PropostaGenerator.open('${p.id}')" title="Gerar proposta PDF">🖨 Gerar</button>
+                      <button class="btn btn-xs btn-secondary" onclick="Propostas.imprimirProposta('${p.id}')" title="Imprimir PDF">🖨</button>
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.duplicar('${p.id}')" title="Duplicar proposta">📋 Dupl.</button>
                       ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-xs btn-secondary" title="Abrir no Canva">🎨</a>` : ''}
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.openForm('${p.id}')">✏</button>
@@ -1047,6 +1048,85 @@ const Propostas = (() => {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
   }
 
+  function imprimirProposta(id) {
+    const p = DB.get('propostas', id);
+    if (!p) return;
+    const cliente = DB.get('clientes', p.clienteId);
+    const cfg = DB.getConfig();
+    const w = window.open('', '_blank');
+    if (!w) { Toast.error('Bloqueador de pop-up ativo — permita pop-ups para este site'); return; }
+    const itensHtml = (p.itens && p.itens.length) ? `
+      <h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px;margin-top:24px">Itens / Serviços</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
+        <thead><tr style="background:#1e40af;color:#fff">
+          <th style="padding:8px;text-align:left">Descrição</th>
+          <th style="padding:8px;text-align:center;width:60px">Qtd</th>
+          <th style="padding:8px;text-align:center;width:50px">Un.</th>
+          <th style="padding:8px;text-align:right;width:110px">Val. Unit.</th>
+          <th style="padding:8px;text-align:right;width:110px">Total</th>
+        </tr></thead>
+        <tbody>${p.itens.map((it,i)=>`<tr style="background:${i%2===0?'#f8fafc':'#fff'}"><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0">${it.desc||''}</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0">${it.qtd}</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;color:#64748b">${it.un||''}</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0">R$ ${(it.unit||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style="padding:7px 8px;text-align:right;font-weight:700;border-bottom:1px solid #e2e8f0">R$ ${(it.total||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td></tr>`).join('')}</tbody>
+      </table>` : '';
+    w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Proposta ${p.numero||''}</title>
+      <style>
+        body{font-family:Arial,sans-serif;color:#1e293b;margin:0;padding:32px;font-size:14px;line-height:1.5}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1e40af}
+        .empresa-info{font-size:13px;color:#475569}.empresa-nome{font-size:20px;font-weight:800;color:#1e40af}
+        .prop-info{text-align:right;font-size:12px;color:#475569}.prop-num{font-size:18px;font-weight:700;color:#1e40af}
+        .section{margin:20px 0}.section h3{color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px}
+        .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f8fafc;padding:16px;border-radius:8px}
+        .field label{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+        .field p{margin:2px 0;font-size:14px}
+        .valor-box{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:20px 24px;border-radius:12px;text-align:center;margin:24px 0}
+        .valor-box .val{font-size:32px;font-weight:800}.valor-box .lbl{font-size:12px;opacity:.8}
+        .obs{background:#fffbeb;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:4px;font-size:13px}
+        .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:11px}
+        @media print { @page { margin: 15mm; } body { padding: 0; } }
+      </style></head><body>
+      <div class="header">
+        <div><div class="empresa-nome">${cfg.empresa||'Bikows Engenharia'}</div>
+          <div class="empresa-info">${cfg.cnpj?'CNPJ: '+cfg.cnpj+' · ':''} ${cfg.cidade||''}${cfg.estado?' / '+cfg.estado:''}</div>
+        </div>
+        <div class="prop-info"><div class="prop-num">${p.numero||'—'}</div><div>Data: ${new Date().toLocaleDateString('pt-BR')}</div></div>
+      </div>
+      <div class="section">
+        <h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Cliente</h3>
+        <div class="grid2">
+          <div class="field"><label>Empresa</label><p><strong>${cliente?.nome||p.clienteNome||'—'}</strong></p></div>
+          <div class="field"><label>CNPJ</label><p>${cliente?.cnpj||'—'}</p></div>
+          <div class="field"><label>Cidade / UF</label><p>${[cliente?.cidade,cliente?.estado].filter(Boolean).join(' / ')||'—'}</p></div>
+          <div class="field"><label>Responsável</label><p>${p.responsavel||'—'}</p></div>
+        </div>
+      </div>
+      <div class="section">
+        <h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Objeto da Proposta</h3>
+        <p><strong>${p.titulo}</strong></p>
+        ${p.descricao?`<p style="color:#475569;font-size:13px">${p.descricao}</p>`:''}
+      </div>
+      ${itensHtml}
+      <div class="valor-box">
+        <div class="lbl">VALOR TOTAL DA PROPOSTA</div>
+        <div class="val">R$ ${(p.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+      </div>
+      <div class="section">
+        <h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Condições Comerciais</h3>
+        <div class="grid2">
+          <div class="field"><label>Validade da Proposta</label><p>${p.validade?new Date(p.validade+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</p></div>
+          ${p.formaPagamento?`<div class="field"><label>Forma de Pagamento</label><p>${p.formaPagamento}</p></div>`:''}
+          ${p.prazoEntrega?`<div class="field"><label>Prazo de Execução</label><p>${p.prazoEntrega}</p></div>`:''}
+          <div class="field"><label>Responsável Técnico</label><p>${p.responsavel||'—'}</p></div>
+        </div>
+      </div>
+      ${p.observacoes?`<div class="section"><h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Observações</h3><div class="obs">${p.observacoes}</div></div>`:''}
+      <div class="footer">
+        <strong>${cfg.empresa||'Bikows Engenharia'}</strong>${cfg.cnpj?' · CNPJ: '+cfg.cnpj:''}<br>
+        Documento gerado pelo CRM Bikows em ${new Date().toLocaleString('pt-BR')}
+      </div>
+    </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 800);
+  }
+
   function addNew() { openForm(); }
 
   /* ---- Drill-down dos KPI cards ---- */
@@ -1173,5 +1253,6 @@ const Propostas = (() => {
     setPeriodo,
     drillDown,
     duplicar,
+    imprimirProposta,
   };
 })();

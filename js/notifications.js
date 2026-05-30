@@ -42,6 +42,25 @@ const Notifications = (() => {
     _startPeriodicCheck();
     _checkAll(); // verifica imediatamente ao carregar
     _checkWeeklySummary(); // verifica se deve mostrar resumo semanal
+
+    // Browser push permission (se ainda não decidido)
+    if ('Notification' in window && Notification.permission === 'default') {
+      setTimeout(function() { Notification.requestPermission(); }, 3000);
+    }
+    // Contratos vencendo em 7 dias
+    setTimeout(function() {
+      if (typeof Contratos !== 'undefined' && Contratos.getContratosVencendo) {
+        var venc7 = Contratos.getContratosVencendo(7);
+        if (venc7.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification('⚠️ Contratos Vencendo', {
+              body: venc7.length + ' contrato(s) vencem nos próximos 7 dias',
+              icon: '/img/logo-bikows.png',
+            });
+          } catch(e) { /* silencioso */ }
+        }
+      }
+    }, 5000);
   }
 
   /* ---- Service Worker ---- */

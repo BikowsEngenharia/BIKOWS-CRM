@@ -186,6 +186,7 @@ const Folha = (() => {
         </div>
         <div class="func-actions">
           <button class="btn btn-xs btn-secondary" onclick="Folha.verFunc('${f.id}')">Ver</button>
+          <button class="btn btn-xs btn-secondary" onclick="Folha.imprimirHolerite('${f.id}','${_mesFolha}')" title="Imprimir Holerite">🖨 Holerite</button>
           <button class="btn btn-xs btn-secondary" onclick="Folha.openFormFunc('${f.id}')">✏</button>
           ${f.ativo !== false
             ? `<button class="btn btn-xs btn-warning" onclick="Folha.toggleAtivo('${f.id}', false)" title="Desligar — mantém histórico">Desligar</button>`
@@ -991,6 +992,43 @@ const Folha = (() => {
   function setHoleirteFunc(v) { _holeriteFuncId = v; render(); }
   function setHoleitreRef(v) { _holeirteRef = v; render(); }
 
+  function imprimirHolerite(funcionarioId, mes) {
+    var func = DB.get('funcionarios', funcionarioId);
+    if (!func) { Toast.error('Funcionário não encontrado'); return; }
+    var mesRef = mes || _mesFolha;
+    var folhaMes = DB.getAll('folha').filter(function(f){ return f.funcionarioId === funcionarioId && f.mes === mesRef; })[0];
+    var cfg = DB.getConfig();
+    var w = window.open('', '_blank');
+    if (!w) { Toast.error('Bloqueador de pop-up ativo'); return; }
+    var sal = func.salarioBase || 0;
+    var inss = folhaMes ? (folhaMes.inss || 0) : calcINSS(sal);
+    var irrf = folhaMes ? (folhaMes.irrf || 0) : calcIRRF(sal, inss, func.dependentes || 0);
+    var fgts = folhaMes ? (folhaMes.fgts || 0) : Math.round(sal * 0.08 * 100) / 100;
+    var vt = func.vt || 0;
+    var vr = func.vr || 0;
+    var plano = func.planoSaude || 0;
+    var bruto = sal + vt + vr;
+    var totalDesc = inss + irrf + plano;
+    var liquido = bruto - totalDesc;
+    var mesLabel = mesRef ? (function(m){ var p=m.split('-');return['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(p[1])-1]+'/'+p[0]; })(mesRef) : '—';
+    var fmt = function(n){ return 'R$ '+(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); };
+    w.document.write('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Holerite '+func.nome+'</title><style>body{font-family:Arial,sans-serif;font-size:13px;margin:0;padding:24px;color:#1e293b}.header{background:#1e40af;color:#fff;padding:16px 20px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between}.empresa{font-size:16px;font-weight:800}h3{color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:4px;margin:16px 0 8px}table{width:100%;border-collapse:collapse;font-size:13px}td{padding:6px 10px;border-bottom:1px solid #e2e8f0}.label{color:#64748b}.value{text-align:right;font-weight:600}.total-row{background:#f1f5f9;font-weight:700}.liquido{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:16px;border-radius:8px;text-align:center;margin-top:16px}.liquido .val{font-size:28px;font-weight:800}.footer{margin-top:24px;text-align:center;color:#94a3b8;font-size:11px}@media print{@page{margin:15mm}body{padding:0}}</style></head><body>');
+    w.document.write('<div class="header"><div><div class="empresa">'+Utils.escHtml(cfg.empresa||'Bikows Engenharia')+'</div><div style="font-size:12px;opacity:.8">'+Utils.escHtml(cfg.cnpj||'')+'</div></div><div style="text-align:right"><div style="font-size:14px;font-weight:700">HOLERITE</div><div style="font-size:12px;opacity:.8">'+mesLabel+'</div></div></div>');
+    w.document.write('<h3>Dados do Funcionário</h3><table><tr><td class="label">Nome</td><td class="value">'+Utils.escHtml(func.nome)+'</td><td class="label">Cargo</td><td class="value">'+Utils.escHtml(func.cargo||'—')+'</td></tr><tr><td class="label">Depto</td><td class="value">'+Utils.escHtml(func.departamento||'—')+'</td><td class="label">Admissão</td><td class="value">'+Utils.formatDate(func.dataAdmissao)+'</td></tr></table>');
+    w.document.write('<h3>Vencimentos</h3><table><tr><td class="label">Salário Base</td><td class="value">'+fmt(sal)+'</td></tr>');
+    if (vt > 0) w.document.write('<tr><td class="label">Vale Transporte</td><td class="value">'+fmt(vt)+'</td></tr>');
+    if (vr > 0) w.document.write('<tr><td class="label">Vale Refeição</td><td class="value">'+fmt(vr)+'</td></tr>');
+    w.document.write('<tr class="total-row"><td>TOTAL BRUTO</td><td class="value">'+fmt(bruto)+'</td></tr></table>');
+    w.document.write('<h3>Descontos</h3><table><tr><td class="label">INSS</td><td class="value" style="color:#dc2626">- '+fmt(inss)+'</td></tr><tr><td class="label">IRRF</td><td class="value" style="color:#dc2626">- '+fmt(irrf)+'</td></tr>');
+    if (plano > 0) w.document.write('<tr><td class="label">Plano de Saúde</td><td class="value" style="color:#dc2626">- '+fmt(plano)+'</td></tr>');
+    w.document.write('<tr class="total-row"><td>TOTAL DESCONTOS</td><td class="value" style="color:#dc2626">- '+fmt(totalDesc)+'</td></tr></table>');
+    w.document.write('<div class="liquido"><div>SALÁRIO LÍQUIDO</div><div class="val">'+fmt(liquido)+'</div></div>');
+    w.document.write('<div class="footer">FGTS: '+fmt(fgts)+' · '+Utils.escHtml(cfg.empresa||'Bikows Engenharia')+' · Gerado pelo CRM Bikows em '+new Date().toLocaleString('pt-BR')+'</div>');
+    w.document.write('</body></html>');
+    w.document.close();
+    setTimeout(function(){ w.print(); }, 800);
+  }
+
   function addNew() { openFormFunc(); }
 
   return {
@@ -1001,5 +1039,6 @@ const Folha = (() => {
     addNew, _previewAvatarFunc,
     openFormSocio, saveSocio, deleteSocio,
     _toggleSocioTipo, _calcSocioPreview,
+    imprimirHolerite,
   };
 })();

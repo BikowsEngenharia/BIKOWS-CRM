@@ -611,8 +611,13 @@ const Pipeline = (() => {
     e.currentTarget.classList.remove('drag-over');
     if (!dragId) return;
     const leadId = dragId;
-    DB.update('leads', leadId, { status: newStatus });
+    const _leadParaDrop = DB.get('leads', leadId);
+    const _statusAnteriorDrop = _leadParaDrop?.status;
+    DB.update('leads', leadId, { status: newStatus, dataMudancaStatus: Utils.todayStr() });
     Toast.success('Lead movido para ' + Utils.LEAD_STATUS[newStatus]?.label);
+    if (newStatus !== _statusAnteriorDrop) {
+      _autoAtividade(leadId, newStatus, _leadParaDrop?.titulo || '');
+    }
     render();
     App.updateNotifBadge();
 
@@ -1299,8 +1304,13 @@ const Pipeline = (() => {
 
     if (id) {
       const wasNotGanho = existingLead?.status !== 'fechado_ganho';
+      const statusAnteriorSave = existingLead?.status;
+      if (data.status !== statusAnteriorSave) { data.dataMudancaStatus = Utils.todayStr(); }
       DB.update('leads', id, data);
       Toast.success('Lead atualizado');
+      if (data.status !== statusAnteriorSave) {
+        _autoAtividade(id, data.status, data.titulo);
+      }
       // Ao mudar para Fechado/Ganho via formulário → disparar fluxo de contratação
       if (data.status === 'fechado_ganho' && wasNotGanho) {
         Modal.close();
@@ -1695,6 +1705,24 @@ const Pipeline = (() => {
     if (row) row.remove();
   }
 
+  function _addDias(dateStr, n) {
+    var d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().split('T')[0];
+  }
+
+  function _autoAtividade(leadId, novoStatus, leadTitulo) {
+    var templates = {
+      'proposta_enviada': { titulo: 'Follow-up: ' + leadTitulo, tipo: 'followup', prioridade: 'alta', data: _addDias(Utils.todayStr(), 3), hora: '09:00', descricao: 'Follow-up automático — proposta enviada há 3 dias', leadId: leadId },
+      'negociacao':       { titulo: 'Negociação ativa: ' + leadTitulo, tipo: 'reuniao', prioridade: 'alta', data: _addDias(Utils.todayStr(), 2), hora: '10:00', descricao: 'Verificar andamento da negociação', leadId: leadId },
+    };
+    var tmpl = templates[novoStatus];
+    if (!tmpl) return;
+    DB.create('atividades', Object.assign({}, tmpl, { status: 'pendente', clienteId: '' }));
+    Toast.success('📌 Atividade criada: ' + tmpl.titulo);
+    if (typeof App !== 'undefined') App.updateNotifBadge();
+  }
+
   return {
     render, openForm, saveLead, deleteLead, viewLead, addNew,
     dragStart, dragEnd, dragOver, dragLeave, drop,
@@ -1708,5 +1736,6 @@ const Pipeline = (() => {
     reativarLeadsPerdidos, _reativarLead, _arquivarLead,
     showEmailTemplates, _selectEmailTemplate,
     calcLeadScore,
+    _autoAtividade, _addDias,
   };
 })();

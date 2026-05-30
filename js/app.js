@@ -284,7 +284,8 @@ const App = (() => {
       !p.art?.numero
     ).length;
 
-    const total = followupsVencidos + vencidos + licsUrgentes + projetosAtrasados + artsPendentes;
+    var contratosVencendo = (typeof Contratos !== 'undefined' && Contratos.getContratosVencendo) ? Contratos.getContratosVencendo(30).length : 0;
+    const total = followupsVencidos + vencidos + licsUrgentes + projetosAtrasados + artsPendentes + contratosVencendo;
     const badge = document.getElementById('notifBadge');
     if (badge) {
       badge.textContent = total;
@@ -414,6 +415,17 @@ const App = (() => {
               <span class="badge badge-yellow">Sem ART</span>
               <button class="btn btn-xs btn-primary" onclick="Projetos.view('${p.id}','arts')">+ ART</button>
             </div>`).join('')}`;
+        })()}
+
+        ${(() => {
+          if (typeof Contratos === 'undefined' || !Contratos.getContratosVencendo) return '';
+          const cv = Contratos.getContratosVencendo(30);
+          if (!cv.length) return '';
+          return '<div class="detail-label mb-2 mt-3">Contratos Vencendo em 30 dias (' + cv.length + ')</div>' +
+            cv.map(function(c) {
+              const dias = Utils.daysUntil(c.dataFim);
+              return '<div class="followup-item urgent mb-2"><div style="flex:1"><div class="font-bold text-sm">📋 ' + Utils.escHtml(c.objeto||c.numero||'—') + '</div><div class="text-xs">' + Utils.escHtml(Utils.getClientName(c.clienteId)) + ' · Vence: ' + Utils.formatDate(c.dataFim) + '</div></div><span class="badge badge-yellow">' + (dias === 0 ? 'Hoje' : dias + 'd') + '</span><button class="btn btn-xs btn-secondary" onclick="App.navigate(\'contratos\');Modal.close()">Ver</button></div>';
+            }).join('');
         })()}
 
         ${followups.length === 0 && atrasadas.length === 0 && parcelasVencidas.length === 0 && licitacoes.length === 0 &&

@@ -127,6 +127,17 @@ const Config = (() => {
           </div>
         </div>
 
+        <!-- Templates de Proposta -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📋 Templates de Proposta</div>
+            <button class="btn btn-sm btn-secondary" onclick="Config.addTemplateProposta()">+ Novo Template</button>
+          </div>
+          <div class="card-body" id="listaTemplatesPropostas">
+            ${_renderTemplatesPropostas(cfg)}
+          </div>
+        </div>
+
         <!-- Regime Tributário -->
         <div class="card">
           <div class="card-header"><div class="card-title">📊 Configurações Financeiras</div></div>
@@ -730,6 +741,80 @@ const Config = (() => {
     App.aplicarPermissoesNavegacao();
   }
 
+  /* ── Templates de Proposta ──────────────────────────────────────────── */
+  function _renderTemplatesPropostas(cfg) {
+    const templates = cfg.templatesPropostas || [];
+    if (!templates.length) return '<p class="text-sm text-muted">Nenhum template cadastrado. Crie templates para agilizar a abertura de propostas.</p>';
+    return templates.map((t, i) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div class="font-bold text-sm">${Utils.escHtml(t.nome)}</div>
+          <div class="text-xs text-muted">${t.formaPagamento ? `Pgto: ${Utils.escHtml(t.formaPagamento)}` : ''} ${t.prazoExecucao ? `· Prazo: ${Utils.escHtml(t.prazoExecucao)}` : ''}</div>
+        </div>
+        <button class="btn btn-xs btn-secondary" onclick="Config.editTemplateProposta(${i})">✏ Editar</button>
+        <button class="btn btn-xs btn-danger" onclick="Config.removeTemplateProposta(${i})">🗑</button>
+      </div>`).join('');
+  }
+
+  function addTemplateProposta() { _formTemplateProposta(null); }
+  function editTemplateProposta(idx) { _formTemplateProposta(idx); }
+
+  function _formTemplateProposta(idx) {
+    const cfg = DB.getConfig();
+    const templates = cfg.templatesPropostas || [];
+    const t = idx !== null ? templates[idx] : null;
+    Modal.open({
+      title: idx !== null ? 'Editar Template' : 'Novo Template de Proposta',
+      body: `
+        <div class="form-group"><label class="form-label">Nome do Template *</label>
+          <input class="form-control" id="tpNome" value="${Utils.escHtml(t?.nome||'')}" placeholder="Ex: NR-12 Padrão, Laudo Estrutural..."></div>
+        <div class="form-group"><label class="form-label">Título padrão da proposta</label>
+          <input class="form-control" id="tpTitulo" value="${Utils.escHtml(t?.titulo||'')}" placeholder="Ex: Adequação NR-12 —"></div>
+        <div class="form-group"><label class="form-label">Descrição / Escopo padrão</label>
+          <textarea class="form-control" id="tpDescricao" rows="4" placeholder="Descrição padrão do serviço...">${Utils.escHtml(t?.descricao||'')}</textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Forma de pagamento padrão</label>
+            <input class="form-control" id="tpFormaPgto" value="${Utils.escHtml(t?.formaPagamento||'')}" placeholder="Ex: 50% entrada + 50% entrega"></div>
+          <div class="form-group"><label class="form-label">Prazo de execução padrão</label>
+            <input class="form-control" id="tpPrazo" value="${Utils.escHtml(t?.prazoExecucao||'')}" placeholder="Ex: 15 dias úteis"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Observações padrão</label>
+          <textarea class="form-control" id="tpObs" rows="3" placeholder="Cláusulas, condições, garantias...">${Utils.escHtml(t?.observacoes||'')}</textarea></div>`,
+      saveCb: () => {
+        const nome = document.getElementById('tpNome').value.trim();
+        if (!nome) { Toast.error('Nome obrigatório'); return; }
+        const novo = {
+          nome,
+          titulo:         document.getElementById('tpTitulo').value,
+          descricao:      document.getElementById('tpDescricao').value,
+          formaPagamento: document.getElementById('tpFormaPgto').value,
+          prazoExecucao:  document.getElementById('tpPrazo').value,
+          observacoes:    document.getElementById('tpObs').value,
+        };
+        const cfg2 = DB.getConfig();
+        const list = [...(cfg2.templatesPropostas || [])];
+        if (idx !== null) list[idx] = novo; else list.push(novo);
+        DB.saveConfig({ ...cfg2, templatesPropostas: list });
+        Modal.close();
+        const el = document.getElementById('listaTemplatesPropostas');
+        if (el) el.innerHTML = _renderTemplatesPropostas(DB.getConfig());
+        Toast.success(idx !== null ? 'Template atualizado' : 'Template criado');
+      },
+    });
+  }
+
+  function removeTemplateProposta(idx) {
+    Confirm.show('Remover template?', 'Esta ação não pode ser desfeita.', () => {
+      const cfg = DB.getConfig();
+      const list = [...(cfg.templatesPropostas || [])];
+      list.splice(idx, 1);
+      DB.saveConfig({ ...cfg, templatesPropostas: list });
+      const el = document.getElementById('listaTemplatesPropostas');
+      if (el) el.innerHTML = _renderTemplatesPropostas(DB.getConfig());
+      Toast.success('Template removido');
+    });
+  }
+
   // Expor ROLE_PAGES para o App.js
   function getRolePages() { return ROLE_PAGES; }
   function getRoles() { return ROLES; }
@@ -741,5 +826,6 @@ const Config = (() => {
     filterAudit, clearAudit, toggleGcal,
     addUsuarioPerfil, editUsuarioPerfil, removeUsuarioPerfil,
     getRolePages, getRoles,
+    addTemplateProposta, editTemplateProposta, removeTemplateProposta,
   };
 })();

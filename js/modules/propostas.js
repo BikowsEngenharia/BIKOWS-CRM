@@ -367,10 +367,21 @@ const Propostas = (() => {
 
     const nextNum = id ? (p?.numero || _nextNumeroProposta()) : _nextNumeroProposta();
 
+    // Templates de proposta salvos na config
+    const templates = cfg.templatesPropostas || [];
+
     Modal.open({
       title: id ? 'Editar Proposta' : 'Nova Proposta',
       size: 'modal-lg',
       body: `
+        ${!id && templates.length > 0 ? `
+        <div style="background:var(--surface-2,#f8fafc);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:13px;font-weight:600;color:var(--text-muted)">📋 Usar template:</span>
+          <select class="form-control" style="flex:1" onchange="Propostas._aplicarTemplate(this.value)">
+            <option value="">— Selecionar template —</option>
+            ${templates.map((t,i)=>`<option value="${i}">${Utils.escHtml(t.nome)}</option>`).join('')}
+          </select>
+        </div>` : ''}
         <!-- Número em destaque -->
         <div style="background:var(--primary);color:#fff;border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
           <div style="flex:1">
@@ -1254,5 +1265,25 @@ const Propostas = (() => {
     drillDown,
     duplicar,
     imprimirProposta,
+    _aplicarTemplate,
   };
 })();
+
+/* Aplica um template salvo na Config ao formulário de proposta aberto */
+Propostas._aplicarTemplate = function(idx) {
+  if (idx === '') return;
+  const cfg = DB.getConfig();
+  const t = (cfg.templatesPropostas || [])[parseInt(idx)];
+  if (!t) return;
+  const fpTitulo = document.getElementById('fpTitulo');
+  const fpDesc   = document.getElementById('fpDescricao');
+  const fpPgto   = document.getElementById('fpFormaPgto');
+  const fpPrazo  = document.getElementById('fpPrazoExec');
+  const fpObs    = document.getElementById('fpObs');
+  if (fpTitulo && !fpTitulo.value && t.titulo)  fpTitulo.value  = t.titulo;
+  if (fpDesc   && !fpDesc.value   && t.descricao) fpDesc.value  = t.descricao;
+  if (fpPgto   && t.formaPagamento) fpPgto.value = t.formaPagamento;
+  if (fpPrazo  && t.prazoExecucao)  fpPrazo.value = t.prazoExecucao;
+  if (fpObs    && t.observacoes)    fpObs.value   = t.observacoes;
+  Toast.success(`Template "${t.nome}" aplicado`);
+};

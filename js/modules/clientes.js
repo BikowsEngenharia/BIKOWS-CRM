@@ -177,7 +177,10 @@ const Clientes = (() => {
             <div class="text-sm text-muted">${c.segmento?`<span class="badge badge-blue">${c.segmento}</span> · `:''} ${Utils.escHtml(c.porte||'')} ${c.cidade?'· '+c.cidade+'/'+c.estado:''}${c.nps ? ` · ${'⭐'.repeat(c.nps)}` : ''}</div>
             <div class="text-xs text-muted mt-1">CNPJ: ${Utils.escHtml(c.cnpj||'—')} · ${Utils.escHtml(c.email||'—')} · ${Utils.escHtml(c.telefone||'—')}${c.engResponsavel?` · Resp: ${Utils.escHtml(c.engResponsavel)}`:''}</div>
           </div>
-          <div>${c.ativo!==false?'<span class="badge badge-green">Ativo</span>':'<span class="badge badge-gray">Inativo</span>'}</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            ${c.ativo!==false?'<span class="badge badge-green">Ativo</span>':'<span class="badge badge-gray">Inativo</span>'}
+            ${(()=>{const s=calcScore(id);return `<div title="${s.detalhes.join(' | ')}" style="cursor:help;text-align:center;min-width:64px;padding:4px 10px;border-radius:12px;background:${s.color}20;border:1px solid ${s.color}40"><div style="font-size:17px;font-weight:800;color:${s.color};line-height:1">${s.score}</div><div style="font-size:10px;font-weight:600;color:${s.color}">${s.label}</div></div>`;})()}
+          </div>
         </div>
 
         <div class="stats-row mb-4">

@@ -1494,6 +1494,16 @@ body.dark-mode .kpi-meta-card { background: var(--surface); border-color: var(--
    WIDGET FAÇA ISSO HOJE
    ================================================ */
 .hoje-item:last-child { border-bottom: none !important; }
+.hoje-item[draggable="true"]:hover { cursor: grab; }
+.hoje-item[draggable="true"]:active { cursor: grabbing; opacity: .7; }
+.dash-drop-zone { transition: all .15s ease; }
+.dash-drop-zone.drag-over {
+  border-color: var(--primary) !important;
+  background: var(--primary-light, #eff6ff) !important;
+  color: var(--primary) !important;
+  transform: scale(1.04);
+  box-shadow: 0 2px 8px rgba(37,99,235,.2);
+}
 
 /* ================================================
    BTN WARNING

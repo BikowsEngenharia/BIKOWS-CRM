@@ -648,6 +648,7 @@ const Dashboard = (() => {
         hora: a.hora || '',
         tipo: 'atividade',
         id: a.id,
+        atividadeId: a.id,
         acao: `App.navigate('atividades')`,
       }));
 
@@ -749,11 +750,22 @@ const Dashboard = (() => {
     return `<div class="card mb-4" style="border-left:4px solid var(--primary)">
       <div class="card-header">
         <div class="card-title">⚡ Faça isso hoje</div>
-        <span class="badge badge-blue">${top5.length} item${top5.length > 1 ? 's' : ''}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge badge-blue">${top5.length} item${top5.length > 1 ? 's' : ''}</span>
+          <span class="text-xs text-muted" style="font-size:11px">Arraste atividades para reagendar</span>
+        </div>
       </div>
       <div class="card-body" style="padding:0">
-        ${top5.map((item, idx) => `
-          <div class="hoje-item" onclick="${item.acao}" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);transition:background .15s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+        ${top5.map((item, idx) => {
+          const isDraggable = item.atividadeId; // só atividades são arrastáveis
+          return `
+          <div class="hoje-item"
+            ${isDraggable ? `draggable="true" ondragstart="Dashboard._dragStart(event,'${item.atividadeId}')"` : ''}
+            onclick="${item.acao}"
+            style="cursor:${isDraggable?'grab':'pointer'};display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);transition:background .15s${isDraggable?';user-select:none':''}"
+            onmouseover="this.style.background='var(--bg)'"
+            onmouseout="this.style.background=''">
+            ${isDraggable ? `<span style="color:var(--text-muted);font-size:14px;cursor:grab;flex-shrink:0" title="Arraste para reagendar">⠿</span>` : ''}
             <div style="width:8px;height:8px;border-radius:50%;background:${item.cor};flex-shrink:0"></div>
             <div style="width:32px;height:32px;border-radius:8px;background:${item.cor}20;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${item.icone}</div>
             <div style="flex:1;min-width:0">
@@ -762,9 +774,38 @@ const Dashboard = (() => {
             </div>
             ${item.hora ? `<span class="text-xs text-muted">${item.hora}</span>` : ''}
             <span style="font-size:11px;color:${item.cor};font-weight:600;text-transform:uppercase">${item.tipo === 'atraso' ? 'ATRASADO' : item.tipo === 'conta' && item.prioridade === 0 ? 'VENCIDO' : 'HOJE'}</span>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
+
+        <!-- Zonas de reagendamento — visíveis durante drag -->
+        <div id="dashDropZones" style="display:none;padding:12px 20px;gap:8px;background:var(--primary-light,#eff6ff)">
+          <div class="text-xs text-muted font-bold mb-2">📅 Arraste aqui para reagendar:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${[{n:1,label:'Amanhã'},{n:3,label:'+3 dias'},{n:7,label:'Semana que vem'},{n:14,label:'+2 semanas'},{n:30,label:'Próximo mês'}].map(z=>`
+            <div class="dash-drop-zone" data-dias="${z.n}"
+              ondragover="Dashboard._dragOver(event)"
+              ondragleave="this.classList.remove('drag-over')"
+              ondrop="Dashboard._drop(event,${z.n})"
+              style="padding:8px 14px;border:2px dashed var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:default;transition:.15s;background:var(--surface)"
+            >📅 ${z.label}</div>`).join('')}
+          </div>
+        </div>
       </div>
-    </div>`;
+    </div>
+    <script>
+    if (!window._dashDragInit) {
+      window._dashDragInit = true;
+      document.addEventListener('dragstart', function(e){
+        if (e.target.closest('.hoje-item[draggable]')) {
+          document.getElementById('dashDropZones') && (document.getElementById('dashDropZones').style.display='block');
+        }
+      });
+      document.addEventListener('dragend', function(){
+        document.getElementById('dashDropZones') && (document.getElementById('dashDropZones').style.display='none');
+        document.querySelectorAll('.dash-drop-zone.drag-over').forEach(el=>el.classList.remove('drag-over'));
+      });
+    }
+    </script>`;
   }
 
   function _renderMetasKpi() {
@@ -997,5 +1038,40 @@ const Dashboard = (() => {
     setTimeout(() => { const f = document.getElementById('modalFoot'); if(f) f.style.display='none'; }, 0);
   }
 
-  return { render, setPeriodo, drillDown, _filtrarAlertasContratos };
+  /* ── Drag-to-reschedule helpers ──────────────────────────────────────── */
+  let _dragAtivId = null;
+
+  function _dragStart(e, atividadeId) {
+    _dragAtivId = atividadeId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', atividadeId);
+  }
+
+  function _dragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('drag-over');
+    e.currentTarget.style.borderColor = 'var(--primary)';
+    e.currentTarget.style.background  = 'var(--primary-light,#eff6ff)';
+    e.currentTarget.style.color       = 'var(--primary)';
+  }
+
+  function _drop(e, dias) {
+    e.preventDefault();
+    const id = _dragAtivId || e.dataTransfer.getData('text/plain');
+    if (!id) return;
+    const a = DB.get('atividades', id);
+    if (!a) return;
+    // Calcular nova data
+    const base = new Date();
+    base.setDate(base.getDate() + dias);
+    const novaData = base.toISOString().split('T')[0];
+    DB.update('atividades', id, { data: novaData });
+    _dragAtivId = null;
+    Toast.success(`📅 Reagendado para ${Utils.formatDate(novaData)}`);
+    if (typeof App !== 'undefined') App.updateNotifBadge();
+    render();
+  }
+
+  return { render, setPeriodo, drillDown, _filtrarAlertasContratos, _dragStart, _dragOver, _drop };
 })();

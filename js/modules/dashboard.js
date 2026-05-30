@@ -413,6 +413,7 @@ const Dashboard = (() => {
     }
 
     _renderMetasKpi();
+    _initDragListeners();
   }
 
   /* ================================================
@@ -792,20 +793,7 @@ const Dashboard = (() => {
         </div>
       </div>
     </div>
-    <script>
-    if (!window._dashDragInit) {
-      window._dashDragInit = true;
-      document.addEventListener('dragstart', function(e){
-        if (e.target.closest('.hoje-item[draggable]')) {
-          document.getElementById('dashDropZones') && (document.getElementById('dashDropZones').style.display='block');
-        }
-      });
-      document.addEventListener('dragend', function(){
-        document.getElementById('dashDropZones') && (document.getElementById('dashDropZones').style.display='none');
-        document.querySelectorAll('.dash-drop-zone.drag-over').forEach(el=>el.classList.remove('drag-over'));
-      });
-    }
-    </script>`;
+    `;
   }
 
   function _renderMetasKpi() {
@@ -1040,6 +1028,28 @@ const Dashboard = (() => {
 
   /* ── Drag-to-reschedule helpers ──────────────────────────────────────── */
   let _dragAtivId = null;
+  let _dragListenerActive = false;
+
+  function _initDragListeners() {
+    if (_dragListenerActive) return;
+    _dragListenerActive = true;
+    document.addEventListener('dragstart', function(e) {
+      if (e.target.closest('.hoje-item[draggable="true"]')) {
+        const zones = document.getElementById('dashDropZones');
+        if (zones) zones.style.display = 'block';
+      }
+    });
+    document.addEventListener('dragend', function() {
+      const zones = document.getElementById('dashDropZones');
+      if (zones) zones.style.display = 'none';
+      document.querySelectorAll('.dash-drop-zone').forEach(el => {
+        el.classList.remove('drag-over');
+        el.style.borderColor = '';
+        el.style.background  = '';
+        el.style.color       = '';
+      });
+    });
+  }
 
   function _dragStart(e, atividadeId) {
     _dragAtivId = atividadeId;

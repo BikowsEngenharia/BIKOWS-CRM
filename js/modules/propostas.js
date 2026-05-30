@@ -1267,23 +1267,21 @@ const Propostas = (() => {
     imprimirProposta,
     _aplicarTemplate,
   };
-})();
 
-/* Aplica um template salvo na Config ao formulário de proposta aberto */
-Propostas._aplicarTemplate = function(idx) {
-  if (idx === '') return;
-  const cfg = DB.getConfig();
-  const t = (cfg.templatesPropostas || [])[parseInt(idx)];
-  if (!t) return;
-  const fpTitulo = document.getElementById('fpTitulo');
-  const fpDesc   = document.getElementById('fpDescricao');
-  const fpPgto   = document.getElementById('fpFormaPgto');
-  const fpPrazo  = document.getElementById('fpPrazoExec');
-  const fpObs    = document.getElementById('fpObs');
-  if (fpTitulo && !fpTitulo.value && t.titulo)  fpTitulo.value  = t.titulo;
-  if (fpDesc   && !fpDesc.value   && t.descricao) fpDesc.value  = t.descricao;
-  if (fpPgto   && t.formaPagamento) fpPgto.value = t.formaPagamento;
-  if (fpPrazo  && t.prazoExecucao)  fpPrazo.value = t.prazoExecucao;
-  if (fpObs    && t.observacoes)    fpObs.value   = t.observacoes;
-  Toast.success(`Template "${t.nome}" aplicado`);
-};
+  /* Aplica template salvo no Config ao formulário aberto */
+  function _aplicarTemplate(idx) {
+    if (idx === '') return;
+    const cfg = DB.getConfig();
+    const t = (cfg.templatesPropostas || [])[parseInt(idx)];
+    if (!t) return;
+    // IDs corretos do formulário de proposta
+    const elTitulo = document.getElementById('fpTitulo');
+    const elDesc   = document.getElementById('fpDesc');   // id real no form
+    const elObs    = document.getElementById('fpObs');
+    if (elTitulo && !elTitulo.value && t.titulo)   elTitulo.value = t.titulo;
+    if (elDesc   && !elDesc.value   && t.descricao) elDesc.value  = t.descricao;
+    if (elObs    && t.observacoes)                  elObs.value   = t.observacoes;
+    Toast.success(`Template "${t.nome}" aplicado`);
+  }
+
+})();

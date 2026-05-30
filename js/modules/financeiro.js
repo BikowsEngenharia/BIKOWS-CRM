@@ -232,8 +232,18 @@ const Financeiro = (() => {
   }
 
   /* ---- DRE ---- */
+  // Calcula o custo mensal proporcional de uma despesa fixa
+  function _despFixaMensal(d) {
+    if (!d.ativo && d.ativo !== undefined) return 0;
+    const mult = { Mensal:1, Bimestral:1/2, Trimestral:1/3, Semestral:1/6, Anual:1/12 };
+    return (d.valor||0) * (mult[d.periodicidade] || 1);
+  }
+
   function buildDRE() {
     const lanc=DB.getAll('lancamentos');
+    const despFixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
+    const totalDespFixaMensal=despFixas.reduce((s,d)=>s+_despFixaMensal(d),0);
+
     const d=(mes)=>{
       const r=lanc.filter(l=>l.tipo==='receita'&&l.data?.startsWith(mes)&&l.status==='recebido').reduce((s,l)=>s+l.valor,0);
       const all=lanc.filter(l=>l.tipo==='despesa'&&l.data?.startsWith(mes)&&l.status==='pago');
@@ -244,7 +254,7 @@ const Financeiro = (() => {
     };
     const v=d(_dremes);
     const aliq=(DB.getConfig().aliquotaImpostos||6)/100;
-    const imp=v.r*aliq, rl=v.r-imp, lb=rl-v.mat, ebitda=lb-v.fl-v.out;
+    const imp=v.r*aliq, rl=v.r-imp, lb=rl-v.mat, ebitda=lb-v.fl-v.out-totalDespFixaMensal;
     const mg=(x)=>v.r>0?((x/v.r)*100).toFixed(1)+'%':'—';
     return `
       <div class="card mb-4">
@@ -265,7 +275,8 @@ const Financeiro = (() => {
             <div class="dre-row dre-total"><div class="dre-label">= LUCRO BRUTO <span style="font-size:11px;font-weight:400;color:var(--text-muted)">— Margem ${mg(lb)}</span></div><div class="dre-value ${lb>=0?'pos':'neg'}">${Utils.formatCurrency(lb)}</div></div>
             <div class="dre-row dre-section"><div class="dre-label">(-) DESPESAS OPERACIONAIS</div></div>
             <div class="dre-row"><div class="dre-label">Folha de Pagamento</div><div class="dre-value neg">- ${Utils.formatCurrency(v.fl)}</div></div>
-            <div class="dre-row"><div class="dre-label">Outras Despesas</div><div class="dre-value neg">- ${Utils.formatCurrency(v.out)}</div></div>
+            <div class="dre-row"><div class="dre-label">Outras Despesas (lançamentos)</div><div class="dre-value neg">- ${Utils.formatCurrency(v.out)}</div></div>
+            ${totalDespFixaMensal > 0 ? `<div class="dre-row"><div class="dre-label">Despesas Fixas (${despFixas.length} item${despFixas.length>1?'s':''})</div><div class="dre-value neg">- ${Utils.formatCurrency(totalDespFixaMensal)}</div></div>` : ''}
             <div class="dre-row dre-total" style="font-size:15px"><div class="dre-label">= EBITDA <span style="font-size:11px;font-weight:400;color:var(--text-muted)">— Margem ${mg(ebitda)}</span></div><div class="dre-value ${ebitda>=0?'pos':'neg'}">${Utils.formatCurrency(ebitda)}</div></div>
           </div>
         </div>
@@ -276,14 +287,17 @@ const Financeiro = (() => {
   /* ---- FLUXO DE CAIXA ---- */
   function buildFluxo() {
     const meses=getLast3Next3(), lanc=DB.getAll('lancamentos');
+    const despFixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
+    const saídaFixaMensal=despFixas.reduce((s,d)=>s+_despFixaMensal(d),0);
     let saldo=0;
     const hoje=Utils.todayStr().substring(0,7);
-    // Usa APENAS lancamentos como fonte única de verdade (evita dupla contagem com contaspagar)
     const rows=meses.map(m=>{
       const [,mo]=m.split('-');
       const lb=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1];
       const e=lanc.filter(l=>l.tipo==='receita'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0);
-      const s=lanc.filter(l=>l.tipo==='despesa'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0);
+      const sLanc=lanc.filter(l=>l.tipo==='despesa'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0);
+      // Inclui despesas fixas nas saídas projetadas de todos os meses
+      const s=sLanc+(saídaFixaMensal>0?saídaFixaMensal:0);
       return {m,lb,e,s,r:e-s};
     });
     return `

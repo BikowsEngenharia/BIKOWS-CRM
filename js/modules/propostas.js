@@ -931,17 +931,24 @@ const Propostas = (() => {
     const fin = { recebimentos: [], custos: [], parceiros: [] };
 
     if (condicao === 'avista') {
-      const data = document.getElementById('cAvistaData').value;
-      const forma = document.getElementById('cAvistaForma').value;
+      const dataRec = document.getElementById('cAvistaData').value;
+      const forma   = document.getElementById('cAvistaForma').value;
       const rec = { id: _uid(), descricao: 'Pagamento único', valor: valorFechado,
-                    vencimento: data, formaPagamento: forma, status: 'pendente',
+                    vencimento: dataRec, formaPagamento: forma, status: 'pendente',
                     lancadoFinanceiro: false, recebiveisId: null };
-      // Auto-lança em recebiveis geral
+      // Cria recebível no formato correto (parcelas array)
       const rv = DB.create('recebiveis', {
-        descricao: `${projTitulo} — Pagamento único`,
-        clienteId: prop.clienteId, valor: valorFechado, vencimento: data,
-        status: 'pendente', formaPagamento: forma, projetoId: projeto.id,
-        propostaId, origem: 'contrato',
+        descricao:  `${projTitulo} — Pagamento único`,
+        clienteId:  prop.clienteId,
+        valorTotal: valorFechado,
+        projetoId:  projeto.id,
+        propostaId,
+        origem: 'contrato',
+        parcelas: [{
+          id: _uid(), valor: valorFechado, vencimento: dataRec,
+          status: 'a_vencer', formaPagamento: forma,
+          dataPagamento: null, nfNumero: '',
+        }],
       });
       rec.recebiveisId = rv.id;
       rec.lancadoFinanceiro = true;
@@ -952,43 +959,58 @@ const Propostas = (() => {
       const data1 = document.getElementById('cParc1Data').value;
       const intv  = parseInt(document.getElementById('cParcIntervalo').value) || 30;
       const forma = document.getElementById('cParcForma').value;
-      const parcVal = valorFechado / n;
-
+      // Cria UM recebível com N parcelas (formato correto para o financeiro)
+      const parcelas = [];
+      const recsInterno = [];
       for (let i = 0; i < n; i++) {
         const d = new Date((data1 || Utils.todayStr()) + 'T00:00:00');
         d.setDate(d.getDate() + i * intv);
         const venc = d.toISOString().split('T')[0];
-        const descParcela = `Parcela ${i+1}/${n}`;
-        const rec = { id: _uid(), descricao: descParcela, valor: parcVal,
-                      vencimento: venc, formaPagamento: forma, status: 'pendente',
-                      lancadoFinanceiro: false, recebiveisId: null };
-        const rv = DB.create('recebiveis', {
-          descricao: `${projTitulo} — ${descParcela}`,
-          clienteId: prop.clienteId, valor: parcVal, vencimento: venc,
-          status: 'pendente', formaPagamento: forma, projetoId: projeto.id,
-          propostaId, origem: 'contrato',
-        });
-        rec.recebiveisId = rv.id;
-        rec.lancadoFinanceiro = true;
-        fin.recebimentos.push(rec);
+        const isLast = i === n - 1;
+        const pVal = isLast
+          ? Math.round((valorFechado - Math.round((valorFechado / n) * 100) / 100 * (n - 1)) * 100) / 100
+          : Math.round((valorFechado / n) * 100) / 100;
+        parcelas.push({ id: _uid(), valor: pVal, vencimento: venc, status: 'a_vencer', formaPagamento: forma, dataPagamento: null, nfNumero: '' });
+        recsInterno.push({ id: _uid(), descricao: `Parcela ${i+1}/${n}`, valor: pVal, vencimento: venc, formaPagamento: forma, status: 'pendente', lancadoFinanceiro: true, recebiveisId: null });
       }
+      const rv = DB.create('recebiveis', {
+        descricao:  `${projTitulo}`,
+        clienteId:  prop.clienteId,
+        valorTotal: valorFechado,
+        projetoId:  projeto.id,
+        propostaId,
+        origem: 'contrato',
+        parcelas,
+      });
+      recsInterno.forEach(r => { r.recebiveisId = rv.id; fin.recebimentos.push(r); });
 
     } else if (condicao === 'medicoes') {
-      // Vinculado a etapas — cria recebível para cada etapa com vincPagamento = true
-      etapasValidas.filter(e => e.vincPagamento && e.valor > 0).forEach((e, i) => {
-        const descRec = `Medição — ${e.nome.trim()}`;
-        const rec = { id: _uid(), descricao: descRec, valor: e.valor,
-                      vencimento: e.fim, formaPagamento: 'A definir', status: 'pendente',
-                      lancadoFinanceiro: false, recebiveisId: null, etapaNome: e.nome };
+      // Vinculado a etapas — cria UM recebível com uma parcela por etapa
+      const etapasPag = etapasValidas.filter(e => e.vincPagamento && e.valor > 0);
+      if (etapasPag.length > 0) {
+        const totalMed = etapasPag.reduce((s, e) => s + (e.valor || 0), 0);
+        const parcelasMed = etapasPag.map(e => ({
+          id: _uid(), valor: e.valor, vencimento: e.fim,
+          status: 'a_vencer', formaPagamento: 'A definir',
+          etapaNome: e.nome.trim(), dataPagamento: null, nfNumero: '',
+        }));
         const rv = DB.create('recebiveis', {
-          descricao: `${projTitulo} — ${descRec}`,
-          clienteId: prop.clienteId, valor: e.valor, vencimento: e.fim,
-          status: 'pendente', projetoId: projeto.id, propostaId, origem: 'contrato',
+          descricao:  `${projTitulo} — Por medições`,
+          clienteId:  prop.clienteId,
+          valorTotal: totalMed,
+          projetoId:  projeto.id,
+          propostaId,
+          origem: 'contrato',
+          parcelas: parcelasMed,
         });
-        rec.recebiveisId = rv.id;
-        rec.lancadoFinanceiro = true;
-        fin.recebimentos.push(rec);
-      });
+        etapasPag.forEach((e, i) => {
+          fin.recebimentos.push({
+            id: _uid(), descricao: `Medição — ${e.nome.trim()}`, valor: e.valor,
+            vencimento: e.fim, formaPagamento: 'A definir', status: 'pendente',
+            lancadoFinanceiro: true, recebiveisId: rv.id, etapaNome: e.nome,
+          });
+        });
+      }
     }
 
     // Salva financeiro no projeto

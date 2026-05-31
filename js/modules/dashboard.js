@@ -95,8 +95,8 @@ const Dashboard = (() => {
     const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
     const periodoLabel = periodoLabels[_periodo] || '';
 
-    const ativos = leadsFiltrados.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
-    const ganhos = leadsFiltrados.filter(l => l.status === 'fechado_ganho');
+    const ativos = leadsFiltrados.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
+    const ganhos = leadsFiltrados.filter(l => ['fechado_ganho','executado'].includes(l.status));
     const perdidos = leadsFiltrados.filter(l => l.status === 'fechado_perdido');
     const totalPipeline = Utils.sum(ativos, 'valorEstimado');
     const receitaFechada = Utils.sum(ganhos, 'valorFechado');
@@ -104,8 +104,8 @@ const Dashboard = (() => {
 
     // Período anterior para comparativo
     const leadsAnt = _filtrarPeriodoAnterior(leads, 'dataEntrada');
-    const ativosAnt = leadsAnt.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
-    const ganhosAnt = leadsAnt.filter(l => l.status === 'fechado_ganho');
+    const ativosAnt = leadsAnt.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
+    const ganhosAnt = leadsAnt.filter(l => ['fechado_ganho','executado'].includes(l.status));
     const totalPipelineAnt = Utils.sum(ativosAnt, 'valorEstimado');
     const receitaFechadaAnt = Utils.sum(ganhosAnt, 'valorFechado');
     const taxaConversaoAnt = leadsAnt.length > 0 ? (ganhosAnt.length / leadsAnt.length) * 100 : 0;
@@ -675,7 +675,7 @@ const Dashboard = (() => {
 
     // 3. Leads com follow-up atrasado
     leads
-      .filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status) && l.dataProximaAcao && l.dataProximaAcao <= hoje)
+      .filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status) && l.dataProximaAcao && l.dataProximaAcao <= hoje)
       .sort((a,b) => a.dataProximaAcao.localeCompare(b.dataProximaAcao))
       .slice(0,2)
       .forEach(l => {
@@ -910,7 +910,7 @@ const Dashboard = (() => {
     const configs = {
       'leads_ativos': {
         title: '💼 Leads Ativos',
-        get items() { return DB.getAll('leads').filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status)); },
+        get items() { return DB.getAll('leads').filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status)); },
         cols: ['Lead','Etapa','Valor','Responsável'],
         row: l => [Utils.escHtml(l.titulo||'—'), Utils.escHtml(l.status||'—'), Utils.formatCurrency(l.valorEstimado||0), Utils.escHtml(l.responsavel||'—')],
         action: l => `onclick="App.navigate('pipeline');Modal.close()"`,

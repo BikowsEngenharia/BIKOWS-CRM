@@ -307,7 +307,7 @@ const GoogleCal = (() => {
     if (!_gapiReady())    { Toast.error('API do Google não está pronta. Recarregue a página.'); return 0; }
 
     const today = Utils.todayStr();
-    const closedStatuses = ['fechado_ganho', 'fechado_perdido'];
+    const closedStatuses = ['fechado_ganho', 'executado', 'fechado_perdido'];
     const leads = DB.getAll('leads').filter(l =>
       !closedStatuses.includes(l.status) &&
       l.dataProximaAcao &&
@@ -471,7 +471,7 @@ const GoogleCal = (() => {
     }
 
     const today      = Utils.todayStr();
-    const closedSt   = ['fechado_ganho', 'fechado_perdido'];
+    const closedSt   = ['fechado_ganho', 'executado', 'fechado_perdido'];
     const pendAtiv   = DB.getAll('atividades').filter(a => a.status === 'pendente' && a.data && a.data >= today);
     const pendLeads  = DB.getAll('leads').filter(l => !closedSt.includes(l.status) && l.dataProximaAcao && l.dataProximaAcao >= today);
 

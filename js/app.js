@@ -251,7 +251,7 @@ const App = (() => {
     const pendentes = atividades.filter(a => a.status === 'pendente').length;
     const leads = DB.getAll('leads');
     const followupsVencidos = leads.filter(l =>
-      !['fechado_ganho','fechado_perdido'].includes(l.status) &&
+      !['fechado_ganho','executado','fechado_perdido'].includes(l.status) &&
       l.dataProximaAcao && Utils.isOverdue(l.dataProximaAcao)
     ).length;
 
@@ -305,7 +305,7 @@ const App = (() => {
     });
 
     const followups = leads.filter(l =>
-      !['fechado_ganho','fechado_perdido'].includes(l.status) &&
+      !['fechado_ganho','executado','fechado_perdido'].includes(l.status) &&
       l.dataProximaAcao && Utils.isOverdue(l.dataProximaAcao)
     );
     const atrasadas = atividades.filter(a => a.status === 'pendente' && Utils.isOverdue(a.data));

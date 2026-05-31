@@ -433,7 +433,7 @@ const Pipeline = (() => {
   function _renderProbabilidadeLegend() {
     return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
       <span class="text-xs text-muted">Probabilidade por etapa:</span>
-      ${STAGES.filter(s => !['fechado_ganho','fechado_perdido'].includes(s.key)).map(s =>
+      ${STAGES.filter(s => !['fechado_ganho','executado','fechado_perdido'].includes(s.key)).map(s =>
         `<span style="font-size:11px;background:${s.color}22;color:${s.color};padding:2px 8px;border-radius:99px;border:1px solid ${s.color}44">${s.label.split(' ')[1]||s.label.split(' ')[0]} ${s.prob}%</span>`
       ).join('')}
     </div>`;
@@ -1437,7 +1437,7 @@ const Pipeline = (() => {
     let title = '', items = [], cols = [], rowFn = () => [];
 
     const allLeads = DB.getAll('leads');
-    const leadsAtivos = allLeads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const leadsAtivos = allLeads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
 
     if (tipo === 'pipeline_total') {
       title = 'Total em Pipeline';
@@ -1530,8 +1530,8 @@ const Pipeline = (() => {
 
     const rows = canais.map(canal => {
       const grupo = leads.filter(l => l.origemLead === canal);
-      const ativos  = grupo.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
-      const ganhos  = grupo.filter(l => l.status === 'fechado_ganho');
+      const ativos  = grupo.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
+      const ganhos  = grupo.filter(l => ['fechado_ganho','executado'].includes(l.status));
       const perdidos = grupo.filter(l => l.status === 'fechado_perdido');
       const valorPipeline = Utils.sum(ativos, 'valorEstimado');
       const valorFechado  = Utils.sum(ganhos, 'valorFechado');

@@ -169,7 +169,7 @@ const Notifications = (() => {
   function _checkLeads(prefs) {
     const ant = prefs.antecedencia?.leads ?? 0;
     return DB.getAll('leads')
-      .filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status) && l.dataProximaAcao)
+      .filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status) && l.dataProximaAcao)
       .filter(l => {
         const d = _daysUntil(l.dataProximaAcao);
         return d !== null && d <= ant && d >= -30;
@@ -357,7 +357,7 @@ const Notifications = (() => {
     const recebiveis = DB.getAll('recebiveis');
     const contasPagar = DB.getAll('contaspagar');
 
-    const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const ativos = leads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
     const hoje = new Date();
     const semanaFim = new Date(hoje); semanaFim.setDate(hoje.getDate() + 7);
     const semanaFimStr = semanaFim.toISOString().split('T')[0];

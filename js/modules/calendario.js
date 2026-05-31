@@ -96,7 +96,7 @@ const Calendario = (() => {
     // ── Leads — próxima ação (follow-up) ──────────────────────────────────
     DB.getAll('leads').forEach(l => {
       if (!l.dataProximaAcao) return;
-      if (['fechado_ganho','fechado_perdido'].includes(l.status)) return;
+      if (['fechado_ganho','executado','fechado_perdido'].includes(l.status)) return;
       addEvent(l.dataProximaAcao, {
         type: 'followup',
         label: `🔵 ${Utils.escHtml(l.titulo || 'Lead')}`,
@@ -200,7 +200,7 @@ const Calendario = (() => {
 
     // follow-ups
     DB.getAll('leads').forEach(l => {
-      if (!['fechado_ganho','fechado_perdido'].includes(l.status) && inMonth(l.dataProximaAcao)) totalEventos++;
+      if (!['fechado_ganho','executado','fechado_perdido'].includes(l.status) && inMonth(l.dataProximaAcao)) totalEventos++;
     });
 
     // propostas

@@ -78,9 +78,9 @@ const Relatorios = (() => {
   function renderComercial() {
     const leadsAll = DB.getAll('leads');
     const leads = _filtrarPorPeriodo(leadsAll, 'dataEntrada');
-    const ganhos = leads.filter(l => l.status === 'fechado_ganho');
+    const ganhos = leads.filter(l => ['fechado_ganho','executado'].includes(l.status));
     const perdidos = leads.filter(l => l.status === 'fechado_perdido');
-    const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const ativos = leads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
     const taxa = leads.length ? ((ganhos.length/leads.length)*100).toFixed(1) : 0;
     const ticketMedio = ganhos.length ? Utils.sum(ganhos,'valorFechado') / ganhos.length : 0;
     const byStatus = Utils.groupBy(leads, 'status');
@@ -155,8 +155,8 @@ const Relatorios = (() => {
             <thead><tr><th>Segmento</th><th>Total</th><th>Ativos</th><th>Ganhos</th><th>Valor Estimado</th><th>Valor Fechado</th></tr></thead>
             <tbody>
               ${Object.entries(bySegmento).sort((a,b)=>b[1].length-a[1].length).map(([seg, sLeads]) => {
-                const sAtivos = sLeads.filter(l=>!['fechado_ganho','fechado_perdido'].includes(l.status));
-                const sGanhos = sLeads.filter(l=>l.status==='fechado_ganho');
+                const sAtivos = sLeads.filter(l=>!['fechado_ganho','executado','fechado_perdido'].includes(l.status));
+                const sGanhos = sLeads.filter(l=>['fechado_ganho','executado'].includes(l.status));
                 return `<tr>
                   <td><span class="badge badge-blue">${Utils.escHtml(seg)}</span></td>
                   <td>${sLeads.length}</td>
@@ -822,8 +822,8 @@ const Relatorios = (() => {
     const periodoLabel = periodoLabels[_periodo] || '';
 
     const leads = _filtrarPorPeriodo(DB.getAll('leads'), 'dataEntrada');
-    const ganhos = leads.filter(l => l.status === 'fechado_ganho');
-    const ativos = leads.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
+    const ganhos = leads.filter(l => ['fechado_ganho','executado'].includes(l.status));
+    const ativos = leads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
     const perdidos = leads.filter(l => l.status === 'fechado_perdido');
     const taxa = leads.length ? ((ganhos.length/leads.length)*100).toFixed(1) : 0;
     const receitaFechada = ganhos.reduce((s,l) => s + (l.valorFechado||0), 0);

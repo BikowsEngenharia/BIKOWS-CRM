@@ -569,8 +569,46 @@ const Contratos = (() => {
     data.validadeLaudo = document.getElementById('fcValidadeLaudo')?.value || null;
     data.tipoLaudo = document.getElementById('fcTipoLaudo')?.value.trim() || null;
 
-    if (id) { DB.update('contratos', id, data); Toast.success('Contrato atualizado'); }
-    else { DB.create('contratos', data); Toast.success('Contrato criado'); }
+    if (id) {
+      DB.update('contratos', id, data);
+      Toast.success('Contrato atualizado');
+    } else {
+      const novoContrato = DB.create('contratos', data);
+      Toast.success('Contrato criado');
+
+      // Criar recebível automático quando o contrato tem valor definido
+      if (data.valor > 0 && data.clienteId) {
+        const hoje = new Date();
+        // Calcular número de parcelas: contratos mensais → parcelas = prazoMeses; senão 3 parcelas padrão
+        const numParcelas = data.prazoMeses > 0 ? Math.min(data.prazoMeses, 24) : 3;
+        const valorParc = Math.round((data.valor / numParcelas) * 100) / 100;
+        const parcelas = Array.from({ length: numParcelas }, (_, i) => {
+          const venc = new Date(data.dataInicio || hoje);
+          venc.setMonth(venc.getMonth() + i + 1);
+          const isLast = i === numParcelas - 1;
+          const valor = isLast
+            ? Math.round((data.valor - valorParc * (numParcelas - 1)) * 100) / 100
+            : valorParc;
+          return {
+            id: Date.now().toString(36) + i.toString(36),
+            vencimento: venc.toISOString().split('T')[0],
+            valor,
+            status: 'a_vencer',
+            dataPagamento: null,
+            nfNumero: '',
+          };
+        });
+        DB.create('recebiveis', {
+          clienteId: data.clienteId,
+          contratoId: novoContrato.id,
+          descricao: `${data.objeto} (${data.numero || novoContrato.id.substring(0,8)})`,
+          valorTotal: data.valor,
+          parcelas,
+          origem: 'contrato_criado',
+        });
+        Toast.show(`💰 Recebível criado automaticamente em ${numParcelas} parcela(s). Ajuste em Financeiro › Contas a Receber se necessário.`, 'default', 7000);
+      }
+    }
     Modal.close();
     render();
   }
@@ -784,8 +822,42 @@ const Contratos = (() => {
           observacoes:        document.getElementById('fcObs').value,
           propostaId:         document.getElementById('fcPropostaId').value || null,
         };
-        DB.create('contratos', data);
+        const novoContratoP = DB.create('contratos', data);
         Toast.success('Contrato criado a partir da proposta!');
+
+        // Criar recebível automático com valor da proposta
+        if (data.valor > 0 && data.clienteId) {
+          const hoje = new Date();
+          const numParcelas = data.prazoMeses > 0 ? Math.min(data.prazoMeses, 24) : 3;
+          const valorParc = Math.round((data.valor / numParcelas) * 100) / 100;
+          const parcelas = Array.from({ length: numParcelas }, (_, i) => {
+            const venc = new Date(data.dataInicio || hoje);
+            venc.setMonth(venc.getMonth() + i + 1);
+            const isLast = i === numParcelas - 1;
+            const valorP = isLast
+              ? Math.round((data.valor - valorParc * (numParcelas - 1)) * 100) / 100
+              : valorParc;
+            return {
+              id: Date.now().toString(36) + i.toString(36),
+              vencimento: venc.toISOString().split('T')[0],
+              valor: valorP,
+              status: 'a_vencer',
+              dataPagamento: null,
+              nfNumero: '',
+            };
+          });
+          DB.create('recebiveis', {
+            clienteId: data.clienteId,
+            contratoId: novoContratoP.id,
+            propostaId: data.propostaId || null,
+            descricao: `${data.objeto} (${data.numero || novoContratoP.id.substring(0,8)})`,
+            valorTotal: data.valor,
+            parcelas,
+            origem: 'contrato_proposta',
+          });
+          Toast.show(`💰 Recebível criado em ${numParcelas} parcela(s). Ajuste em Financeiro › Contas a Receber.`, 'default', 7000);
+        }
+
         Modal.close();
         App.navigate('contratos');
       },

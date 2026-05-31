@@ -11,6 +11,7 @@ const Pipeline = (() => {
     { key: 'proposta_enviada',    label: '📤 Proposta Enviada',       color: '#f97316', prob: 55 },
     { key: 'negociacao',          label: '🤝 Negociação',             color: '#eab308', prob: 75 },
     { key: 'fechado_ganho',       label: '✅ Fechado / Ganho',        color: '#10b981', prob: 100 },
+    { key: 'executado',           label: '🏁 Executado',              color: '#0891b2', prob: 100 },
     { key: 'fechado_perdido',     label: '❌ Fechado / Perdido',      color: '#ef4444', prob: 0  },
   ];
 
@@ -245,7 +246,7 @@ const Pipeline = (() => {
   }
 
   function _isLeadFrio(lead) {
-    if (['fechado_ganho','fechado_perdido'].includes(lead.status)) return false;
+    if (['fechado_ganho','executado','fechado_perdido'].includes(lead.status)) return false;
     const diasSemAtualizar = _diasSemAtualizacao(lead);
     if (diasSemAtualizar !== null && diasSemAtualizar >= DIAS_FRIO) return true;
     // Também considera frio se dataProximaAcao passou há mais de 3 dias sem update
@@ -259,7 +260,7 @@ const Pipeline = (() => {
   /* ---- Receita ponderada (valor × probabilidade por etapa) ---- */
   function _receitaPonderada(leads) {
     return leads
-      .filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status))
+      .filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status))
       .reduce((sum, l) => {
         const stage = STAGES.find(s => s.key === l.status);
         const prob = (stage?.prob || 0) / 100;
@@ -308,8 +309,9 @@ const Pipeline = (() => {
     const config = DB.getConfig();
 
     const leadsFiltrados = _filtrarPorPeriodo(leads, 'dataEntrada');
-    const ativos = leadsFiltrados.filter(l => !['fechado_ganho','fechado_perdido'].includes(l.status));
-    const ganhos = leadsFiltrados.filter(l => l.status === 'fechado_ganho');
+    const FECHADOS = ['fechado_ganho','executado','fechado_perdido'];
+    const ativos = leadsFiltrados.filter(l => !FECHADOS.includes(l.status));
+    const ganhos = leadsFiltrados.filter(l => ['fechado_ganho','executado'].includes(l.status));
     const totalPipeline = Utils.sum(ativos, 'valorEstimado');
     const receitaPond = _receitaPonderada(leadsFiltrados);
     const taxa = leadsFiltrados.length ? ((ganhos.length / leadsFiltrados.length)*100).toFixed(0) : 0;

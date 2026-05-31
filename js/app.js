@@ -278,9 +278,10 @@ const App = (() => {
     ).length;
 
     // ARTs pendentes em projetos em andamento
+    // Projeto "sem ART" = nenhum registro na entidade arts E sem ART inline (campo legado p.art.numero)
     const artsPendentes = projetos.filter(p =>
       p.status === 'em_andamento' &&
-      !DB.getAll('arts').some(a => a.projetoId === p.id && a.status === 'registrada') &&
+      !DB.getAll('arts').some(a => a.projetoId === p.id) &&
       !p.art?.numero
     ).length;
 
@@ -401,7 +402,7 @@ const App = (() => {
           const artsAll = DB.getAll('arts');
           const projSemArt = DB.getAll('projetos').filter(p =>
             p.status === 'em_andamento' &&
-            !artsAll.some(a => a.projetoId === p.id && a.status === 'registrada') &&
+            !artsAll.some(a => a.projetoId === p.id) &&
             !p.art?.numero
           );
           if (!projSemArt.length) return '';
@@ -430,7 +431,7 @@ const App = (() => {
 
         ${followups.length === 0 && atrasadas.length === 0 && parcelasVencidas.length === 0 && licitacoes.length === 0 &&
           DB.getAll('projetos').filter(p => p.status === 'em_andamento' && Utils.isOverdue(p.prazo)).length === 0 &&
-          DB.getAll('projetos').filter(p => p.status === 'em_andamento' && !DB.getAll('arts').some(a => a.projetoId === p.id && a.status === 'registrada') && !p.art?.numero).length === 0 ?
+          DB.getAll('projetos').filter(p => p.status === 'em_andamento' && !DB.getAll('arts').some(a => a.projetoId === p.id) && !p.art?.numero).length === 0 ?
           '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Tudo em dia!</div><div class="empty-sub">Nenhuma pendência no momento.</div></div>' : ''}
       `,
     });

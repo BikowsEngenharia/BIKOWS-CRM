@@ -86,6 +86,7 @@ const Utils = (() => {
     proposta_enviada:   { label: '📤 Proposta Enviada',      badge: 'badge-orange', color: '#f97316' },
     negociacao:         { label: '🤝 Negociação',            badge: 'badge-yellow', color: '#eab308' },
     fechado_ganho:      { label: '✅ Fechado / Ganho',       badge: 'badge-green',  color: '#10b981' },
+    executado:          { label: '🏁 Executado',             badge: 'badge-teal',   color: '#0891b2' },
     fechado_perdido:    { label: '❌ Fechado / Perdido',     badge: 'badge-red',    color: '#ef4444' },
   };
 

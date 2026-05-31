@@ -1135,6 +1135,15 @@ const Projetos = (() => {
         }
       }
 
+      // Hook: valor definido pela primeira vez → cria recebível se ainda não existir
+      const valorAntes = anterior?.valor || 0;
+      if (data.valor > 0 && valorAntes === 0) {
+        const jaTemRecebivel = DB.getAll('recebiveis').some(r => r.projetoId === id);
+        if (!jaTemRecebivel) {
+          _criarRecebivelProjeto({ id, ...anterior }, data);
+        }
+      }
+
       // Hook: etapa concluída com pagamento vinculado → solicita confirmação
       const novasConcluidas = (data.etapas || []).filter(e => {
         const antes = etapasAntes.find(a => a.nome === e.nome);
@@ -1154,26 +1163,9 @@ const Projetos = (() => {
       Toast.success('Projeto criado');
 
       // Criar recebível automático quando o projeto tem valor definido
-      if (data.valor > 0 && data.clienteId) {
-        const hoje = new Date();
-        const venc1 = new Date(hoje); venc1.setDate(venc1.getDate() + 30);
-        const venc2 = new Date(hoje); venc2.setDate(venc2.getDate() + 60);
-        const venc3 = new Date(hoje); venc3.setDate(venc3.getDate() + 90);
-        const parc = Math.round((data.valor / 3) * 100) / 100;
-        const parc3 = Math.round((data.valor - parc * 2) * 100) / 100; // ajusta arredondamento
-        DB.create('recebiveis', {
-          clienteId: data.clienteId,
-          projetoId: novoProjeto.id,
-          descricao: `${data.titulo} (${data.codigo || novoProjeto.id.substring(0,8)})`,
-          valorTotal: data.valor,
-          parcelas: [
-            { id: Date.now().toString(36) + '1', vencimento: venc1.toISOString().split('T')[0], valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
-            { id: Date.now().toString(36) + '2', vencimento: venc2.toISOString().split('T')[0], valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
-            { id: Date.now().toString(36) + '3', vencimento: venc3.toISOString().split('T')[0], valor: parc3, status: 'a_vencer', dataPagamento: null, nfNumero: '' },
-          ],
-          origem: 'projeto_criado',
-        });
-        Toast.show('💰 Recebível criado automaticamente em 3 parcelas. Ajuste em Financeiro › Contas a Receber se necessário.', 'default', 7000);
+      // clienteId é opcional — recebível é criado mesmo sem cliente vinculado
+      if (data.valor > 0) {
+        _criarRecebivelProjeto(novoProjeto, data);
       }
     }
     Modal.close();
@@ -1187,6 +1179,31 @@ const Projetos = (() => {
       Toast.success('Projeto removido');
       render();
     });
+  }
+
+  /* ====================================================
+     CRIAÇÃO AUTOMÁTICA DE RECEBÍVEL
+     ==================================================== */
+  function _criarRecebivelProjeto(projeto, data) {
+    const hoje = new Date();
+    const venc1 = new Date(hoje); venc1.setDate(venc1.getDate() + 30);
+    const venc2 = new Date(hoje); venc2.setDate(venc2.getDate() + 60);
+    const venc3 = new Date(hoje); venc3.setDate(venc3.getDate() + 90);
+    const parc  = Math.round((data.valor / 3) * 100) / 100;
+    const parc3 = Math.round((data.valor - parc * 2) * 100) / 100;
+    DB.create('recebiveis', {
+      clienteId:  data.clienteId || '',
+      projetoId:  projeto.id,
+      descricao:  `${data.titulo} (${data.codigo || projeto.id.substring(0, 8)})`,
+      valorTotal: data.valor,
+      parcelas: [
+        { id: Date.now().toString(36) + '1', vencimento: venc1.toISOString().split('T')[0], valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
+        { id: Date.now().toString(36) + '2', vencimento: venc2.toISOString().split('T')[0], valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
+        { id: Date.now().toString(36) + '3', vencimento: venc3.toISOString().split('T')[0], valor: parc3, status: 'a_vencer', dataPagamento: null, nfNumero: '' },
+      ],
+      origem: 'projeto_criado',
+    });
+    Toast.show('💰 Recebível criado automaticamente em 3 parcelas. Ajuste em Financeiro › Contas a Receber se necessário.', 'default', 7000);
   }
 
   /* ====================================================

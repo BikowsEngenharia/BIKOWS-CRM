@@ -419,7 +419,18 @@ const Financeiro = (() => {
     if(id){DB.update('contaspagar',id,data);Toast.success('Atualizado');}else{DB.create('contaspagar',data);Toast.success('Conta criada');}
     Modal.close();renderTab();
   }
-  function pagarConta(id){DB.update('contaspagar',id,{status:'pago',dataPagamento:Utils.todayStr()});Toast.success('Conta paga');renderTab();}
+  function pagarConta(id){
+    const p=DB.get('contaspagar',id);if(!p||p.status==='pago')return;
+    DB.update('contaspagar',id,{status:'pago',dataPagamento:Utils.todayStr()});
+    // Cria lançamento de despesa para alimentar KPIs, DRE e relatórios
+    DB.create('lancamentos',{
+      tipo:'despesa',categoria:p.categoria||'Outros',
+      descricao:p.descricao||p.fornecedor||'Pagamento',
+      valor:p.valor,data:Utils.todayStr(),status:'pago',
+      clienteId:'',observacoes:'Criado automaticamente ao pagar conta: '+(p.fornecedor||''),
+    });
+    Toast.success('Conta paga e lançamento registrado');renderTab();
+  }
   function deleteContaPagar(id){Utils.confirmDelete('esta conta a pagar',()=>{DB.remove('contaspagar',id);Toast.success('Removida');renderTab();});}
 
   /* ---- CRUD RECEBÍVEIS ---- */
@@ -455,7 +466,20 @@ const Financeiro = (() => {
     if(id){DB.update('recebiveis',id,data);Toast.success('Atualizado');}else{DB.create('recebiveis',data);Toast.success('Recebível criado');}
     Modal.close();renderTab();
   }
-  function marcarRecebido(rId,pId){const r=DB.get('recebiveis',rId);if(!r)return;DB.update('recebiveis',rId,{parcelas:(r.parcelas||[]).map(p=>p.id===pId?{...p,status:'recebido',dataPagamento:Utils.todayStr()}:p)});Toast.success('Parcela recebida');renderTab();}
+  function marcarRecebido(rId,pId){
+    const r=DB.get('recebiveis',rId);if(!r)return;
+    const parcela=(r.parcelas||[]).find(p=>p.id===pId);
+    if(!parcela||parcela.status==='recebido')return;
+    DB.update('recebiveis',rId,{parcelas:(r.parcelas||[]).map(p=>p.id===pId?{...p,status:'recebido',dataPagamento:Utils.todayStr()}:p)});
+    // Cria lançamento de receita para alimentar KPIs, DRE e relatórios
+    DB.create('lancamentos',{
+      tipo:'receita',categoria:'Serviços de Engenharia',
+      descricao:(r.descricao||'Recebimento')+' — Parcela',
+      valor:parcela.valor,data:Utils.todayStr(),status:'recebido',
+      clienteId:r.clienteId||'',observacoes:'Criado automaticamente ao receber parcela do recebível.',
+    });
+    Toast.success('Parcela recebida e lançamento registrado');renderTab();
+  }
   function addParcela(rId){editRecebivel(rId);}
   function deleteRecebivel(id){Utils.confirmDelete('este recebível',()=>{DB.remove('recebiveis',id);Toast.success('Removido');renderTab();});}
   function addNew(){novoLancamento();}

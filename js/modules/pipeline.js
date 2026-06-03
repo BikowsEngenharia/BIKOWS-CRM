@@ -282,7 +282,7 @@ const Pipeline = (() => {
     const jaExiste = DB.getAll('atividades').some(a =>
       a.leadId === leadId &&
       a.status === 'pendente' &&
-      a.tipo === 'call' &&
+      a.tipo === 'ligacao' &&
       a.titulo?.includes('Follow-up automático')
     );
     if (jaExiste) return;
@@ -443,8 +443,8 @@ const Pipeline = (() => {
     // Note: kanban board shows all leads regardless of period (period only affects KPI summary)
 
     initDragDrop();
-    // Verificar leads frios ao abrir o pipeline
-    setTimeout(() => _checkLeadsFrios(), 300);
+    // Auto-check desabilitado: use o botão 🧊 Frios para verificar manualmente
+    // setTimeout(() => _checkLeadsFrios(), 300);
   }
 
   function _renderProbabilidadeLegend() {

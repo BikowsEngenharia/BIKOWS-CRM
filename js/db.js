@@ -185,12 +185,14 @@ const DB = (() => {
           _cache[entity] = fromSupabase;
           _saveLocalBackup(entity); // mantém backup sincronizado
         } else {
-          // Supabase retornou vazio — pode ser nova instalação OU problema de conexão
-          // Só usa fallback se o cache local tiver dados e for uma tabela core
+          // Supabase retornou vazio — restaura do backup local e faz push automático
+          // Isso sincroniza dados criados antes da tabela existir no Supabase
           const backup = _loadLocalBackup(entity);
           if (backup) {
             _cache[entity] = backup;
-            console.info('[DB] Supabase vazio, restaurando local:', entity);
+            console.info('[DB] Supabase vazio, restaurando local e sincronizando:', entity, backup.length, 'registros');
+            // Auto-sync: empurra dados locais para o Supabase (idempotente via upsert)
+            backup.forEach(record => _sbUpsert(entity, record));
           }
         }
       } catch (e) {

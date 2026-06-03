@@ -187,6 +187,7 @@ const Pipeline = (() => {
   }
 
   let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+  let _pipelineTab = 'ativo'; // 'ativo' | 'historico'
 
   function _filtrarPorPeriodo(lista, campo) {
     if (_periodo === 'tudo') return lista;
@@ -209,6 +210,11 @@ const Pipeline = (() => {
 
   function setPeriodo(p) {
     _periodo = p;
+    render();
+  }
+
+  function setPipelineTab(t) {
+    _pipelineTab = t;
     render();
   }
 
@@ -415,11 +421,22 @@ const Pipeline = (() => {
         </div>
       </div>
 
-      ${_renderProbabilidadeLegend()}
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;width:fit-content">
+        <button onclick="Pipeline.setPipelineTab('ativo')" style="padding:8px 20px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='ativo'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">📋 Pipeline Ativo</button>
+        <button onclick="Pipeline.setPipelineTab('historico')" style="padding:8px 20px;border:none;border-left:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='historico'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">🗂 Histórico <span style="font-size:11px;opacity:.85">(${leadsFiltrados.filter(l=>['fechado_ganho','executado','fechado_perdido'].includes(l.status)).length})</span></button>
+      </div>
+
+      ${_pipelineTab === 'ativo' ? _renderProbabilidadeLegend() : ''}
 
       <div class="kanban-wrap">
         <div class="kanban-board" id="kanbanBoard">
-          ${STAGES.map(s => renderColumn(s, leads)).join('')}
+          ${(() => {
+            const TERMINAL = ['fechado_ganho','executado','fechado_perdido'];
+            const stagesToShow = _pipelineTab === 'ativo'
+              ? STAGES.filter(s => !TERMINAL.includes(s.key))
+              : STAGES.filter(s => TERMINAL.includes(s.key));
+            return stagesToShow.map(s => renderColumn(s, leads)).join('');
+          })()}
         </div>
       </div>
     `;
@@ -1731,7 +1748,7 @@ const Pipeline = (() => {
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
     relatorioOrigem, filtrarLicitacoes,
-    setFilter, clearFilters, setPeriodo,
+    setFilter, clearFilters, setPeriodo, setPipelineTab,
     drillDown,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
     importCSV, downloadCSVTemplate,

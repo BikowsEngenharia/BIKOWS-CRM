@@ -4,6 +4,7 @@
 const Atividades = (() => {
 
   let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
+  let _tab = 'pendentes'; // 'pendentes' | 'concluidas'
 
   function _filtrarPorPeriodo(lista, campo) {
     if (_periodo === 'tudo') return lista;
@@ -40,9 +41,10 @@ const Atividades = (() => {
 
     let list = [...atividades].sort((a, b) => {
       if (!a.data) return 1; if (!b.data) return -1;
-      return a.data.localeCompare(b.data);
+      return b.data.localeCompare(a.data);
     });
-    if (_filter.status) list = list.filter(a => a.status === _filter.status);
+    if (_tab === 'pendentes') list = list.filter(a => a.status === 'pendente');
+    else if (_tab === 'concluidas') list = list.filter(a => a.status === 'concluida');
     if (_filter.tipo) list = list.filter(a => a.tipo === _filter.tipo);
     if (_filter.responsavel) list = list.filter(a => a.responsavel === _filter.responsavel);
 
@@ -69,6 +71,11 @@ const Atividades = (() => {
         <div class="stat-box" style="cursor:pointer" onclick="Atividades.drillDown('concluidas')"><div class="stat-val text-success">${concluidas}</div><div class="stat-lbl">Concluídas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div></div>
       </div>
 
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;width:fit-content">
+        <button onclick="Atividades.setTab('pendentes')" style="padding:8px 20px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_tab==='pendentes'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">⏳ Pendentes <span style="font-size:11px;opacity:.85">(${pendentes})</span></button>
+        <button onclick="Atividades.setTab('concluidas')" style="padding:8px 20px;border:none;border-left:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_tab==='concluidas'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">✅ Concluídas <span style="font-size:11px;opacity:.85">(${concluidas})</span></button>
+      </div>
+
       ${_selected.size > 0 ? `
       <div class="bulk-bar">
         <span class="text-sm font-bold">${_selected.size} selecionada(s)</span>
@@ -80,10 +87,6 @@ const Atividades = (() => {
       <div class="card">
         <div class="card-header">
           <div class="filters">
-            <select class="filter-select" onchange="Atividades.setFilter('status',this.value)">
-              <option value="">Todos os status</option>
-              ${Object.entries(Utils.ATIV_STATUS).map(([k,v]) => `<option value="${k}" ${_filter.status===k?'selected':''}>${v.label}</option>`).join('')}
-            </select>
             <select class="filter-select" onchange="Atividades.setFilter('tipo',this.value)">
               <option value="">Todos os tipos</option>
               ${Object.entries(Utils.ATIV_TIPO).map(([k,v]) => `<option value="${k}" ${_filter.tipo===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}
@@ -148,6 +151,8 @@ const Atividades = (() => {
   function emptyState() {
     return `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Nenhuma atividade</div><button class="btn btn-primary mt-4" onclick="Atividades.openForm()">+ Criar Atividade</button></div>`;
   }
+
+  function setTab(t) { _tab = t; _selected.clear(); render(); }
 
   function setFilter(k, v) { _filter[k] = v; render(); }
 
@@ -482,5 +487,5 @@ const Atividades = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir, setPeriodo, drillDown, _toggleDiaInteiro, _calcDuracao };
+  return { render, openForm, saveAtividade, concluir, deleteAtividade, setFilter, setTab, addNew, toggleSelect, toggleAll, clearSelection, bulkConcluir, bulkExcluir, setPeriodo, drillDown, _toggleDiaInteiro, _calcDuracao };
 })();

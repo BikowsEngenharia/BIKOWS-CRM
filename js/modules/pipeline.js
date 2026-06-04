@@ -551,7 +551,7 @@ const Pipeline = (() => {
         ${proposta
           ? `<button class="btn btn-xs btn-secondary" onclick="Modal.close();Propostas.view('${proposta.id}')" title="Ver proposta">📄</button>`
           : (['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status)
-              ? `<button class="btn btn-xs btn-secondary" onclick="Pipeline.criarPropostaLead('${lead.id}')" title="Criar proposta">📄+</button>`
+              ? `<button class="btn btn-xs btn-secondary" onclick="Propostas.propostaRapida('${lead.id}')" title="Proposta rápida por template de serviço" style="background:#7c3aed;color:#fff;border-color:#7c3aed">⚡</button>`
               : '')}
         ${lead.status === 'fechado_ganho' ? `<button class="btn btn-xs btn-primary" onclick="Pipeline.abrirContratoLead('${lead.id}')" title="Preencher condições de pagamento, prazo e criar projeto" style="background:#059669;border-color:#059669;font-size:10px;padding:2px 6px">🤝 Contrato</button>` : ''}
         ${lead.contato ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escHtml(lead.contato)}')" title="WhatsApp">💬</button>` : ''}
@@ -648,6 +648,32 @@ const Pipeline = (() => {
     if (newStatus === 'proposta_elaboracao') {
       setTimeout(() => _sugerirCriarProposta(leadId), 350);
     }
+    // Hook: ao enviar proposta → cria sequência de follow-up automática
+    if (newStatus === 'proposta_enviada') {
+      setTimeout(() => _criarSequenciaFollowup(leadId), 500);
+    }
+  }
+
+  /* ---- Sequência automática de follow-up ao enviar proposta ---- */
+  function _criarSequenciaFollowup(leadId) {
+    const lead = DB.get('leads', leadId); if (!lead) return;
+    const jaExiste = DB.getAll('atividades').some(a =>
+      a.leadId === leadId && a.status === 'pendente' && a.titulo?.includes('Follow-up proposta')
+    );
+    if (jaExiste) return;
+    const addDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
+    const clienteNome = Utils.getClientName(lead.clienteId) || lead.empresa || lead.titulo || '';
+    [
+      { dias:3,  titulo:`📤 Follow-up proposta — ${clienteNome}`, desc:'Confirmar recebimento e tirar dúvidas iniciais.' },
+      { dias:7,  titulo:`📞 Follow-up proposta +7d — ${clienteNome}`, desc:'Verificar análise da proposta, perguntar sobre dúvidas técnicas ou de valor.' },
+      { dias:14, titulo:`🤝 Follow-up proposta +14d — ${clienteNome}`, desc:'Decisão: negociar, ajustar ou entender motivo da não aprovação.' },
+    ].forEach(f => DB.create('atividades', {
+      titulo: f.titulo, tipo:'ligacao', prioridade:'alta', status:'pendente',
+      data: addDias(f.dias), hora:'09:00',
+      responsavel: lead.responsavel||'', clienteId: lead.clienteId||'', leadId,
+      descricao: f.desc,
+    }));
+    Toast.success('📅 Sequência de follow-up criada: +3d, +7d e +14d', 4000);
   }
 
   function viewLead(id) {
@@ -1756,5 +1782,6 @@ const Pipeline = (() => {
     showEmailTemplates, _selectEmailTemplate,
     calcLeadScore,
     _autoAtividade, _addDias,
+    _criarSequenciaFollowup,
   };
 })();

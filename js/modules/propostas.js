@@ -139,6 +139,7 @@ const Propostas = (() => {
           <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
             ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Propostas.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
           </div>
+          <button class="btn btn-secondary" onclick="Propostas.propostaRapida(null)" title="Criar proposta a partir de template de serviço">⚡ Rápida</button>
           <button class="btn btn-primary" onclick="Propostas.openForm()">+ Nova Proposta</button>
         </div>
       </div>
@@ -185,9 +186,10 @@ const Propostas = (() => {
                   <td>
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.view('${p.id}')">Ver</button>
-                      <button class="btn btn-xs btn-success" onclick="PropostaGenerator.open('${p.id}')" title="Gerar proposta PDF">🖨 Gerar</button>
-                      <button class="btn btn-xs btn-secondary" onclick="Propostas.imprimirProposta('${p.id}')" title="Imprimir PDF">🖨</button>
-                      <button class="btn btn-xs btn-secondary" onclick="Propostas.duplicar('${p.id}')" title="Duplicar proposta">📋 Dupl.</button>
+                      <button class="btn btn-xs btn-success" onclick="PropostaGenerator.open('${p.id}')" title="Gerar proposta PDF">🖨 PDF</button>
+                      <button class="btn btn-xs" style="background:#25D366;color:#fff;border-color:#25D366" onclick="Propostas.enviarWhatsApp('${p.id}')" title="Enviar via WhatsApp">💬</button>
+                      <button class="btn btn-xs" style="background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="Propostas.enviarEmail('${p.id}')" title="Enviar por e-mail">📧</button>
+                      <button class="btn btn-xs btn-secondary" onclick="Propostas.duplicar('${p.id}')" title="Duplicar">📋</button>
                       ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-xs btn-secondary" title="Abrir no Canva">🎨</a>` : ''}
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.openForm('${p.id}')">✏</button>
                       <button class="btn btn-xs btn-danger" onclick="Propostas.deleteProposta('${p.id}')">🗑</button>
@@ -313,10 +315,12 @@ const Propostas = (() => {
 
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
           <button class="btn btn-success btn-sm" onclick="Modal.close();PropostaGenerator.open('${id}')">🖨 Gerar PDF</button>
-          ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">🎨 Abrir no Canva</a>` : ''}
-          ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Propostas.criarRecebivel('${id}')">💰 Criar Recebível</button>` : ''}
-          ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Contratos.criarDePropostal('${id}')">📝 Criar Contrato</button>` : ''}
-          <button class="btn btn-secondary btn-sm" onclick="Modal.close();Propostas.openForm('${id}')">✏ Editar / Nova Versão</button>
+          <button class="btn btn-sm" style="background:#25D366;color:#fff;border-color:#25D366" onclick="Propostas.enviarWhatsApp('${id}')">💬 WhatsApp</button>
+          <button class="btn btn-sm" style="background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="Propostas.enviarEmail('${id}')">📧 E-mail</button>
+          ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">🎨 Canva</a>` : ''}
+          ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Propostas.criarRecebivel('${id}')">💰 Recebível</button>` : ''}
+          ${p.status === 'aprovada' ? `<button class="btn btn-primary btn-sm" onclick="Modal.close();Contratos.criarDePropostal('${id}')">📝 Contrato</button>` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="Modal.close();Propostas.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
       `,
@@ -1277,17 +1281,259 @@ const Propostas = (() => {
     setTimeout(() => openForm(copia.id), 300);
   }
 
+  /* ============================================================
+     TEMPLATES DE SERVIÇO — Proposta Rápida
+     ============================================================ */
+  const TEMPLATES_SERVICOS = {
+    'NR-12': { emoji:'⚙️', grupo:'NR', titulo:'Adequação NR-12 — Segurança em Máquinas e Equipamentos', prazo:'45 dias', formaPagamento:'50% na assinatura + 50% na entrega do laudo',
+      itens:[
+        {desc:'Levantamento técnico e inventário das máquinas/equipamentos',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Apreciação de Riscos conforme ABNT NBR ISO 12100',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Projeto de adequação com especificação dos dispositivos de segurança',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Laudo Técnico de conformidade NR-12 + ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui: Apreciação de Riscos (ISO 12100), Laudo Técnico, ART CREA-PR, registros fotográficos e orientações de uso seguro. Deslocamento incluso.'},
+    'NR-35': { emoji:'🪜', grupo:'NR', titulo:'Projeto de Linha de Vida — NR-35 Trabalho em Altura', prazo:'30 dias', formaPagamento:'50% na assinatura + 50% na entrega do projeto',
+      itens:[
+        {desc:'Levantamento e mapeamento dos pontos de ancoragem',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Projeto de sistema de ancoragem e linha de vida',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Memorial descritivo e cálculo estrutural das ancoragens',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Laudo técnico de aprovação da estrutura + ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui: Projeto executivo, Memorial de cálculo, ART CREA-PR e Laudo de aprovação. Não inclui fornecimento e instalação dos equipamentos.'},
+    'NR-33': { emoji:'🏭', grupo:'NR', titulo:'Programa de Espaços Confinados — NR-33', prazo:'30 dias', formaPagamento:'À vista na entrega',
+      itens:[
+        {desc:'Identificação e cadastro dos espaços confinados',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Classificação de riscos e elaboração do PEC (Programa de Entrada)',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Procedimento operacional de entrada em espaço confinado',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Laudo técnico + ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui: PEC, Fichas de entrada, Laudo técnico e ART CREA-PR.'},
+    'NR-10': { emoji:'⚡', grupo:'NR', titulo:'Prontuário e Adequação NR-10 — Segurança Elétrica', prazo:'30 dias', formaPagamento:'50% na assinatura + 50% na entrega',
+      itens:[
+        {desc:'Levantamento da instalação elétrica existente',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Elaboração do Prontuário NR-10 com diagrama unifilar',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Relatório de não-conformidades e plano de ação',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Laudo técnico de segurança elétrica + ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui: Prontuário NR-10, Diagrama unifilar, Laudo técnico e ART CREA-PR. Não inclui obras de adequação.'},
+    'NR-17': { emoji:'🪑', grupo:'NR', titulo:'Laudo Ergonômico — NR-17 Ergonomia', prazo:'25 dias', formaPagamento:'À vista',
+      itens:[
+        {desc:'Análise ergonômica dos postos de trabalho',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Programa de condições de trabalho e AET',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Laudo Ergonômico + recomendações + ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui: Análise Ergonômica do Trabalho (AET), Laudo Ergonômico e ART CREA-PR.'},
+    'Laudo Técnico': { emoji:'📋', grupo:'Laudos', titulo:'Laudo Técnico de Engenharia', prazo:'20 dias', formaPagamento:'À vista',
+      itens:[
+        {desc:'Vistoria técnica in loco com registro fotográfico',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Análise de documentos, projetos e normas aplicáveis',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Elaboração do Laudo Técnico com conclusões e recomendações',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Emissão de ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Laudo com força legal, assinado por engenheiro habilitado com ART CREA-PR. Inclui registros fotográficos e embasamento normativo.'},
+    'Projeto Estrutural': { emoji:'🏗', grupo:'Projetos', titulo:'Projeto Estrutural de Engenharia', prazo:'45 dias', formaPagamento:'50% aprovação anteprojeto + 50% entrega',
+      itens:[
+        {desc:'Levantamento de dados e medições em campo',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Projeto executivo estrutural (pranchas técnicas)',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Memorial descritivo e de cálculo',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Conforme NBR aplicável. Inclui memorial de cálculo, pranchas técnicas PDF/DWG e ART CREA-PR.'},
+    'Projeto Elétrico': { emoji:'🔌', grupo:'Projetos', titulo:'Projeto Elétrico de Engenharia', prazo:'30 dias', formaPagamento:'50% na assinatura + 50% na entrega',
+      itens:[
+        {desc:'Levantamento da demanda e levantamento em campo',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Projeto elétrico executivo (unifilares, diagramas, layout)',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Memorial descritivo e lista de materiais',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui projeto conforme ABNT NBR 5410, memorial descritivo, pranchas técnicas e ART CREA-PR.'},
+    'Treinamento NR': { emoji:'🎓', grupo:'Treinamentos', titulo:'Treinamento em Normas Regulamentadoras', prazo:'15 dias', formaPagamento:'À vista',
+      itens:[
+        {desc:'Elaboração do material didático personalizado',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Treinamento presencial (carga horária conforme NR)',qtd:1,un:'Turma',unit:0,disc:0,total:0},
+        {desc:'Certificados de conclusão para todos os participantes',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui: material didático, avaliação, certificados com carga horária e lista de presença assinada. Treinamento registrado no CREA-PR.'},
+    'PGR/LTCAT': { emoji:'📊', grupo:'Programas', titulo:'Programa de Gerenciamento de Riscos — PGR + LTCAT', prazo:'30 dias', formaPagamento:'50% na assinatura + 50% na entrega',
+      itens:[
+        {desc:'Levantamento de riscos ocupacionais e ambientais em campo',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Elaboração do PGR com inventário de riscos e plano de ação',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'LTCAT — Laudo Técnico das Condições Ambientais do Trabalho',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'ART CREA-PR',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Conforme Portaria MTE 671/2021. Inclui: PGR, Inventário de Riscos, Plano de Ação, LTCAT e ART CREA-PR.'},
+    'Consultoria': { emoji:'💡', grupo:'Consultoria', titulo:'Consultoria Técnica de Engenharia', prazo:'20 dias', formaPagamento:'À vista',
+      itens:[
+        {desc:'Diagnóstico técnico da situação atual',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Relatório técnico com recomendações priorizadas',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+        {desc:'Plano de ação com cronograma e responsáveis',qtd:1,un:'Serv.',unit:0,disc:0,total:0},
+      ],observacoes:'Inclui reuniões de alinhamento, relatório técnico detalhado e plano de ação com prazos.'},
+  };
+
+  let _templateSelecionado = null;
+
+  /* ---------- Proposta Rápida ---------- */
+  function propostaRapida(leadId) {
+    const lead = leadId ? DB.get('leads', leadId) : null;
+    const cliente = lead ? DB.get('clientes', lead.clienteId) : null;
+    _templateSelecionado = null;
+    const grupos = {};
+    Object.entries(TEMPLATES_SERVICOS).forEach(([key, t]) => {
+      if (!grupos[t.grupo]) grupos[t.grupo] = [];
+      grupos[t.grupo].push({ key, ...t });
+    });
+    const validadeDefault = (() => { const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString().split('T')[0]; })();
+    Modal.open({
+      title: '⚡ Proposta Rápida', size: 'modal-lg', saveLabel: null,
+      body: `
+        ${lead ? `<div style="background:var(--surface-2);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;border-left:3px solid var(--primary)">
+          <div class="text-xs text-muted">Lead de origem</div>
+          <div class="font-bold">${Utils.escHtml(lead.titulo)}</div>
+          <div class="text-sm text-muted">${Utils.escHtml(cliente?.nome||'—')} · ${Utils.formatCurrency(lead.valorEstimado||0)}</div>
+        </div>` : ''}
+        <div class="form-label mb-2">1. Selecione o tipo de serviço:</div>
+        ${Object.entries(grupos).map(([grupo, items]) => `
+          <div class="text-xs font-bold text-muted mb-2 mt-3" style="text-transform:uppercase;letter-spacing:.5px">${grupo}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
+            ${items.map(t => `
+              <button type="button" class="pr-tmpl-btn" data-key="${t.key}" onclick="Propostas._selecionarTemplate('${t.key}',this)"
+                style="text-align:left;padding:10px 12px;border:2px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;transition:all .15s">
+                <div style="font-size:20px;margin-bottom:3px">${t.emoji}</div>
+                <div style="font-size:11px;font-weight:700;color:var(--text);line-height:1.3">${t.key}</div>
+              </button>`).join('')}
+          </div>`).join('')}
+        <div id="prResumo" style="display:none;margin-top:20px;background:var(--surface-2);border-radius:var(--radius);padding:16px;border:1px solid var(--border)">
+          <div class="font-bold mb-3" id="prTituloPreview" style="font-size:14px"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Valor Total (R$) *</label>
+              <input class="form-control" id="prValor" type="number" step="0.01" placeholder="Ex: 15000" value="${lead?.valorEstimado||''}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Prazo de Execução</label>
+              <input class="form-control" id="prPrazo" placeholder="Ex: 30 dias">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Validade da Proposta</label>
+              <input class="form-control" id="prValidade" type="date" value="${validadeDefault}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Condição de Pagamento</label>
+            <input class="form-control" id="prPagamento" placeholder="Ex: 50% entrada + 50% entrega">
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+            <button type="button" class="btn btn-ghost" onclick="Modal.close()">Cancelar</button>
+            <button type="button" class="btn btn-primary" onclick="Propostas._gerarPropostaRapida('${leadId||''}')">⚡ Gerar Proposta Agora</button>
+          </div>
+        </div>`,
+    });
+  }
+
+  function _selecionarTemplate(key, btn) {
+    _templateSelecionado = key;
+    btn.closest('.modal-body').querySelectorAll('.pr-tmpl-btn').forEach(b => {
+      b.style.borderColor = 'var(--border)';
+      b.style.background = 'var(--surface)';
+      b.style.color = 'var(--text)';
+    });
+    btn.style.borderColor = 'var(--primary)';
+    btn.style.background = '#eff6ff';
+    const t = TEMPLATES_SERVICOS[key]; if (!t) return;
+    const resumo = document.getElementById('prResumo');
+    if (resumo) resumo.style.display = 'block';
+    const titulo = document.getElementById('prTituloPreview');
+    if (titulo) titulo.textContent = t.emoji + ' ' + t.titulo;
+    const prazo = document.getElementById('prPrazo');
+    if (prazo) prazo.value = t.prazo || '';
+    const pag = document.getElementById('prPagamento');
+    if (pag) pag.value = t.formaPagamento || '';
+  }
+
+  function _gerarPropostaRapida(leadId) {
+    if (!_templateSelecionado) { Toast.error('Selecione um tipo de serviço'); return; }
+    const valor = Number(document.getElementById('prValor')?.value);
+    if (!valor) { Toast.error('Informe o valor total'); return; }
+    const t = TEMPLATES_SERVICOS[_templateSelecionado];
+    const lead = leadId ? DB.get('leads', leadId) : null;
+    const cfg = DB.getConfig();
+    const n = t.itens.length || 1;
+    const baseUnit = Math.floor(valor / n);
+    const resto = valor - baseUnit * n;
+    const itens = t.itens.map((it, i) => {
+      const unit = i === n - 1 ? baseUnit + resto : baseUnit;
+      return { ...it, unit, total: unit * it.qtd };
+    });
+    const numero = _nextNumeroProposta();
+    const proposta = DB.create('propostas', {
+      numero, titulo: t.titulo + (lead ? ` — ${Utils.getClientName(lead.clienteId)||lead.titulo}` : ''),
+      clienteId: lead?.clienteId||'', responsavel: lead?.responsavel||(cfg.responsaveis?.[0]||''),
+      valor, status:'elaboracao', leadId: leadId||null, itens,
+      prazoEntrega: document.getElementById('prPrazo')?.value||'',
+      formaPagamento: document.getElementById('prPagamento')?.value||'',
+      validade: document.getElementById('prValidade')?.value||'',
+      observacoes: t.observacoes||'', versoes:[], tipoServico:_templateSelecionado,
+    });
+    if (leadId) DB.update('leads', leadId, { propostaId: proposta.id, propostaNum: proposta.numero });
+    _templateSelecionado = null;
+    Modal.close();
+    Toast.success(`✅ Proposta ${numero} criada!`);
+    setTimeout(() => PropostaGenerator.open(proposta.id), 350);
+  }
+
+  /* ---------- Enviar via WhatsApp ---------- */
+  function enviarWhatsApp(id) {
+    const p = DB.get('propostas', id); if (!p) return;
+    const cliente = DB.get('clientes', p.clienteId);
+    const nome1 = (cliente?.nome||'').split(' ')[0];
+    const msg = [
+      `Olá${nome1?' '+nome1:''}! 👋`,
+      ``,
+      `Segue nossa proposta comercial:`,
+      ``,
+      `📋 *${p.numero||''}* — ${p.titulo||''}`,
+      `💰 Valor: *${Utils.formatCurrency(p.valor)}*`,
+      p.prazoEntrega ? `⏱ Prazo: ${p.prazoEntrega}` : '',
+      p.validade ? `📅 Válida até: ${Utils.formatDate(p.validade)}` : '',
+      p.formaPagamento ? `💳 Pgto: ${p.formaPagamento}` : '',
+      ``,
+      `Ficou alguma dúvida? Estou à disposição! 😊`,
+      ``,
+      `*Bikows Engenharia*`,
+    ].filter(l => l !== null && l !== undefined && !(l === '' && false)).join('\n').trim();
+    const fone = (cliente?.telefone||'').replace(/\D/g,'');
+    const url = fone
+      ? `https://wa.me/55${fone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  }
+
+  /* ---------- Enviar via E-mail (mailto) ---------- */
+  function enviarEmail(id) {
+    const p = DB.get('propostas', id); if (!p) return;
+    const cliente = DB.get('clientes', p.clienteId);
+    const email = cliente?.email||'';
+    const subject = `Proposta ${p.numero||''} — ${p.titulo||''}`;
+    const body = [
+      `Prezado(a) ${cliente?.nome||'Cliente'},`,``,
+      `Segue nossa proposta comercial conforme solicitado:`,``,
+      `  Proposta Nº: ${p.numero||'—'}`,
+      `  Serviço: ${p.titulo||'—'}`,
+      `  Valor Total: ${Utils.formatCurrency(p.valor)}`,
+      p.prazoEntrega ? `  Prazo de Execução: ${p.prazoEntrega}` : '',
+      p.validade ? `  Validade: ${Utils.formatDate(p.validade)}` : '',
+      p.formaPagamento ? `  Forma de Pagamento: ${p.formaPagamento}` : '',
+      ``,
+      p.observacoes ? p.observacoes+`\n` : '',
+      `Em caso de dúvidas, estamos à disposição.`,``,
+      `Atenciosamente,`,
+      `Bikows Engenharia`,
+      `contato@bikows.com.br`,
+    ].filter(l=>l!==null&&l!==undefined).join('\n');
+    const href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const a = document.createElement('a'); a.href = href; a.click();
+  }
+
   return {
     render, openForm, saveProposta, deleteProposta, view, setFilter, changeStatus,
     criarRecebivel, addNew, addItemRow, removeItemRow, _setItemField,
     abrirFluxoContratacao, _ctab, _toggleCondicao, _previewParcelas,
     _addEtapaContrato, _renderEtapasContrato, _setEtapaCampo, _removeEtapaContrato,
-    nextNumeroProposta: _nextNumeroProposta, // exposto para uso no pipeline
-    setPeriodo,
-    drillDown,
-    duplicar,
-    imprimirProposta,
-    _aplicarTemplate,
+    nextNumeroProposta: _nextNumeroProposta,
+    setPeriodo, drillDown, duplicar, imprimirProposta, _aplicarTemplate,
+    propostaRapida, _selecionarTemplate, _gerarPropostaRapida,
+    enviarWhatsApp, enviarEmail,
   };
 
   /* Aplica template salvo no Config ao formulário aberto */

@@ -12,7 +12,7 @@
    6. Cole o Client ID abaixo
    ========================================== */
 
-const GCAL_CLIENT_ID = '502992926661-oeffbek20h6r36g35k4c7vgi99tsvl61.apps.googleusercontent.com';
+const GCAL_CLIENT_ID = '1067520616871-i0tpqsgkafn59u4icads3uqc9994irpf.apps.googleusercontent.com';
 const GCAL_API_KEY   = '';
 const GCAL_SCOPES    = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 const GCAL_DISCOVERY = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';

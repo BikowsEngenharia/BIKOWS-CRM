@@ -796,7 +796,7 @@ const App = (() => {
       DB.create('atividades', {
         titulo,
         tipo: 'note',
-        status: 'concluido',
+        status: 'concluida',
         prioridade: 'baixa',
         data: Utils.todayStr(),
         clienteId: document.getElementById('qcCliente')?.value || '',

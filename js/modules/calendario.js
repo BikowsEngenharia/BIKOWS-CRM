@@ -172,6 +172,24 @@ const Calendario = (() => {
         });
       });
 
+    // ── Google Calendar — eventos importados ──────────────────────────────────
+    if (typeof GoogleCal !== 'undefined') {
+      GoogleCal.getImportedEvents().forEach(ev => {
+        const label = ev.isAllDay
+          ? `🗓 ${Utils.escHtml(ev.summary)}`
+          : `🗓 ${ev.timeLabel ? ev.timeLabel + ' ' : ''}${Utils.escHtml(ev.summary)}`;
+        addEvent(ev.dateStr, {
+          type:       'gcal',
+          label,
+          color:      '#fff',
+          bg:         '#4285F4',
+          entityId:   ev.gcalId,
+          entityType: 'gcal',
+          raw:        ev,
+        });
+      });
+    }
+
     return map;
   }
 
@@ -246,6 +264,7 @@ const Calendario = (() => {
         parcela:    'Parcela',
         projeto:    'Prazo Projeto',
         licitacao:  'Sessão Licitação',
+        gcal:       'Google Calendar',
       };
       const typeBadge = typeLabels[ev.type] || ev.type;
 
@@ -262,6 +281,8 @@ const Calendario = (() => {
         actionBtn = `<button class="btn btn-sm btn-secondary" onclick="App.navigate('projetos');Modal.close()">→ Projetos</button>`;
       } else if (ev.type === 'licitacao') {
         actionBtn = `<button class="btn btn-sm btn-secondary" onclick="App.navigate('licitacoes');Modal.close()">→ Licitações</button>`;
+      } else if (ev.type === 'gcal' && ev.raw && ev.raw.htmlLink) {
+        actionBtn = `<button class="btn btn-sm btn-secondary" onclick="window.open('${Utils.escHtml(ev.raw.htmlLink)}','_blank')">↗ Abrir no Google</button>`;
       }
 
       return `
@@ -406,6 +427,7 @@ const Calendario = (() => {
   }
 
   function renderLegend() {
+    const gcalConnected = typeof GoogleCal !== 'undefined' && GoogleCal.isConnected();
     const items = [
       { bg: '#7c3aed', label: 'Atividade' },
       { bg: '#2563eb', label: 'Follow-up' },
@@ -415,6 +437,7 @@ const Calendario = (() => {
       { bg: '#f59e0b', label: 'Parcela a vencer' },
       { bg: '#059669', label: 'Prazo Projeto' },
       { bg: '#0f766e', label: 'Sessão Licitação' },
+      ...(gcalConnected ? [{ bg: '#4285F4', label: 'Google Calendar' }] : []),
     ];
     const chips = items.map(it =>
       `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:12px;color:var(--text)">
@@ -458,15 +481,21 @@ const Calendario = (() => {
 
   // ── Public: render ─────────────────────────────────────────────────────────
 
+  // Chave do último mês importado do Google (evita re-requisição desnecessária)
+  let _gcalImportedKey = null;
+
   function render() {
-    const eventMap = buildEventMap(_year, _month);
-    const kpisHtml = renderKpis(_year, _month);
+    const monthKey   = `${_year}-${String(_month + 1).padStart(2, '0')}`;
+    const eventMap   = buildEventMap(_year, _month);
+    const kpisHtml   = renderKpis(_year, _month);
     const legendHtml = renderLegend();
-    const gridHtml = renderCalendarGrid(_year, _month, eventMap);
-    const mesAno = labelMesAno(_year, _month);
-    const todayStr = Utils.todayStr();
-    const [ty, tm, td] = todayStr.split('-').map(Number);
+    const gridHtml   = renderCalendarGrid(_year, _month, eventMap);
+    const mesAno     = labelMesAno(_year, _month);
+    const todayStr   = Utils.todayStr();
+    const [ty, tm]   = todayStr.split('-').map(Number);
     const isCurrentMonth = _year === ty && _month === (tm - 1);
+    const gcalConnected  = typeof GoogleCal !== 'undefined' && GoogleCal.isConnected();
+    const totalEventos   = Object.values(eventMap).reduce((s, arr) => s + arr.length, 0);
 
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
@@ -496,7 +525,7 @@ const Calendario = (() => {
               ? `<button class="btn btn-secondary btn-sm" onclick="Calendario.goToday()">Hoje</button>`
               : `<span class="badge badge-blue text-xs">Mês atual</span>`
             }
-            <span class="text-xs text-muted">${Object.values(eventMap).reduce((s, arr) => s + arr.length, 0)} eventos</span>
+            <span class="text-xs text-muted">${totalEventos} evento(s)</span>
           </div>
         </div>
         <div class="card-body" style="padding:12px">
@@ -505,10 +534,17 @@ const Calendario = (() => {
       </div>
     `;
 
-    // Renderizar bloco Google Calendar após o DOM estar pronto
+    // Renderizar status GCal e disparar importação automática
     setTimeout(() => {
-      if (typeof GoogleCal !== 'undefined') {
-        GoogleCal.renderStatus(document.getElementById('gcalStatusContainer'));
+      if (typeof GoogleCal === 'undefined') return;
+      GoogleCal.renderStatus(document.getElementById('gcalStatusContainer'));
+
+      // Importar eventos do Google Calendar se conectado e ainda não importou este mês
+      if (gcalConnected && _gcalImportedKey !== monthKey) {
+        _gcalImportedKey = monthKey; // marcar antes de chamar para evitar loop
+        GoogleCal.importFromGoogle(_year, _month).then(events => {
+          if (events.length > 0) render(); // re-renderizar com os eventos importados
+        }).catch(() => { _gcalImportedKey = null; }); // resetar em caso de erro para tentar novamente
       }
     }, 0);
   }
@@ -518,12 +554,14 @@ const Calendario = (() => {
   function prevMonth() {
     _month--;
     if (_month < 0) { _month = 11; _year--; }
+    _gcalImportedKey = null; // forçar nova importação ao mudar de mês
     render();
   }
 
   function nextMonth() {
     _month++;
     if (_month > 11) { _month = 0; _year++; }
+    _gcalImportedKey = null;
     render();
   }
 

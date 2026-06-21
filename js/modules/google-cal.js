@@ -143,19 +143,15 @@ const GoogleCal = (() => {
       client_id: GCAL_CLIENT_ID,
       scope:     GCAL_SCOPES,
       callback:  (tokenResponse) => {
-        const wasSilent = _silentConnecting;
         _silentConnecting = false;
 
         if (tokenResponse.error) {
-          if (wasSilent) {
-            // Reconexão silenciosa falhou — limpar flag sem mostrar erro
-            if (tokenResponse.error === 'access_denied' || tokenResponse.error === 'interaction_required') {
-              localStorage.removeItem(LS_KEY_CONNECTED);
-            }
-          } else {
-            Toast.error('Erro ao conectar Google Calendar: ' + tokenResponse.error);
+          if (tokenResponse.error === 'access_denied') {
+            localStorage.removeItem(LS_KEY_CONNECTED);
           }
+          Toast.error('Erro ao conectar Google Calendar: ' + tokenResponse.error);
           console.warn('[GoogleCal] Erro no token:', tokenResponse.error);
+          _refreshAllStatuses();
           return;
         }
 
@@ -164,25 +160,12 @@ const GoogleCal = (() => {
         localStorage.setItem(LS_KEY_CONNECTED, '1');
         gapi.client.setToken({ access_token: _accessToken });
         _refreshAllStatuses();
-        if (!wasSilent) Toast.success('Google Calendar conectado!');
+        Toast.success('Google Calendar conectado!');
       },
     });
 
-    // Auto-reconectar silenciosamente se o usuário já havia conectado antes
-    if (localStorage.getItem(LS_KEY_CONNECTED) === '1') {
-      setTimeout(_silentConnect, 800);
-    }
-  }
-
-  function _silentConnect() {
-    if (!_tokenClient) { setTimeout(_silentConnect, 1000); return; }
-    _silentConnecting = true;
-    try {
-      _tokenClient.requestAccessToken({ prompt: '' });
-    } catch(e) {
-      _silentConnecting = false;
-      console.warn('[GoogleCal] Erro na reconexão silenciosa:', e);
-    }
+    // Atualizar status para mostrar botão "Reconectar" se necessário
+    setTimeout(_refreshAllStatuses, 200);
   }
 
   function _refreshAllStatuses() {
@@ -203,7 +186,9 @@ const GoogleCal = (() => {
       init();
       return;
     }
-    _tokenClient.requestAccessToken({ prompt: 'consent' });
+    // Se já conectou antes, reconecta sem mostrar tela de consentimento novamente
+    const prompt = localStorage.getItem(LS_KEY_CONNECTED) === '1' ? '' : 'consent';
+    _tokenClient.requestAccessToken({ prompt });
   }
 
   function disconnect() {
@@ -502,17 +487,33 @@ const GoogleCal = (() => {
     }
 
     if (!_connected) {
-      el.innerHTML = `
-        <div class="card" style="border-left:4px solid #64748b">
-          <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-            <div style="font-size:2rem">📅</div>
-            <div style="flex:1;min-width:200px">
-              <div class="font-bold" style="margin-bottom:4px">Google Calendar</div>
-              <div class="text-sm text-muted">Não conectado · Sincronize atividades e veja seus eventos do Google</div>
+      const jaConectouAntes = localStorage.getItem(LS_KEY_CONNECTED) === '1';
+      if (jaConectouAntes) {
+        // Reconexão rápida — sem tela de consentimento, 1 clique
+        el.innerHTML = `
+          <div class="card" style="border-left:4px solid #f59e0b">
+            <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="font-size:2rem">📅</div>
+              <div style="flex:1;min-width:200px">
+                <div class="font-bold" style="margin-bottom:4px">Google Calendar</div>
+                <div class="text-sm text-muted">Sessão expirada · Clique para reconectar (sem precisar refazer login)</div>
+              </div>
+              <button class="btn btn-primary" onclick="GoogleCal.connect()">🔄 Reconectar Google Calendar</button>
             </div>
-            <button class="btn btn-primary" onclick="GoogleCal.connect()">⚡ Conectar Google Calendar</button>
-          </div>
-        </div>`;
+          </div>`;
+      } else {
+        el.innerHTML = `
+          <div class="card" style="border-left:4px solid #64748b">
+            <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="font-size:2rem">📅</div>
+              <div style="flex:1;min-width:200px">
+                <div class="font-bold" style="margin-bottom:4px">Google Calendar</div>
+                <div class="text-sm text-muted">Não conectado · Sincronize atividades e veja seus eventos do Google</div>
+              </div>
+              <button class="btn btn-primary" onclick="GoogleCal.connect()">⚡ Conectar Google Calendar</button>
+            </div>
+          </div>`;
+      }
       return;
     }
 

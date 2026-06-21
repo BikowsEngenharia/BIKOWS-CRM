@@ -486,12 +486,6 @@ const GoogleCal = (() => {
 
     el.setAttribute('data-gcal-status', '1');
 
-    const cfg = (typeof DB !== 'undefined') ? DB.getConfig() : null;
-    if (!cfg?.gcalEnabled && !_connected) {
-      el.innerHTML = '';
-      return;
-    }
-
     if (!_isConfigured()) {
       el.innerHTML = `
         <div class="card" style="border-left:4px solid #f59e0b">

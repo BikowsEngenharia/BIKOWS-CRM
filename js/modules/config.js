@@ -509,7 +509,7 @@ const Config = (() => {
     const blob = new Blob([json], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `backup-crm-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `backup-crm-${Utils.localDateStr(new Date())}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
 

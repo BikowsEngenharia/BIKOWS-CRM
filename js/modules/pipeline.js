@@ -204,7 +204,7 @@ const Pipeline = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -288,7 +288,7 @@ const Pipeline = (() => {
     if (jaExiste) return;
     // Criar atividade de follow-up para amanhã
     const amanha = new Date(); amanha.setDate(amanha.getDate() + 1);
-    const amanhaStr = amanha.toISOString().split('T')[0];
+    const amanhaStr = Utils.localDateStr(amanha);
     DB.create('atividades', {
       titulo: `🧊 Follow-up automático — ${lead.titulo}`,
       tipo: 'ligacao',
@@ -661,7 +661,7 @@ const Pipeline = (() => {
       a.leadId === leadId && a.status === 'pendente' && a.titulo?.includes('Follow-up proposta')
     );
     if (jaExiste) return;
-    const addDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
+    const addDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return Utils.localDateStr(d); };
     const clienteNome = Utils.getClientName(lead.clienteId) || lead.empresa || lead.titulo || '';
     [
       { dias:3,  titulo:`📤 Follow-up proposta — ${clienteNome}`, desc:'Confirmar recebimento e tirar dúvidas iniciais.' },
@@ -1476,7 +1476,7 @@ const Pipeline = (() => {
 
   /* ---- Drill-down dos KPI cards ---- */
   function drillDown(tipo) {
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = Utils.localDateStr(new Date());
     let title = '', items = [], cols = [], rowFn = () => [];
 
     const allLeads = DB.getAll('leads');
@@ -1675,7 +1675,7 @@ const Pipeline = (() => {
   function reativarLeadsPerdidos() {
     const limiteData = new Date();
     limiteData.setDate(limiteData.getDate() - 90);
-    const limitStr = limiteData.toISOString().split('T')[0];
+    const limitStr = Utils.localDateStr(limiteData);
 
     const perdidos = DB.getAll('leads').filter(l => {
       if (l.status !== 'fechado_perdido') return false;
@@ -1753,7 +1753,7 @@ const Pipeline = (() => {
   function _addDias(dateStr, n) {
     var d = new Date(dateStr + 'T00:00:00');
     d.setDate(d.getDate() + n);
-    return d.toISOString().split('T')[0];
+    return Utils.localDateStr(d);
   }
 
   function _autoAtividade(leadId, novoStatus, leadTitulo) {

@@ -82,7 +82,7 @@ const PropostaGenerator = (() => {
     const cliente  = proposta ? DB.get('clientes', proposta.clienteId) : null;
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = Utils.localDateStr(new Date());
     const nextNum = proposta?.numero ||
       'BIK-' + new Date().getFullYear() + '-CTR-' + String(DB.getAll('propostas').length + 1).padStart(3,'0');
 
@@ -576,7 +576,7 @@ enerlab</textarea>
     if (data.data) {
       const d = new Date(data.data);
       d.setDate(d.getDate() + (parseInt(data.validade) || 15));
-      validadeISO = d.toISOString().split('T')[0];
+      validadeISO = Utils.localDateStr(d);
     }
 
     if (propostaId) {

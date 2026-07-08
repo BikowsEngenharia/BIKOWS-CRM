@@ -100,7 +100,7 @@ const Licitacoes = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -346,7 +346,7 @@ const Licitacoes = (() => {
     // Converter data de encerramento para data de abertura (dd/mm para yyyy-mm-dd)
     let dataAbertura = '';
     if (d.dataEncerramento) {
-      try { dataAbertura = new Date(d.dataEncerramento).toISOString().split('T')[0]; } catch {}
+      try { dataAbertura = Utils.localDateStr(new Date(d.dataEncerramento)); } catch {}
     }
 
     // Mapear modalidade PNCP para local
@@ -435,7 +435,7 @@ const Licitacoes = (() => {
       d.setDate(d.getDate() - 3);
       const hoje = new Date(); hoje.setHours(0,0,0,0);
       if (d < hoje) d.setDate(hoje.getDate() + 1);
-      dataAcao = d.toISOString().split('T')[0];
+      dataAcao = Utils.localDateStr(d);
     }
 
     const lead = DB.create('leads', {

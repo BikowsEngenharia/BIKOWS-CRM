@@ -64,8 +64,14 @@ const Utils = (() => {
     return daysUntil(dateStr) === 0;
   }
 
+  // Data local YYYY-MM-DD (evita bug de timezone: toISOString() usa UTC e
+  // no Brasil, após as 21h, retornaria a data de amanhã)
+  function localDateStr(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   function todayStr() {
-    return new Date().toISOString().split('T')[0];
+    return localDateStr(new Date());
   }
 
   function truncate(str, n = 50) {
@@ -114,6 +120,7 @@ const Utils = (() => {
     followup: { label: 'Follow-up',  icon: '🔄', bg: '#fef9c3' },
     tarefa:   { label: 'Tarefa',     icon: '✅', bg: '#f1f5f9' },
     visita:   { label: 'Visita',     icon: '🏭', bg: '#ffedd5' },
+    nota:     { label: 'Nota',       icon: '📝', bg: '#fef3c7' },
   };
 
   const ATIV_STATUS = {
@@ -232,7 +239,7 @@ const Utils = (() => {
 
   return {
     formatCurrency, formatDate, formatDateTime, formatCNPJ, formatPhone,
-    timeAgo, daysUntil, isOverdue, isToday, todayStr, truncate, escHtml,
+    timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, truncate, escHtml,
     LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS,
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,

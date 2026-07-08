@@ -21,7 +21,7 @@ const Atividades = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -405,7 +405,7 @@ const Atividades = (() => {
   }
 
   function drillDown(tipo, tipoFiltro) {
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = Utils.localDateStr(new Date());
     const atividades = DB.getAll('atividades');
     const atividadesFiltradas = _filtrarPorPeriodo(atividades, 'data');
     let title = '', items = [], cols = [], rowFn = () => [];

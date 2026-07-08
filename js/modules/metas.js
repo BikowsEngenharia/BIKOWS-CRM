@@ -26,8 +26,8 @@ const Metas = (() => {
   /* ---- Cálculo de realizados ---- */
   function _realizados(ano, trimestre) {
     const meses = TRIMESTRE_MESES[trimestre];
-    const inicio = new Date(ano, meses[0], 1).toISOString().split('T')[0];
-    const fim    = new Date(ano, meses[2]+1, 0).toISOString().split('T')[0];
+    const inicio = Utils.localDateStr(new Date(ano, meses[0], 1));
+    const fim    = Utils.localDateStr(new Date(ano, meses[2]+1, 0));
     const inP    = d => d && d >= inicio && d <= fim;
 
     const receita = DB.getAll('lancamentos')

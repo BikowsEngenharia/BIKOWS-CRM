@@ -341,7 +341,7 @@ const Notifications = (() => {
     const hoje = new Date();
     if (hoje.getDay() !== 1) return; // 1 = segunda-feira
 
-    const WEEKLY_KEY = 'crm_weekly_' + hoje.toISOString().split('T')[0];
+    const WEEKLY_KEY = 'crm_weekly_' + Utils.localDateStr(hoje);
     if (sessionStorage.getItem(WEEKLY_KEY)) return; // já mostrou hoje
 
     sessionStorage.setItem(WEEKLY_KEY, '1');
@@ -360,8 +360,8 @@ const Notifications = (() => {
     const ativos = leads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
     const hoje = new Date();
     const semanaFim = new Date(hoje); semanaFim.setDate(hoje.getDate() + 7);
-    const semanaFimStr = semanaFim.toISOString().split('T')[0];
-    const hojeStr = hoje.toISOString().split('T')[0];
+    const semanaFimStr = Utils.localDateStr(semanaFim);
+    const hojeStr = Utils.localDateStr(hoje);
 
     const ativsHojeOuMais = atividades.filter(a => a.status === 'pendente' && a.data && a.data >= hojeStr && a.data <= semanaFimStr);
     const ativsAtrasadas = atividades.filter(a => a.status === 'pendente' && a.data && a.data < hojeStr);

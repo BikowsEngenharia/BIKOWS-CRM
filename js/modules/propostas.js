@@ -20,7 +20,7 @@ const Propostas = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -773,7 +773,7 @@ const Propostas = (() => {
     for (let i = 0; i < n; i++) {
       const d = new Date(data1 + 'T00:00:00');
       d.setDate(d.getDate() + i * intv);
-      const ds = d.toISOString().split('T')[0];
+      const ds = Utils.localDateStr(d);
       rows += `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
         <span class="text-muted">Parcela ${i+1}</span>
         <span>${Utils.formatDate(ds)}</span>
@@ -969,7 +969,7 @@ const Propostas = (() => {
       for (let i = 0; i < n; i++) {
         const d = new Date((data1 || Utils.todayStr()) + 'T00:00:00');
         d.setDate(d.getDate() + i * intv);
-        const venc = d.toISOString().split('T')[0];
+        const venc = Utils.localDateStr(d);
         const isLast = i === n - 1;
         const pVal = isLast
           ? Math.round((valorFechado - Math.round((valorFechado / n) * 100) / 100 * (n - 1)) * 100) / 100
@@ -1168,9 +1168,9 @@ const Propostas = (() => {
 
   /* ---- Drill-down dos KPI cards ---- */
   function drillDown(tipo) {
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = Utils.localDateStr(new Date());
     const em7dias = new Date(); em7dias.setDate(em7dias.getDate() + 7);
-    const em7diasStr = em7dias.toISOString().split('T')[0];
+    const em7diasStr = Utils.localDateStr(em7dias);
 
     let title = '', items = [], cols = [], rowFn = () => [];
     const todasPropostas = DB.getAll('propostas');
@@ -1373,7 +1373,7 @@ const Propostas = (() => {
       if (!grupos[t.grupo]) grupos[t.grupo] = [];
       grupos[t.grupo].push({ key, ...t });
     });
-    const validadeDefault = (() => { const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString().split('T')[0]; })();
+    const validadeDefault = (() => { const d = new Date(); d.setDate(d.getDate() + 15); return Utils.localDateStr(d); })();
     Modal.open({
       title: '⚡ Proposta Rápida', size: 'modal-lg', saveLabel: null,
       body: `

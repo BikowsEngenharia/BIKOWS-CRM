@@ -40,7 +40,7 @@ const Marketing = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -313,7 +313,7 @@ const Marketing = (() => {
     const novaData = post.data ? (() => {
       const d = new Date(post.data + 'T12:00:00');
       d.setDate(d.getDate() + 7);
-      return d.toISOString().split('T')[0];
+      return Utils.localDateStr(d);
     })() : '';
     DB.create('marketing_posts', { ...post, id: undefined, titulo: post.titulo + ' (cópia)', status: 'rascunho', data: novaData });
     Toast.success('Post duplicado!');
@@ -369,8 +369,8 @@ const Marketing = (() => {
 
   function _downloadTemplate() {
     const header = 'data;canal;titulo;descricao;formato;pilar;status;hashtags;cta';
-    const ex1 = `${new Date().toISOString().split('T')[0]};LinkedIn;Como a NR-12 protege sua empresa;Texto do post aqui...;Post Imagem;Segurança do Trabalho;rascunho;#NR12 #Segurança;Fale com a Bikows`;
-    const ex2 = `${new Date().toISOString().split('T')[0]};Instagram;Case: Projeto de linha de vida;Descrevemos o projeto...;Carrossel;Cases e Resultados;ideia;#Engenharia #Cases;Ver portfólio no link`;
+    const ex1 = `${Utils.localDateStr(new Date())};LinkedIn;Como a NR-12 protege sua empresa;Texto do post aqui...;Post Imagem;Segurança do Trabalho;rascunho;#NR12 #Segurança;Fale com a Bikows`;
+    const ex2 = `${Utils.localDateStr(new Date())};Instagram;Case: Projeto de linha de vida;Descrevemos o projeto...;Carrossel;Cases e Resultados;ideia;#Engenharia #Cases;Ver portfólio no link`;
     const csv = [header, ex1, ex2].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

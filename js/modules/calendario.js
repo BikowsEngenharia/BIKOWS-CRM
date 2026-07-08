@@ -111,7 +111,7 @@ const Calendario = (() => {
     // ── Propostas — vencimento ────────────────────────────────────────────
     DB.getAll('propostas').forEach(p => {
       if (!p.validade) return;
-      if (['aprovada','reprovada','cancelada'].includes(p.status)) return;
+      if (['aprovada','recusada','reprovada','cancelada'].includes(p.status)) return;
       addEvent(p.validade, {
         type: 'proposta',
         label: `📄 ${Utils.escHtml(p.titulo || p.numero || 'Proposta')}`,
@@ -223,8 +223,8 @@ const Calendario = (() => {
 
     // propostas
     DB.getAll('propostas').forEach(p => {
-      if (!['aprovada','reprovada','cancelada'].includes(p.status) && inMonth(p.validade)) totalEventos++;
-      if (!['aprovada','reprovada','cancelada'].includes(p.status) && Utils.isOverdue(p.validade)) vencidos++;
+      if (!['aprovada','recusada','reprovada','cancelada'].includes(p.status) && inMonth(p.validade)) totalEventos++;
+      if (!['aprovada','recusada','reprovada','cancelada'].includes(p.status) && Utils.isOverdue(p.validade)) vencidos++;
     });
 
     // parcelas

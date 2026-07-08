@@ -21,7 +21,7 @@ const Relatorios = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -809,7 +809,7 @@ const Relatorios = (() => {
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = filename + '_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.download = filename + '_' + Utils.localDateStr(new Date()) + '.csv';
     a.click();
   }
 

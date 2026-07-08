@@ -20,7 +20,7 @@ const Dashboard = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -47,8 +47,8 @@ const Dashboard = (() => {
       fimAnterior = new Date(inicioAtual.getTime() - 1);
       inicioAnterior = new Date(fimAnterior.getFullYear(), 0, 1);
     }
-    const inicioStr = inicioAnterior.toISOString().split('T')[0];
-    const fimStr = fimAnterior.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicioAnterior);
+    const fimStr = Utils.localDateStr(fimAnterior);
     return lista.filter(item => {
       const d = (item[campo] || item.createdAt || '').slice(0, 10);
       return d >= inicioStr && d <= fimStr;
@@ -809,8 +809,8 @@ const Dashboard = (() => {
 
     const lancamentos = DB.getAll('lancamentos');
     const meses = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]][qi];
-    const inicio = new Date(ano, meses[0], 1).toISOString().split('T')[0];
-    const fim = new Date(ano, meses[2] + 1, 0).toISOString().split('T')[0];
+    const inicio = Utils.localDateStr(new Date(ano, meses[0], 1));
+    const fim = Utils.localDateStr(new Date(ano, meses[2] + 1, 0));
     const receitaReal = lancamentos
       .filter(l => l.tipo==='receita' && l.status==='recebido' && l.data >= inicio && l.data <= fim)
       .reduce((s,l) => s + (l.valor||0), 0);
@@ -906,7 +906,7 @@ const Dashboard = (() => {
      DRILL-DOWN — Modal com lista de itens do KPI
      ================================================ */
   function drillDown(tipo) {
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = Utils.localDateStr(new Date());
     const configs = {
       'leads_ativos': {
         title: '💼 Leads Ativos',
@@ -1075,7 +1075,7 @@ const Dashboard = (() => {
     // Calcular nova data
     const base = new Date();
     base.setDate(base.getDate() + dias);
-    const novaData = base.toISOString().split('T')[0];
+    const novaData = Utils.localDateStr(base);
     DB.update('atividades', id, { data: novaData });
     _dragAtivId = null;
     Toast.success(`📅 Reagendado para ${Utils.formatDate(novaData)}`);

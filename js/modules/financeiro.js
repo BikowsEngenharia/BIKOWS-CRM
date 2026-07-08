@@ -486,7 +486,7 @@ const Financeiro = (() => {
 
   /* ---- Drill-down dos KPI cards ---- */
   function drillDown(tipo) {
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = Utils.localDateStr(new Date());
     const mes = hoje.substring(0, 7);
     let title = '', items = [], cols = [], rowFn = () => [];
 

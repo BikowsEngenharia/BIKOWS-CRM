@@ -20,7 +20,7 @@ const Clientes = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -816,7 +816,7 @@ const Clientes = (() => {
     var projetos = DB.getAll('projetos').filter(function(p) { return p.clienteId === clienteId; });
     var projetosAtivos = projetos.filter(function(p) { return p.status === 'em_andamento'; });
     if (projetosAtivos.length > 0) { score += 20; detalhes.push('+20 Projeto ativo'); }
-    var propostas = DB.getAll('propostas').filter(function(p) { return p.clienteId === clienteId && !['reprovada','cancelada'].includes(p.status); });
+    var propostas = DB.getAll('propostas').filter(function(p) { return p.clienteId === clienteId && !['recusada','reprovada','cancelada'].includes(p.status); });
     if (propostas.length > 0) { score += 15; detalhes.push('+15 Proposta ativa'); }
     var hoje = Utils.todayStr();
     var recVencidas = [];
@@ -826,9 +826,9 @@ const Clientes = (() => {
     if (recVencidas.length > 0) { score -= 20; detalhes.push('-20 Parcela(s) vencida(s)'); }
     var atividades = DB.getAll('atividades').filter(function(a) { return a.clienteId === clienteId; });
     var dataCorte30 = new Date(); dataCorte30.setDate(dataCorte30.getDate() - 30);
-    var corte30Str = dataCorte30.toISOString().split('T')[0];
+    var corte30Str = Utils.localDateStr(dataCorte30);
     var dataCorte90 = new Date(); dataCorte90.setDate(dataCorte90.getDate() - 90);
-    var corte90Str = dataCorte90.toISOString().split('T')[0];
+    var corte90Str = Utils.localDateStr(dataCorte90);
     var recente = atividades.some(function(a) { return (a.data || '') >= corte30Str; });
     if (recente) { score += 10; detalhes.push('+10 Contato recente (<30d)'); }
     else {

@@ -783,7 +783,7 @@ const App = (() => {
     } else if (tipo === 'qc-atv') {
       DB.create('atividades', {
         titulo,
-        tipo: 'task',
+        tipo: 'tarefa',
         status: 'pendente',
         prioridade: document.getElementById('qcPrioridade')?.value || 'media',
         data: document.getElementById('qcData')?.value || Utils.todayStr(),
@@ -795,7 +795,7 @@ const App = (() => {
     } else if (tipo === 'qc-nota') {
       DB.create('atividades', {
         titulo,
-        tipo: 'note',
+        tipo: 'nota',
         status: 'concluida',
         prioridade: 'baixa',
         data: Utils.todayStr(),

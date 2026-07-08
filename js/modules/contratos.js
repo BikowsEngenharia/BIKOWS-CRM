@@ -28,7 +28,7 @@ const Contratos = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -383,7 +383,7 @@ const Contratos = (() => {
     if (c.dataInicio && c.dataFim) {
       const duracao = new Date(c.dataFim) - new Date(c.dataInicio);
       const novaFimDate = new Date(new Date(novoInicio).getTime() + duracao);
-      novoFim = novaFimDate.toISOString().split('T')[0];
+      novoFim = Utils.localDateStr(novaFimDate);
     }
     Modal.open({
       title: '🔄 Renovar Contrato',
@@ -591,7 +591,7 @@ const Contratos = (() => {
             : valorParc;
           return {
             id: Date.now().toString(36) + i.toString(36),
-            vencimento: venc.toISOString().split('T')[0],
+            vencimento: Utils.localDateStr(venc),
             valor,
             status: 'a_vencer',
             dataPagamento: null,
@@ -623,7 +623,7 @@ const Contratos = (() => {
   }
 
   function drillDown(tipo) {
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = Utils.localDateStr(new Date());
     const contratos = DB.getAll('contratos');
     const contratosFiltrados = _filtrarPorPeriodo(contratos, 'dataInicio');
     let title = '', items = [], cols = [], rowFn = () => [];
@@ -839,7 +839,7 @@ const Contratos = (() => {
               : valorParc;
             return {
               id: Date.now().toString(36) + i.toString(36),
-              vencimento: venc.toISOString().split('T')[0],
+              vencimento: Utils.localDateStr(venc),
               valor: valorP,
               status: 'a_vencer',
               dataPagamento: null,
@@ -871,7 +871,7 @@ const Contratos = (() => {
     const d = new Date(inicio);
     d.setMonth(d.getMonth() + meses);
     const fimEl = document.getElementById('fcFim');
-    if (fimEl) fimEl.value = d.toISOString().split('T')[0];
+    if (fimEl) fimEl.value = Utils.localDateStr(d);
   }
 
   /* ================================================

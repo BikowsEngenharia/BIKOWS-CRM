@@ -21,7 +21,7 @@ const Projetos = (() => {
     } else if (_periodo === 'ano') {
       inicio = new Date(hoje.getFullYear(), 0, 1);
     }
-    const inicioStr = inicio.toISOString().split('T')[0];
+    const inicioStr = Utils.localDateStr(inicio);
     return lista.filter(item => (item[campo] || item.createdAt || '') >= inicioStr);
   }
 
@@ -1197,9 +1197,9 @@ const Projetos = (() => {
       descricao:  `${data.titulo} (${data.codigo || projeto.id.substring(0, 8)})`,
       valorTotal: data.valor,
       parcelas: [
-        { id: Date.now().toString(36) + '1', vencimento: venc1.toISOString().split('T')[0], valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
-        { id: Date.now().toString(36) + '2', vencimento: venc2.toISOString().split('T')[0], valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
-        { id: Date.now().toString(36) + '3', vencimento: venc3.toISOString().split('T')[0], valor: parc3, status: 'a_vencer', dataPagamento: null, nfNumero: '' },
+        { id: Date.now().toString(36) + '1', vencimento: Utils.localDateStr(venc1), valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
+        { id: Date.now().toString(36) + '2', vencimento: Utils.localDateStr(venc2), valor: parc,  status: 'a_vencer', dataPagamento: null, nfNumero: '' },
+        { id: Date.now().toString(36) + '3', vencimento: Utils.localDateStr(venc3), valor: parc3, status: 'a_vencer', dataPagamento: null, nfNumero: '' },
       ],
       origem: 'projeto_criado',
     });
@@ -1329,7 +1329,7 @@ const Projetos = (() => {
   }
 
   function drillDown(tipo) {
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = Utils.localDateStr(new Date());
     const projetos = DB.getAll('projetos');
     const projetosFiltrados = _filtrarPorPeriodo(projetos, 'dataInicio');
     let title = '', items = [], cols = [], rowFn = () => [];

@@ -1096,15 +1096,60 @@ const Pipeline = (() => {
   function criarRecebivel(leadId) {
     const lead = DB.get('leads', leadId);
     if (!lead) return;
-    const valor = lead.valorFechado || lead.valorEstimado || 0;
-    const hoje = Utils.todayStr();
-    DB.create('recebiveis', {
-      clienteId: lead.clienteId,
-      descricao: lead.titulo,
-      valorTotal: valor,
-      parcelas: [{ id: Date.now().toString(36), vencimento: hoje, valor, status: 'a_vencer', dataPagamento: null, nfNumero: '' }],
+
+    // Evitar duplicação: um recebível por lead
+    const jaExiste = DB.getAll('recebiveis').find(r => r.leadId === leadId);
+    if (jaExiste) {
+      Toast.warning('Este lead já tem recebível criado — veja em Financeiro → Contas a Receber.');
+      return;
+    }
+
+    const valorSugerido = lead.valorFechado || lead.valorEstimado || 0;
+    const d30 = new Date(); d30.setDate(d30.getDate() + 30);
+
+    Modal.open({
+      title: `💰 Gerar Financeiro — ${Utils.escHtml(Utils.truncate(lead.titulo || '', 40))}`,
+      body: `
+        <p class="text-sm text-muted mb-3">Cria o recebível com as parcelas no Financeiro, vinculado ao cliente.</p>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Valor Total (R$) *</label>
+            <input class="form-control" id="grValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(valorSugerido)}" placeholder="0,00"></div>
+          <div class="form-group"><label class="form-label">Nº de Parcelas</label>
+            <select class="form-control" id="grParcelas">${[1,2,3,4,5,6,8,10,12].map(n=>`<option value="${n}">${n}x</option>`).join('')}</select></div>
+          <div class="form-group"><label class="form-label">1º Vencimento *</label>
+            <input class="form-control" id="grVenc" type="date" value="${Utils.localDateStr(d30)}"></div>
+        </div>
+        <div class="text-xs text-muted">As parcelas seguintes vencem de 30 em 30 dias (mensal). Você pode ajustar depois em Financeiro → Contas a Receber.</div>
+      `,
+      saveLabel: '✅ Criar Recebível',
+      saveCb: () => {
+        const valor = Utils.parseMoney(document.getElementById('grValor').value);
+        if (!valor) { Toast.error('Valor inválido — use o formato 1500,00'); return; }
+        const nParc = Number(document.getElementById('grParcelas').value) || 1;
+        const venc1 = document.getElementById('grVenc').value;
+        if (!venc1) { Toast.error('Informe o primeiro vencimento'); return; }
+
+        const parcelas = [];
+        const base = Math.floor((valor / nParc) * 100) / 100;
+        let acumulado = 0;
+        for (let i = 0; i < nParc; i++) {
+          const dt = new Date(venc1 + 'T00:00:00');
+          dt.setMonth(dt.getMonth() + i);
+          const v = i === nParc - 1 ? Math.round((valor - acumulado) * 100) / 100 : base;
+          acumulado += v;
+          parcelas.push({ id: Date.now().toString(36) + i, valor: v, vencimento: Utils.localDateStr(dt), status: 'a_vencer', dataPagamento: null, nfNumero: '' });
+        }
+
+        DB.create('recebiveis', {
+          clienteId: lead.clienteId, leadId,
+          descricao: lead.titulo, valorTotal: valor,
+          origem: 'pipeline', parcelas,
+        });
+        DB.update('leads', leadId, { valorFechado: valor });
+        Modal.close();
+        Toast.success(`💰 Recebível criado: ${nParc}x — 1ª parcela em ${Utils.formatDate(venc1)}`);
+      },
     });
-    Toast.success('Recebível criado! Acesse Financeiro → Contas a Receber para ajustar as parcelas.');
   }
 
   function openForm(id = null, defaultStatus = 'lead_identificado') {

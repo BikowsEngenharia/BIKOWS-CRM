@@ -598,7 +598,7 @@ const Propostas = (() => {
         <div class="form-row">
           <div class="form-group" style="flex:2">
             <label class="form-label">Valor Fechado (R$) *</label>
-            <input class="form-control" id="cValorFechado" type="number" step="0.01" value="${prop.valor||''}">
+            <input class="form-control" id="cValorFechado" type="text" inputmode="decimal" value="${Utils.moneyToInput(prop.valor)}" placeholder="0,00">
           </div>
           <div class="form-group" style="flex:3">
             <label class="form-label">Condição de Pagamento *</label>
@@ -764,7 +764,7 @@ const Propostas = (() => {
     const n     = parseInt(document.getElementById('cNParcelas')?.value) || 3;
     const data1 = document.getElementById('cParc1Data')?.value;
     const intv  = parseInt(document.getElementById('cParcIntervalo')?.value) || 30;
-    const valor = Number(document.getElementById('cValorFechado')?.value) || 0;
+    const valor = Utils.parseMoney(document.getElementById('cValorFechado')?.value) || 0;
     const prev  = document.getElementById('cParcelasPreview');
     if (!prev || !data1 || !valor) return;
 
@@ -800,7 +800,7 @@ const Propostas = (() => {
     const respOpts = cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
     const condicao = document.getElementById('cCondicao')?.value || 'avista';
     const showPgto = condicao === 'medicoes';
-    const valorTotal = Number(document.getElementById('cValorFechado')?.value) || 0;
+    const valorTotal = Utils.parseMoney(document.getElementById('cValorFechado')?.value) || 0;
 
     if (_etapasContrato.length === 0) {
       container.innerHTML = `<div class="text-sm text-muted" style="padding:12px;text-align:center">
@@ -879,7 +879,7 @@ const Propostas = (() => {
     if (!prop) return;
 
     // Coletar dados financeiros
-    const valorFechado = Number(document.getElementById('cValorFechado').value);
+    const valorFechado = Utils.parseMoney(document.getElementById('cValorFechado').value);
     if (!valorFechado) { Toast.error('Informe o valor fechado'); _ctab('fin'); return; }
     const condicao = document.getElementById('cCondicao').value;
     const contratoInicio = document.getElementById('cContratoInicio').value;

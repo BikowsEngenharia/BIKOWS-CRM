@@ -289,6 +289,17 @@ const Financeiro = (() => {
   }
 
   /* ---- FLUXO DE CAIXA ---- */
+  /* Projeção do mês (só meses atuais/futuros): parcelas de recebíveis em
+     aberto = entradas previstas; contas a pagar pendentes = saídas previstas */
+  function _projecaoMes(m,hojeM){
+    if(m<hojeM)return{e:0,s:0};
+    let e=0;
+    DB.getAll('recebiveis').forEach(r=>(r.parcelas||[]).forEach(p=>{if(p.status!=='recebido'&&(p.vencimento||'').startsWith(m))e+=p.valor;}));
+    let s=0;
+    DB.getAll('contaspagar').forEach(c=>{if(c.status==='pendente'&&(c.vencimento||'').startsWith(m))s+=c.valor;});
+    return{e,s};
+  }
+
   function buildFluxo() {
     const meses=getLast3Next3(), lanc=DB.getAll('lancamentos');
     const despFixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
@@ -298,14 +309,15 @@ const Financeiro = (() => {
     const rows=meses.map(m=>{
       const [,mo]=m.split('-');
       const lb=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1];
-      const e=lanc.filter(l=>l.tipo==='receita'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0);
+      const proj=_projecaoMes(m,hoje);
+      const e=lanc.filter(l=>l.tipo==='receita'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0)+proj.e;
       const sLanc=lanc.filter(l=>l.tipo==='despesa'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0);
-      // Inclui despesas fixas nas saídas projetadas de todos os meses
-      const s=sLanc+(saídaFixaMensal>0?saídaFixaMensal:0);
+      // Saídas: lançamentos + contas pendentes do mês + despesas fixas
+      const s=sLanc+proj.s+(saídaFixaMensal>0?saídaFixaMensal:0);
       return {m,lb,e,s,r:e-s};
     });
     return `
-      <div class="card mb-4"><div class="card-header"><div class="card-title">🔄 Fluxo de Caixa — 6 Meses</div></div><div class="card-body"><div id="chartFluxo" style="height:190px"></div></div></div>
+      <div class="card mb-4"><div class="card-header"><div class="card-title">🔄 Fluxo de Caixa — 6 Meses</div><span class="text-xs text-muted">Meses futuros incluem parcelas a receber e contas a pagar em aberto</span></div><div class="card-body"><div id="chartFluxo" style="height:190px"></div></div></div>
       <div class="card"><div class="card-header"><div class="card-title">📋 Detalhamento Mensal</div></div>
         <div class="table-wrap"><table class="tbl"><thead><tr><th>Mês</th><th>Entradas</th><th>Saídas</th><th>Resultado</th><th>Saldo Acumulado</th></tr></thead>
         <tbody>${rows.map(r=>{saldo+=r.r;const fut=r.m>hoje;return `<tr style="${fut?'opacity:.65;font-style:italic':''}">
@@ -336,8 +348,9 @@ const Financeiro = (() => {
   }
   function renderFluxoChart() {
     const meses=getLast3Next3(),lanc=DB.getAll('lancamentos');
+    const hoje=Utils.todayStr().substring(0,7);
     const lbs=meses.map(m=>{const[,mo]=m.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1];});
-    Charts.bar({containerId:'chartFluxo',data:lbs.map((l,i)=>{const e=lanc.filter(x=>x.tipo==='receita'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0);const s=lanc.filter(x=>x.tipo==='despesa'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0);return{label:l,value:e-s,color:e-s>=0?'#10b981':'#dc2626'};}),height:190,showValues:false});
+    Charts.bar({containerId:'chartFluxo',data:lbs.map((l,i)=>{const proj=_projecaoMes(meses[i],hoje);const e=lanc.filter(x=>x.tipo==='receita'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.e;const s=lanc.filter(x=>x.tipo==='despesa'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.s;return{label:l,value:e-s,color:e-s>=0?'#10b981':'#dc2626'};}),height:190,showValues:false});
   }
 
   function getLast6(){const r=[],d=new Date();for(let i=5;i>=0;i--){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);r.push(dt.toISOString().substring(0,7));}return r;}
@@ -445,8 +458,23 @@ const Financeiro = (() => {
       tipo:'despesa',categoria:p.categoria||'Outros',
       descricao:p.descricao||p.fornecedor||'Pagamento',
       valor:p.valor,data:Utils.todayStr(),status:'pago',
-      clienteId:'',observacoes:'Criado automaticamente ao pagar conta: '+(p.fornecedor||''),
+      clienteId:'',contaId:id,observacoes:'Criado automaticamente ao pagar conta: '+(p.fornecedor||''),
     });
+    // Conta recorrente: gera automaticamente a do próximo mês
+    if(p.recorrente){
+      const dt=new Date((p.vencimento||Utils.todayStr())+'T00:00:00');
+      dt.setMonth(dt.getMonth()+1);
+      const proxVenc=Utils.localDateStr(dt);
+      const jaExiste=DB.getAll('contaspagar').some(c=>c.id!==id&&c.fornecedor===p.fornecedor&&c.vencimento===proxVenc&&c.status==='pendente');
+      if(!jaExiste){
+        DB.create('contaspagar',{
+          fornecedor:p.fornecedor,categoria:p.categoria,descricao:p.descricao,
+          valor:p.valor,vencimento:proxVenc,status:'pendente',recorrente:true,
+          observacoes:'Gerada automaticamente (conta recorrente).',
+        });
+        Toast.success(`🔁 Conta recorrente: próxima gerada para ${Utils.formatDate(proxVenc)}`);
+      }
+    }
     Toast.success('Conta paga e lançamento registrado');renderTab();
   }
   function deleteContaPagar(id){Utils.confirmDelete('esta conta a pagar',()=>{DB.remove('contaspagar',id);Toast.success('Removida');renderTab();});}
@@ -638,9 +666,12 @@ const Financeiro = (() => {
         <div class="fin-kpi-cell"><div class="fin-kpi-label">Total Anual Estimado</div><div class="fin-kpi-val text-warning">${Utils.formatCurrency(totalAnual)}</div><div class="fk-sub">Projeção 12 meses</div></div>
       </div>
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="flex-wrap:wrap;gap:8px">
           <div class="card-title">📌 Despesas Fixas Recorrentes</div>
-          <button class="btn btn-sm btn-primary" onclick="Financeiro.openFormDespFixa(null)">+ Despesa Fixa</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-success" onclick="Financeiro.gerarContasDoMes()" title="Cria as contas a pagar deste mês a partir das despesas fixas mensais ativas">⚡ Gerar Contas do Mês</button>
+            <button class="btn btn-sm btn-primary" onclick="Financeiro.openFormDespFixa(null)">+ Despesa Fixa</button>
+          </div>
         </div>
         ${list.length===0?'<div class="card-body"><div class="empty-state"><div class="empty-icon">📌</div><div class="empty-title">Nenhuma despesa fixa cadastrada</div></div></div>':`
         <div class="table-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Categoria</th><th>Valor</th><th>Periodicidade</th><th>Dia Venc.</th><th>Status</th><th>Ações</th></tr></thead>
@@ -684,6 +715,32 @@ const Financeiro = (() => {
       }
     });
   }
+  /* Gera as contas a pagar do mês atual a partir das despesas fixas mensais
+     ativas. Idempotente: não duplica se já foi gerada (marca despesaFixaId). */
+  function gerarContasDoMes(){
+    const mes=Utils.todayStr().substring(0,7);
+    const fixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false&&(d.periodicidade||'Mensal')==='Mensal');
+    if(fixas.length===0){Toast.warning('Nenhuma despesa fixa mensal ativa cadastrada.');return;}
+    const existentes=DB.getAll('contaspagar');
+    let criadas=0;
+    fixas.forEach(d=>{
+      const ja=existentes.some(c=>c.despesaFixaId===d.id&&(c.vencimento||'').startsWith(mes));
+      if(ja)return;
+      const dia=Math.min(Math.max(d.vencimento_dia||10,1),28);
+      DB.create('contaspagar',{
+        fornecedor:d.nome,categoria:d.categoria||'Outros',
+        descricao:`${d.nome} — ${mes}`,valor:d.valor,
+        vencimento:`${mes}-${String(dia).padStart(2,'0')}`,
+        status:'pendente',recorrente:false,despesaFixaId:d.id,
+        observacoes:'Gerada automaticamente da despesa fixa.',
+      });
+      criadas++;
+    });
+    if(criadas>0)Toast.success(`⚡ ${criadas} conta(s) do mês gerada(s) em Contas a Pagar`);
+    else Toast.warning('Todas as despesas fixas deste mês já foram geradas.');
+    renderTab();
+  }
+
   function toggleDespFixa(id){const d=DB.get('despesas_fixas',id);if(!d)return;DB.update('despesas_fixas',id,{ativo:d.ativo===false});Toast.success('Status alterado');renderTab();}
   function deleteDespFixa(id){Utils.confirmDelete('esta despesa fixa',()=>{DB.remove('despesas_fixas',id);Toast.success('Removida');renderTab();});}
 
@@ -719,6 +776,7 @@ const Financeiro = (() => {
             <td class="text-sm">${d.taxa_juros?d.taxa_juros+'%':'—'}</td>
             <td style="min-width:100px"><div style="display:flex;align-items:center;gap:4px"><div style="flex:1;height:6px;background:var(--border);border-radius:4px"><div style="width:${pct}%;height:100%;background:${pct===100?'#10b981':'#2563eb'};border-radius:4px"></div></div><span class="text-xs">${pagas}/${total}</span></div></td>
             <td><div class="tbl-actions">
+              ${(d.valor_restante||0)>0?`<button class="btn btn-xs btn-success" onclick="Financeiro.pagarParcelaDivida('${d.id}')" title="Registrar pagamento de 1 parcela">✓ Pagar</button>`:''}
               <button class="btn btn-xs btn-secondary" onclick="Financeiro.openFormDivida('${d.id}')">✏</button>
               <button class="btn btn-xs btn-danger" onclick="Financeiro.deleteDivida('${d.id}')">🗑</button>
             </div></td>
@@ -759,6 +817,29 @@ const Financeiro = (() => {
     });
   }
   function deleteDivida(id){Utils.confirmDelete('esta dívida',()=>{DB.remove('dividas',id);Toast.success('Removida');renderTab();});}
+
+  /* Registra o pagamento de uma parcela da dívida: atualiza saldo/contador,
+     avança o vencimento em 1 mês e cria o lançamento de despesa. */
+  function pagarParcelaDivida(id){
+    const d=DB.get('dividas',id);if(!d)return;
+    const vParc=d.valor_parcela||0;
+    if(!vParc){Toast.warning('Cadastre o "Valor Parcela" na dívida para registrar pagamentos.');openFormDivida(id);return;}
+    Confirm.show('Pagar parcela?',`${d.credor} — ${Utils.formatCurrency(vParc)}. Será criado um lançamento de despesa.`,()=>{
+      const pagas=(d.parcelas_pagas||0)+1;
+      const rest=Math.max(0,Math.round(((d.valor_restante||0)-vParc)*100)/100);
+      let venc=d.vencimento||'';
+      if(venc){const dt=new Date(venc+'T00:00:00');dt.setMonth(dt.getMonth()+1);venc=Utils.localDateStr(dt);}
+      DB.update('dividas',id,{parcelas_pagas:pagas,valor_restante:rest,vencimento:rest>0?venc:''});
+      DB.create('lancamentos',{
+        tipo:'despesa',categoria:'Outros',
+        descricao:`Parcela ${pagas}${d.parcelas_total?'/'+d.parcelas_total:''} — ${d.credor}`,
+        valor:vParc,data:Utils.todayStr(),status:'pago',
+        clienteId:'',dividaId:id,observacoes:'Criado automaticamente ao pagar parcela de dívida.',
+      });
+      Toast.success(rest>0?`Parcela paga — restam ${Utils.formatCurrency(rest)}`:'🎉 Dívida quitada!');
+      renderTab();
+    });
+  }
 
   /* ---- ATIVOS ---- */
   function buildAtivos() {
@@ -823,5 +904,5 @@ const Financeiro = (() => {
   }
   function deleteAtivo(id){Utils.confirmDelete('este ativo',()=>{DB.remove('ativos_empresa',id);Toast.success('Removido');renderTab();});}
 
-  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew,drillDown,openFormDespFixa,toggleDespFixa,deleteDespFixa,openFormDivida,deleteDivida,openFormAtivo,deleteAtivo};
+  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew,drillDown,openFormDespFixa,toggleDespFixa,deleteDespFixa,gerarContasDoMes,openFormDivida,deleteDivida,pagarParcelaDivida,openFormAtivo,deleteAtivo};
 })();

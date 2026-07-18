@@ -81,7 +81,23 @@ const Utils = (() => {
 
   function escHtml(str) {
     if (!str) return '';
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // Escape para strings JS dentro de atributos onclick="Fn('...')".
+  // escHtml NÃO protege esse contexto: o browser decodifica entidades HTML
+  // antes de interpretar o JS, então &#39; volta a ser aspas e quebra a string.
+  // Aqui escapamos com backslash (sobrevive à decodificação) + entidades HTML.
+  function escJs(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r?\n/g, '\\n')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   const LEAD_STATUS = {
@@ -234,12 +250,12 @@ const Utils = (() => {
 
   function waBtn(phone, cls = '') {
     if (!phone) return '';
-    return `<button class="btn btn-xs btn-success ${cls}" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${escHtml(phone)}')" title="Abrir WhatsApp">💬</button>`;
+    return `<button class="btn btn-xs btn-success ${cls}" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${escJs(phone)}')" title="Abrir WhatsApp">💬</button>`;
   }
 
   return {
     formatCurrency, formatDate, formatDateTime, formatCNPJ, formatPhone,
-    timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, truncate, escHtml,
+    timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, truncate, escHtml, escJs,
     LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS,
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,

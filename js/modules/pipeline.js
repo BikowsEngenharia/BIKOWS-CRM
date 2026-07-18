@@ -554,7 +554,7 @@ const Pipeline = (() => {
               ? `<button class="btn btn-xs btn-secondary" onclick="Propostas.propostaRapida('${lead.id}')" title="Proposta rápida por template de serviço" style="background:#7c3aed;color:#fff;border-color:#7c3aed">⚡</button>`
               : '')}
         ${lead.status === 'fechado_ganho' ? `<button class="btn btn-xs btn-primary" onclick="Pipeline.abrirContratoLead('${lead.id}')" title="Preencher condições de pagamento, prazo e criar projeto" style="background:#059669;border-color:#059669;font-size:10px;padding:2px 6px">🤝 Contrato</button>` : ''}
-        ${lead.contato ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escHtml(lead.contato)}')" title="WhatsApp">💬</button>` : ''}
+        ${lead.contato ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escJs(lead.contato)}')" title="WhatsApp">💬</button>` : ''}
         ${frio ? `<button class="btn btn-xs btn-warning" onclick="Pipeline.criarFollowupAutomatico('${lead.id}')" title="Criar follow-up">🔔</button>` : ''}
         <button class="btn btn-xs btn-secondary" onclick="Pipeline.openForm('${lead.id}')">✏</button>
         <button class="btn btn-xs btn-danger" onclick="Pipeline.deleteLead('${lead.id}')">🗑</button>
@@ -589,7 +589,7 @@ const Pipeline = (() => {
                   <div style="display:flex;gap:4px">
                     <button class="btn btn-xs btn-primary" onclick="Modal.close();Pipeline.openForm('${l.id}')">Atualizar</button>
                     <button class="btn btn-xs btn-warning" onclick="Pipeline.criarFollowupAutomatico('${l.id}');this.disabled=true;this.textContent='✓ Criado'">🔔 Follow-up</button>
-                    ${l.contato ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escHtml(l.contato)}')">💬</button>` : ''}
+                    ${l.contato ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escJs(l.contato)}')">💬</button>` : ''}
                   </div>
                 </td>
               </tr>`;
@@ -821,7 +821,7 @@ const Pipeline = (() => {
           ${lead.status === 'fechado_ganho' ? `<button class="btn btn-success btn-sm" onclick="Modal.close();Pipeline.abrirContratoLead('${id}')">🤝 Fechar Contrato</button>` : ''}
           ${['proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status) && !_getPropostaLead(lead.id) ? `<button class="btn btn-secondary btn-sm" onclick="Modal.close();Pipeline.criarPropostaLead('${id}')">📄 Criar Proposta</button>` : ''}
           ${frio ? `<button class="btn btn-warning btn-sm" onclick="Pipeline.criarFollowupAutomatico('${lead.id}');Modal.close()">🔔 Criar Follow-up</button>` : ''}
-          ${lead.contato ? `<button class="btn btn-sm" style="background:#25D366;border-color:#25D366;color:#fff" onclick="Utils.openWhatsApp('${Utils.escHtml(lead.contato)}','Olá ${Utils.escHtml(lead.decisor||'')}! Sou da Bikows Engenharia. Gostaria de falar sobre ${Utils.escHtml(lead.titulo)}.')">💬 WhatsApp</button>` : ''}
+          ${lead.contato ? `<button class="btn btn-sm" style="background:#25D366;border-color:#25D366;color:#fff" onclick="Utils.openWhatsApp('${Utils.escJs(lead.contato)}','Olá ${Utils.escJs(lead.decisor||'')}! Sou da Bikows Engenharia. Gostaria de falar sobre ${Utils.escJs(lead.titulo)}.')">💬 WhatsApp</button>` : ''}
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Pipeline.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>

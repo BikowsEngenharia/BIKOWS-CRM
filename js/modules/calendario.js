@@ -282,7 +282,7 @@ const Calendario = (() => {
       } else if (ev.type === 'licitacao') {
         actionBtn = `<button class="btn btn-sm btn-secondary" onclick="App.navigate('licitacoes');Modal.close()">→ Licitações</button>`;
       } else if (ev.type === 'gcal' && ev.raw && ev.raw.htmlLink) {
-        actionBtn = `<button class="btn btn-sm btn-secondary" onclick="window.open('${Utils.escHtml(ev.raw.htmlLink)}','_blank')">↗ Abrir no Google</button>`;
+        actionBtn = `<button class="btn btn-sm btn-secondary" onclick="window.open('${Utils.escJs(ev.raw.htmlLink)}','_blank')">↗ Abrir no Google</button>`;
       }
 
       return `

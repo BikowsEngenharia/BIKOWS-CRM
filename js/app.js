@@ -334,7 +334,7 @@ const App = (() => {
             const clienteNome = Utils.getClientName(l.clienteId) || l.clienteNome || '';
             const msgWpp = `Olá ${clienteNome}, tudo bem? Passando para verificar o andamento da proposta de ${l.titulo}. Podemos conversar?`.replace(/['"]/g, '');
             const wppBtn = telefone
-              ? `<button class="btn btn-xs btn-success ml-2" onclick="Utils.openWhatsApp('${Utils.escHtml(telefone)}', '${Utils.escHtml(msgWpp)}')" title="WhatsApp">📱 WhatsApp</button>`
+              ? `<button class="btn btn-xs btn-success ml-2" onclick="Utils.openWhatsApp('${Utils.escJs(telefone)}', '${Utils.escJs(msgWpp)}')" title="WhatsApp">📱 WhatsApp</button>`
               : '';
             return `<div class="followup-item urgent mb-2" style="flex-wrap:wrap;gap:6px">
               <div style="flex:1"><div class="font-bold text-sm">${Utils.escHtml(clienteNome)}</div>

@@ -188,7 +188,7 @@ const Marketing = (() => {
           <span class="status-post-badge" style="background:${statusCor}">${p.status||'—'}</span>
         </div>
         <div class="tbl-actions">
-          <button class="btn-icon" title="Editar" onclick="Marketing.openPostForm('${p.id}')">âœ</button>
+          <button class="btn-icon" title="Editar" onclick="Marketing.openPostForm('${p.id}')">✏</button>
           <button class="btn-icon" title="Duplicar" onclick="Marketing.duplicatePost('${p.id}')">📋</button>
           <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deletePost('${p.id}')">🗑</button>
         </div>
@@ -440,7 +440,7 @@ const Marketing = (() => {
           <span class="status-post-badge" style="background:${cor}">${c.status||'—'}</span>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
-          📅 ${c.dataInicio ? Utils.formatDate(c.dataInicio) : '—'} â†’ ${c.dataFim ? Utils.formatDate(c.dataFim) : '—'}
+          📅 ${c.dataInicio ? Utils.formatDate(c.dataInicio) : '—'} → ${c.dataFim ? Utils.formatDate(c.dataFim) : '—'}
         </div>
         <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px">${canais}</div>
         ${orcamento > 0 ? `
@@ -457,7 +457,7 @@ const Marketing = (() => {
         ${c.leads ? `<div style="font-size:12px;color:var(--success);margin-bottom:8px">🎯 ${c.leads} leads gerados</div>` : ''}
         <div class="tbl-actions" style="justify-content:flex-end">
           <button class="btn-icon" onclick="Marketing.viewCampanha('${c.id}')">👁</button>
-          <button class="btn-icon" onclick="Marketing.openCampanhaForm('${c.id}')">âœ</button>
+          <button class="btn-icon" onclick="Marketing.openCampanhaForm('${c.id}')">✏</button>
           <button class="btn-icon text-danger" onclick="Marketing.deleteCampanha('${c.id}')">🗑</button>
         </div>
       </div>
@@ -574,7 +574,7 @@ const Marketing = (() => {
             <div class="estrategia-section-content">${Utils.escHtml(c.objetivo||'—')}</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div><span class="form-label">Período</span><div class="font-bold">${c.dataInicio?Utils.formatDate(c.dataInicio):'—'} â†’ ${c.dataFim?Utils.formatDate(c.dataFim):'—'}</div></div>
+            <div><span class="form-label">Período</span><div class="font-bold">${c.dataInicio?Utils.formatDate(c.dataInicio):'—'} → ${c.dataFim?Utils.formatDate(c.dataFim):'—'}</div></div>
             <div><span class="form-label">Status</span><div>${c.status||'—'}</div></div>
             <div><span class="form-label">Orçamento</span><div class="font-bold">${Utils.formatCurrency(c.orcamento||0)}</div></div>
             <div><span class="form-label">Gasto Real</span><div class="font-bold" style="color:${(c.gasto||0)>(c.orcamento||0)?'var(--danger)':'var(--success)'}">${Utils.formatCurrency(c.gasto||0)}</div></div>
@@ -611,7 +611,7 @@ const Marketing = (() => {
     if (_filtroIdeiaPilar) ideias = ideias.filter(i => i.pilar === _filtroIdeiaPilar);
     if (_filtroIdeiaPrior) ideias = ideias.filter(i => i.prioridade === _filtroIdeiaPrior);
 
-    // Ordenar: alta â†’ media â†’ baixa
+    // Ordenar: alta → media → baixa
     const priorOrd = { alta:0, media:1, baixa:2 };
     ideias = ideias.sort((a,b) => (priorOrd[a.prioridade]??3) - (priorOrd[b.prioridade]??3));
 
@@ -661,7 +661,7 @@ const Marketing = (() => {
           ${i.formato ? `<span class="pilar-badge">${Utils.escHtml(i.formato)}</span>` : ''}
         </div>
         <div class="tbl-actions">
-          <button class="btn-icon" title="Editar" onclick="Marketing.openIdeiaForm('${i.id}')">âœ</button>
+          <button class="btn-icon" title="Editar" onclick="Marketing.openIdeiaForm('${i.id}')">✏</button>
           <button class="btn-icon" title="Usar como post" onclick="Marketing.usarIdeia('${i.id}')">➡</button>
           <button class="btn-icon text-danger" title="Excluir" onclick="Marketing.deleteIdeia('${i.id}')">🗑</button>
         </div>
@@ -813,9 +813,9 @@ const Marketing = (() => {
     el.innerHTML = `
       <!-- Seletor de mês -->
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
-        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesAnterior()">â† Mês anterior</button>
+        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesAnterior()">← Mês anterior</button>
         <span style="font-size:15px;font-weight:700;color:var(--text)">${mesNome}</span>
-        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesPosterior()">Próximo mês â†’</button>
+        <button class="btn btn-ghost btn-sm" onclick="Marketing._kpiMesPosterior()">Próximo mês →</button>
         <div style="flex:1"></div>
         ${leadsTotal > 0 ? `<div class="kpi-card" style="padding:8px 16px"><span style="font-size:13px;color:var(--text-muted)">Leads totais: </span><strong style="color:var(--success)">${leadsTotal}</strong></div>` : ''}
       </div>
@@ -838,7 +838,7 @@ const Marketing = (() => {
             <span style="font-size:22px">${icon}</span>
             <span style="font-size:13px;font-weight:700;color:${cor}">${canal}</span>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="Marketing.editKpi('${mes}','${canal}')">âœ Editar</button>
+          <button class="btn btn-ghost btn-sm" onclick="Marketing.editKpi('${mes}','${canal}')">✏ Editar</button>
         </div>
         ${metricas.map(m => `
           <div class="kpi-canal-metric">
@@ -926,7 +926,7 @@ const Marketing = (() => {
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div class="estrategia-section-title">👤 Persona Principal</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('persona')">âœ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('persona')">✏ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.persona || 'Clique em Editar para definir a persona principal da Bikows.')}</div>
         </div>
@@ -935,7 +935,7 @@ const Marketing = (() => {
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div class="estrategia-section-title">💎 Proposta de Valor</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('proposta')">âœ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('proposta')">✏ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.proposta || 'Descreva o que torna a Bikows única no mercado.')}</div>
         </div>
@@ -944,7 +944,7 @@ const Marketing = (() => {
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div class="estrategia-section-title">🗣 Tom de Voz</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('tom')">âœ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('tom')">✏ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.tom || 'Defina como a Bikows se comunica: técnico mas acessível, confiante...')}</div>
         </div>
@@ -953,7 +953,7 @@ const Marketing = (() => {
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div class="estrategia-section-title">🎯 Objetivos de Marketing</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('objetivos')">âœ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('objetivos')">✏ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.objetivos || 'Liste os principais objetivos de marketing da empresa.')}</div>
         </div>
@@ -961,8 +961,8 @@ const Marketing = (() => {
         <!-- Concorrência -->
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="estrategia-section-title">âš” Concorrência</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('concorrencia')">âœ Editar</button>
+            <div class="estrategia-section-title">⚔ Concorrência</div>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('concorrencia')">✏ Editar</button>
           </div>
           <div class="estrategia-section-content" style="margin-top:8px">${Utils.escHtml(est.concorrencia || 'Liste principais concorrentes e diferenciais competitivos.')}</div>
         </div>
@@ -971,7 +971,7 @@ const Marketing = (() => {
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div class="estrategia-section-title">🏻 Pilares de Conteúdo</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('pilares')">âœ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('pilares')">✏ Editar</button>
           </div>
           <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
             ${PILARES.map(p => `
@@ -987,7 +987,7 @@ const Marketing = (() => {
         <div class="estrategia-section">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div class="estrategia-section-title">📆 Frequência por Canal</div>
-            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('frequencia')">âœ Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Marketing._editEstrategia('frequencia')">✏ Editar</button>
           </div>
           <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
             ${CANAIS.map(canal => `

@@ -32,6 +32,7 @@ html {
   --success-border: #a7f3d0;
   --warning:        #d97706;
   --warning-light:  #fffbeb;
+  --warning-bg:     var(--warning-light);
   --warning-border: #fde68a;
   --danger:         #C42B2B;  /* Vermelho Ação */
   --danger-light:   #FBEAEA;
@@ -1164,6 +1165,16 @@ select.form-control { cursor: pointer; }
   .filters { flex-wrap: wrap; gap: 6px; }
   .filter-select { flex: 1; min-width: 100px; font-size: 13px; }
 
+  /* Grupos de botões (seletor de período, abas) roláveis na horizontal
+     em vez de estourar a largura da tela */
+  .sec-actions > div {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sec-actions > div::-webkit-scrollbar { display: none; }
+
   /* User card na sidebar */
   .user-name-sm { font-size: 12px; }
 
@@ -1181,6 +1192,9 @@ select.form-control { cursor: pointer; }
   .pipeline-summary { grid-template-columns: repeat(2, 1fr); }
   .tab-btn { padding: 5px 8px; font-size: 11px; }
   .page-content { padding: 8px; }
+  /* Calendário: chips viram barras coloridas (texto ilegível nesse tamanho) */
+  .cal-event-chip { font-size: 0; height: 7px; padding: 0; margin-bottom: 3px; border-radius: 3px; }
+  .cal-cell { min-height: 48px; }
 }
 
 /* === TOUCH DEVICE HELPERS === */
@@ -1206,38 +1220,24 @@ select.form-control { cursor: pointer; }
 }
 
 /* ==========================================
-   DARK MODE
+   DARK MODE — componentes
+   Tokens de cor ficam no bloco unificado do topo do arquivo
+   (body.dark-mode + [data-theme="dark"]) com a paleta Marinho da marca.
    ========================================== */
-body.dark-mode {
-  --bg:             #0a1628;
-  --surface:        #0f1f3d;
-  --surface-2:      #0d1a32;
-  --border:         #1e3558;
-  --border-strong:  #2a4a78;
-  --text:           #e8f0fa;
-  --text-secondary: #94b0cc;
-  --text-muted:     #5a7a9a;
-  --text-disabled:  #2a4a78;
-  --sb-bg:          #060e1a;
-  --sb-hover:       #0d1e36;
-  --primary-light:#1e3a5f;
-  --primary-50:  #1a3a60;
-  --warning-bg:  #292310;
-}
-body.dark-mode .top-bar    { background: #1e293b; border-color: #334155; }
-body.dark-mode .modal-box  { background: #1e293b; color: #f1f5f9; }
-body.dark-mode .modal-head { border-color: #334155; }
-body.dark-mode .modal-foot { border-color: #334155; background: #1e293b; }
-body.dark-mode .form-control { background: #0f172a; border-color: #334155; color: #f1f5f9; }
-body.dark-mode .form-control::placeholder { color: #475569; }
-body.dark-mode .filter-select { background: #0f172a; border-color: #334155; color: #f1f5f9; }
-body.dark-mode .tbl thead tr { background: #273549; }
-body.dark-mode .tbl tbody tr:hover { background: #273549; }
-body.dark-mode .holerite-wrap { background: #1e293b; }
-body.dark-mode .holerite-section { border-color: #334155; }
-body.dark-mode .chart-wrap { background: transparent; }
-body.dark-mode .search-panel { background: #1e293b; border-color: #334155; }
-body.dark-mode .search-result-item:hover { background: #273549; }
+body.dark-mode .top-bar,    [data-theme="dark"] .top-bar    { background: var(--surface); border-color: var(--border); }
+body.dark-mode .modal-box,  [data-theme="dark"] .modal-box  { background: var(--surface); color: var(--text); }
+body.dark-mode .modal-head, [data-theme="dark"] .modal-head { border-color: var(--border); }
+body.dark-mode .modal-foot, [data-theme="dark"] .modal-foot { border-color: var(--border); background: var(--surface); }
+body.dark-mode .form-control, [data-theme="dark"] .form-control { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+body.dark-mode .form-control::placeholder, [data-theme="dark"] .form-control::placeholder { color: var(--text-muted); }
+body.dark-mode .filter-select, [data-theme="dark"] .filter-select { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+body.dark-mode .tbl thead tr, [data-theme="dark"] .tbl thead tr { background: var(--surface-3); }
+body.dark-mode .tbl tbody tr:hover, [data-theme="dark"] .tbl tbody tr:hover { background: var(--surface-3); }
+body.dark-mode .holerite-wrap, [data-theme="dark"] .holerite-wrap { background: var(--surface); }
+body.dark-mode .holerite-section, [data-theme="dark"] .holerite-section { border-color: var(--border); }
+body.dark-mode .chart-wrap, [data-theme="dark"] .chart-wrap { background: transparent; }
+body.dark-mode .search-panel, [data-theme="dark"] .search-panel { background: var(--surface); border-color: var(--border); }
+body.dark-mode .search-result-item:hover, [data-theme="dark"] .search-result-item:hover { background: var(--surface-3); }
 .dark-toggle { background: none; border: 1px solid rgba(255,255,255,.15); color: var(--text-secondary); border-radius: var(--radius-full); padding: 5px 10px; cursor: pointer; font-size: 13px; transition: all var(--t); }
 .dark-toggle:hover { border-color: var(--primary); color: var(--primary); }
 
@@ -1323,10 +1323,10 @@ kbd.shortcut-hint {
 .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
 .cal-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
-body.dark-mode .cal-cell { background: var(--surface); border-color: var(--border); }
-body.dark-mode .cal-cell:hover { background: var(--surface-2); }
-body.dark-mode .cal-day-header { background: #1e293b; }
-body.dark-mode tr.row-selected td { background: #1e3a5f !important; }
+body.dark-mode .cal-cell, [data-theme="dark"] .cal-cell { background: var(--surface); border-color: var(--border); }
+body.dark-mode .cal-cell:hover, [data-theme="dark"] .cal-cell:hover { background: var(--surface-2); }
+body.dark-mode .cal-day-header, [data-theme="dark"] .cal-day-header { background: var(--surface-3); }
+body.dark-mode tr.row-selected td, [data-theme="dark"] tr.row-selected td { background: var(--primary-50) !important; }
 
 /* ==========================================
    METAS & KPIs

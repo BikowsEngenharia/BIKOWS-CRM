@@ -329,45 +329,27 @@ const Calendario = (() => {
   // ── Render helpers ─────────────────────────────────────────────────────────
 
   function renderChip(ev) {
-    return `<div
-      style="font-size:11px;padding:1px 5px;border-radius:4px;margin-bottom:2px;cursor:pointer;
-             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-             background:${ev.bg};color:${ev.color};max-width:100%"
-      title="${ev.label}"
-    >${ev.label}</div>`;
+    return `<div class="cal-event-chip" style="background:${ev.bg};color:${ev.color}" title="${ev.label}">${ev.label}</div>`;
   }
 
   function renderDayCell(dateStr, events, isCurrentMonth, isToday) {
     const dayNum = parseInt(dateStr.split('-')[2], 10);
-    const borderStyle = isToday
-      ? 'border:2px solid var(--primary)'
-      : 'border:1px solid var(--border)';
-    const opacityStyle = isCurrentMonth ? '' : 'opacity:0.4';
-    const bgStyle = isToday ? 'background:var(--primary-light, #eff6ff)' : 'background:var(--surface)';
     const MAX_VISIBLE = 3;
     const visible = events.slice(0, MAX_VISIBLE);
     const overflow = events.length - MAX_VISIBLE;
 
     const chipsHtml = visible.map(ev => renderChip(ev)).join('');
     const overflowHtml = overflow > 0
-      ? `<div style="font-size:10px;color:var(--text-muted);cursor:pointer;padding:1px 4px"
-           onclick="Calendario._openDay('${dateStr}')">+${overflow} mais</div>`
+      ? `<div class="cal-overflow">+${overflow} mais</div>`
       : '';
 
-    const clickHandler = events.length > 0
-      ? `onclick="Calendario._openDay('${dateStr}')"`
-      : `onclick="Calendario._openDay('${dateStr}')"`;
+    const cls = 'cal-cell'
+      + (isToday ? ' today' : '')
+      + (!isCurrentMonth ? ' other-month' : '');
 
     return `
-      <div ${clickHandler}
-        style="min-height:100px;padding:6px;border-radius:8px;${bgStyle};${borderStyle};${opacityStyle};
-               cursor:pointer;transition:box-shadow 0.15s"
-        onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'"
-        onmouseout="this.style.boxShadow='none'"
-      >
-        <div style="font-size:12px;font-weight:${isToday ? '700' : '500'};
-                    color:${isToday ? 'var(--primary)' : 'var(--text)'};
-                    margin-bottom:4px">${dayNum}</div>
+      <div class="${cls}" onclick="Calendario._openDay('${dateStr}')">
+        <div class="cal-day-num">${dayNum}</div>
         ${chipsHtml}
         ${overflowHtml}
       </div>`;
@@ -382,7 +364,7 @@ const Calendario = (() => {
 
     // Header row: day-of-week labels
     const headerCells = DIAS_PT.map(d =>
-      `<div style="text-align:center;font-size:12px;font-weight:600;color:var(--text-muted);padding:4px 0">${d}</div>`
+      `<div class="cal-day-header">${d}</div>`
     ).join('');
 
     // Leading empty cells from previous month
@@ -418,10 +400,10 @@ const Calendario = (() => {
     const allCells = [...leadingCells, ...currentCells, ...trailingCells].join('');
 
     return `
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">
+      <div class="cal-grid" style="margin-bottom:8px">
         ${headerCells}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+      <div class="cal-grid">
         ${allCells}
       </div>`;
   }

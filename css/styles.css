@@ -416,6 +416,15 @@ h1, h2, h3 {
    ========================================== */
 .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .sec-title { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -.3px; }
+/* Detalhe da marca: barra de destaque em Vermelho Ação sob o título da seção */
+.sec-title::after {
+  content: '';
+  display: block;
+  width: 34px; height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  margin-top: 5px;
+}
 .sec-actions { display: flex; gap: 8px; }
 
 /* ==========================================

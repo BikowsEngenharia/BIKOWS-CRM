@@ -143,12 +143,27 @@ const DB = (() => {
     return _cache[entity][idx];
   }
 
+  // Último registro excluído — permite "Desfazer" logo após a exclusão
+  let _lastDeleted = null;
+
   function remove(entity, id) {
     const toDelete = _cache[entity].find(r => r.id === id);
+    _lastDeleted = toDelete ? { entity, record: toDelete } : null;
     _auditLog('delete', entity, toDelete);
     _cache[entity] = _cache[entity].filter(r => r.id !== id);
     _saveLocalBackup(entity);
     _sbDelete(entity, id);
+  }
+
+  function undoRemove() {
+    if (!_lastDeleted) return null;
+    const { entity, record } = _lastDeleted;
+    _lastDeleted = null;
+    _cache[entity].push(record);
+    _saveLocalBackup(entity);
+    _sbUpsert(entity, record);
+    _auditLog('restore', entity, record);
+    return { entity, record };
   }
 
   function saveConfig(data) {
@@ -496,7 +511,7 @@ const DB = (() => {
   }
 
   return {
-    getAll, get, create, update, remove,
+    getAll, get, create, update, remove, undoRemove,
     getConfig, saveConfig,
     loadAll, subscribeRealtime, initSampleData,
     getAuditLog, clearAuditLog,

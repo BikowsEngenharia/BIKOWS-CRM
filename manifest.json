@@ -1,0 +1,20 @@
+{
+  "name": "Bikows CRM",
+  "short_name": "Bikows CRM",
+  "description": "CRM de gestão da Bikows Engenharia — pipeline, propostas, projetos e financeiro",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B1B33",
+  "theme_color": "#0B1B33",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "img/simbolo-bikows.png",
+      "sizes": "380x378",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

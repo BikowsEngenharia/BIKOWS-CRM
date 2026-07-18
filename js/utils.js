@@ -204,7 +204,22 @@ const Utils = (() => {
   }
 
   function confirmDelete(name, cb) {
-    Confirm.show(`Excluir "${name}"?`, `Esta ação não pode ser desfeita.`, cb);
+    Confirm.show(`Excluir "${name}"?`, `Você poderá desfazer por alguns segundos.`, () => {
+      cb();
+      // Oferecer desfazer da última exclusão feita pelo callback
+      setTimeout(() => {
+        Toast.undo(`"${truncate(name, 30)}" excluído`, () => {
+          const r = DB.undoRemove();
+          if (r) {
+            Toast.success('Registro restaurado!');
+            if (typeof App !== 'undefined') {
+              App.refreshIfNeeded(r.entity);
+              App.updateNotifBadge();
+            }
+          }
+        });
+      }, 100);
+    });
   }
 
   function getClientName(clienteId) {
@@ -279,7 +294,13 @@ const Modal = (() => {
     _saveCb = saveCb || null;
     if (!saveCb) { document.getElementById('modalFoot').style.display = 'none'; }
     else { document.getElementById('modalFoot').style.display = ''; }
-    btn.onclick = () => { if (_saveCb) _saveCb(); };
+    // Trava anti duplo-clique: desabilita por 800ms para evitar registros duplicados
+    btn.onclick = () => {
+      if (!_saveCb || btn.disabled) return;
+      btn.disabled = true;
+      setTimeout(() => { btn.disabled = false; }, 800);
+      _saveCb();
+    };
     document.getElementById('modalBackdrop').classList.add('open');
     const first = document.querySelector('#modalBody input, #modalBody select, #modalBody textarea');
     if (first) setTimeout(() => first.focus(), 100);
@@ -334,5 +355,23 @@ const Toast = (() => {
   const success = (m) => show(m, 'success');
   const error = (m) => show(m, 'error');
   const warning = (m) => show(m, 'warning');
-  return { show, success, error, warning };
+
+  // Toast com botão "Desfazer" — usado após exclusões
+  let _undoCb = null;
+  function undo(msg, cb, duration = 6000) {
+    _undoCb = cb;
+    const el = document.createElement('div');
+    el.className = 'toast toast-default';
+    el.innerHTML = `<span class="toast-icon">↩️</span><span class="toast-msg">${Utils.escHtml(msg)}</span>` +
+      `<button class="btn btn-xs btn-primary" style="margin-left:8px;flex-shrink:0" onclick="Toast._runUndo(this)">Desfazer</button>` +
+      `<button class="toast-x" onclick="this.parentElement.remove()">✕</button>`;
+    document.getElementById('toastStack').appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, duration);
+  }
+  function _runUndo(btn) {
+    if (_undoCb) { try { _undoCb(); } finally { _undoCb = null; } }
+    btn.closest('.toast')?.remove();
+  }
+
+  return { show, success, error, warning, undo, _runUndo };
 })();

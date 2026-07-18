@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bikows CRM</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260718">
+  <meta name="theme-color" content="#0B1B33">
+  <link rel="icon" type="image/png" href="img/simbolo-bikows.png">
+  <link rel="apple-touch-icon" href="img/simbolo-bikows.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css?v=20260718a">
   <!-- Supabase JS SDK — versão fixada para evitar breaking changes -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"
     onerror="document.getElementById('loadingText').innerHTML='Erro ao carregar dependências.<br><button onclick=\'location.reload()\' style=\'margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px\'>🔄 Recarregar</button>'"></script>
@@ -19,7 +23,7 @@
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- ===== TELA DE LOGIN ===== -->
-<div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:9998;background:var(--bg,#f8fafc);align-items:center;justify-content:center;">
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:9998;background:linear-gradient(160deg,#0B1B33 0%,#163A68 55%,#1D4F8C 100%);align-items:center;justify-content:center;">
   <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:16px;padding:40px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.12);">
     <div style="text-align:center;margin-bottom:32px;">
       <div style="margin-bottom:12px;"><img src="img/logo-bikows.png" alt="Bikows" style="height:90px;width:auto;"></div>
@@ -272,9 +276,9 @@
 
 <!-- SCRIPTS — v=20260518 para invalidar cache do browser -->
 <script src="js/supabase-client.js?v=20260523"></script>
-<script src="js/db.js?v=20260603a"></script>
+<script src="js/db.js?v=20260718a"></script>
 <script src="js/auth.js?v=20260524b"></script>
-<script src="js/utils.js?v=20260718"></script>
+<script src="js/utils.js?v=20260718a"></script>
 <script src="js/charts.js?v=20260601"></script>
 <script src="js/modules/dashboard.js?v=20260708"></script>
 <script src="js/modules/pipeline.js?v=20260718"></script>

@@ -2,7 +2,7 @@
    BIKOWS CRM — Design System v3
    Refinado: tipografia, espaçamento, profundidade, responsividade
    ========================================== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
 
 /* ---- RESET ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,16 +16,16 @@ html {
 
 /* ---- TOKENS ---- */
 :root {
-  /* Bikows Brand — azul refinado com mais profundidade */
-  --primary:        #1d4ed8;
-  --primary-dark:   #1e40af;
-  --primary-hover:  #1a3fbf;
-  --primary-light:  #eff6ff;
-  --primary-50:     #dbeafe;
-  --primary-grad:   linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  /* Bikows Brand — Manual de Marca v1.0 2026 */
+  --primary:        #1D4F8C;  /* Azul Engenharia */
+  --primary-dark:   #163A68;
+  --primary-hover:  #16406F;
+  --primary-light:  #E8EEF6;
+  --primary-50:     #DCE6F2;  /* Azul claro da marca */
+  --primary-grad:   linear-gradient(135deg, #1D4F8C 0%, #2E6FBF 100%);
 
-  --accent:         #b91c1c;
-  --accent-light:   #fef2f2;
+  --accent:         #C42B2B;  /* Vermelho Ação */
+  --accent-light:   #FBEAEA;
 
   --success:        #059669;
   --success-light:  #ecfdf5;
@@ -33,9 +33,10 @@ html {
   --warning:        #d97706;
   --warning-light:  #fffbeb;
   --warning-border: #fde68a;
-  --danger:         #dc2626;
-  --danger-light:   #fef2f2;
-  --danger-border:  #fecaca;
+  --danger:         #C42B2B;  /* Vermelho Ação */
+  --danger-light:   #FBEAEA;
+  --danger-border:  #EFC3C3;
+  --bordo:          #8B2222;  /* Bordô Selo */
   --info:           #0891b2;
   --info-light:     #ecfeff;
   --purple:         #7c3aed;
@@ -45,26 +46,26 @@ html {
   --teal:           #0d9488;
   --teal-light:     #f0fdfa;
 
-  /* Backgrounds — neutro azulado premium */
-  --bg:             #f1f5fa;
+  /* Backgrounds — cinzas da marca */
+  --bg:             #F4F5F7;
   --surface:        #ffffff;
-  --surface-2:      #f7fafd;
-  --surface-3:      #eef3f9;
-  --border:         #e1e7f0;
-  --border-strong:  #c4cfdf;
+  --surface-2:      #F7F9FB;
+  --surface-3:      #ECEDEF;
+  --border:         #E5E7EB;
+  --border-strong:  #C6CDD6;
 
-  /* Texto — escala de contraste otimizada */
-  --text:           #0b1729;
-  --text-secondary: #41546d;
-  --text-muted:     #7587a0;
-  --text-disabled:  #c4cfdf;
+  /* Texto — Marinho como cor de texto principal */
+  --text:           #0B1B33;
+  --text-secondary: #4B5563;
+  --text-muted:     #6B7280;
+  --text-disabled:  #9CA3AF;
 
-  /* Sidebar — navy Bikows mais sutil */
-  --sb-bg:          #0a1628;
-  --sb-bg-2:        #0f1d33;
-  --sb-hover:       #152238;
-  --sb-active-bg:   #1d4ed8;
-  --sb-text:        #8aa5c4;
+  /* Sidebar — Marinho Bikows */
+  --sb-bg:          #0B1B33;
+  --sb-bg-2:        #0E2140;
+  --sb-hover:       #142A4D;
+  --sb-active-bg:   #1D4F8C;
+  --sb-text:        #8FA0B5;
   --sb-text-active: #ffffff;
   --sb-border:      rgba(255,255,255,.06);
   --sb-width:       236px;
@@ -95,8 +96,9 @@ html {
   --radius-2xl: 24px;
   --radius-full: 9999px;
 
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  --font: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Archivo', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
   --t: 180ms cubic-bezier(.4,0,.2,1);
   --t-slow: 280ms cubic-bezier(.4,0,.2,1);
 
@@ -108,20 +110,20 @@ html {
 /* ---- DARK MODE — unificado em body.dark-mode + [data-theme="dark"] ---- */
 body.dark-mode,
 [data-theme="dark"] {
-  --bg:             #0a1322;
-  --surface:        #0f1d33;
-  --surface-2:      #122340;
-  --surface-3:      #18294a;
-  --border:         #1e3558;
-  --border-strong:  #2a4878;
+  --bg:             #071120;
+  --surface:        #0B1B33;
+  --surface-2:      #0E2140;
+  --surface-3:      #142A4D;
+  --border:         #1D3557;
+  --border-strong:  #2A4878;
 
-  --text:           #e8f0fa;
-  --text-secondary: #a3b8d4;
-  --text-muted:     #6a85a8;
-  --text-disabled:  #2a4878;
+  --text:           #E8F0FA;
+  --text-secondary: #A3B8D4;
+  --text-muted:     #6A85A8;
+  --text-disabled:  #2A4878;
 
-  --primary-light:  #1c3360;
-  --primary-50:     #173050;
+  --primary-light:  #16345C;
+  --primary-50:     #12294A;
   --accent-light:   #2d1818;
   --success-light:  #0f2820;
   --success-border: #1d4838;
@@ -134,10 +136,10 @@ body.dark-mode,
   --orange-light:   #2e1c0c;
   --teal-light:     #0c2628;
 
-  --sb-bg:          #060e1a;
-  --sb-bg-2:        #0a1628;
+  --sb-bg:          #060E1A;
+  --sb-bg-2:        #0B1B33;
   --sb-hover:       #112038;
-  --sb-text:        #94b0cc;
+  --sb-text:        #94B0CC;
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,.3);
   --shadow-sm: 0 1px 2px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.25);
@@ -164,7 +166,13 @@ body {
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Tipografia da marca: Archivo em títulos e números de destaque */
+.sec-title, .card-title, .modal-title, .page-title,
+.kpi-value, .stat-val, .brand-text,
+h1, h2, h3 {
+  font-family: var(--font-display);
 }
 
 /* Scrollbars finos globais */
@@ -254,7 +262,7 @@ body {
 .nav-section-label {
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .8px;
-  color: rgba(255,255,255,.22);
+  color: rgba(255,255,255,.35);
   padding: 12px 8px 4px;
   white-space: nowrap; overflow: hidden;
 }

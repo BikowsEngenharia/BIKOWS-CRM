@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bikows CRM</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260701">
+  <link rel="stylesheet" href="css/styles.css?v=20260718">
   <!-- Supabase JS SDK — versão fixada para evitar breaking changes -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"
     onerror="document.getElementById('loadingText').innerHTML='Erro ao carregar dependências.<br><button onclick=\'location.reload()\' style=\'margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px\'>🔄 Recarregar</button>'"></script>
@@ -80,6 +80,8 @@
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         <span>Dashboard</span>
       </a>
+
+      <div class="nav-section-label">Comercial</div>
       <a class="nav-link" data-page="pipeline" href="#">
         <svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
         <span>Pipeline CRM</span>
@@ -92,6 +94,24 @@
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
         <span>Contatos</span>
       </a>
+      <a class="nav-link" data-page="propostas" href="#">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        <span>Propostas</span>
+      </a>
+      <a class="nav-link" data-page="contratos" href="#">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Contratos</span>
+      </a>
+      <a class="nav-link" data-page="licitacoes" href="#">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Licitações</span>
+      </a>
+      <a class="nav-link" data-page="prospeccao" href="#">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <span>Prospecção</span>
+      </a>
+
+      <div class="nav-section-label">Operação</div>
       <a class="nav-link" data-page="projetos" href="#">
         <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5h6M9 12l2 2 4-4"/></svg>
         <span>Projetos</span>
@@ -100,10 +120,16 @@
         <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
         <span>Atividades</span>
       </a>
-      <a class="nav-link" data-page="propostas" href="#">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-        <span>Propostas</span>
+      <a class="nav-link" data-page="calendario" href="#">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Calendário</span>
       </a>
+      <a class="nav-link" data-page="documentos" href="#">
+        <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+        <span>Documentos</span>
+      </a>
+
+      <div class="nav-section-label">Financeiro</div>
       <a class="nav-link" data-page="financeiro" href="#">
         <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
         <span>Financeiro</span>
@@ -112,17 +138,15 @@
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
         <span>RH / Folha</span>
       </a>
-      <a class="nav-link" data-page="calendario" href="#">
-        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span>Calendário</span>
+
+      <div class="nav-section-label">Gestão</div>
+      <a class="nav-link" data-page="relatorios" href="#">
+        <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        <span>Relatórios</span>
       </a>
-      <a class="nav-link" data-page="licitacoes" href="#">
-        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span>Licitações</span>
-      </a>
-      <a class="nav-link" data-page="contratos" href="#">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <span>Contratos</span>
+      <a class="nav-link" data-page="metas" href="#">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <span>Metas & KPIs</span>
       </a>
       <a class="nav-link" data-page="marketing" href="#">
         <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -131,22 +155,6 @@
       <a class="nav-link" data-page="trafego" href="#">
         <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/><circle cx="19" cy="5" r="3" fill="currentColor" opacity=".3"/></svg>
         <span>Tráfego Pago</span>
-      </a>
-      <a class="nav-link" data-page="metas" href="#">
-        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        <span>Metas & KPIs</span>
-      </a>
-      <a class="nav-link" data-page="relatorios" href="#">
-        <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-        <span>Relatórios</span>
-      </a>
-      <a class="nav-link" data-page="documentos" href="#">
-        <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-        <span>Documentos</span>
-      </a>
-      <a class="nav-link" data-page="prospeccao" href="#">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <span>Prospecção</span>
       </a>
     </nav>
     <div class="sidebar-bottom">

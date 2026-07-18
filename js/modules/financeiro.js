@@ -51,7 +51,11 @@ const Financeiro = (() => {
     const recMes=lanc.filter(l=>l.tipo==='receita'&&l.data?.startsWith(mes)&&l.status==='recebido').reduce((s,l)=>s+l.valor,0);
     const dspMes=lanc.filter(l=>l.tipo==='despesa'&&l.data?.startsWith(mes)&&l.status==='pago').reduce((s,l)=>s+l.valor,0);
     const res=recMes-dspMes;
-    const aRec=lanc.filter(l=>l.tipo==='receita'&&l.status==='a_receber').reduce((s,l)=>s+l.valor,0);
+    // A Receber = parcelas de recebíveis em aberto (não vencidas) + lançamentos "a receber"
+    // Antes contava só lançamentos e não batia com o detalhamento (que lista parcelas)
+    const aRecParcelas=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>p.status!=='recebido'&&!Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
+    const aRecLanc=lanc.filter(l=>l.tipo==='receita'&&l.status==='a_receber').reduce((s,l)=>s+l.valor,0);
+    const aRec=aRecParcelas+aRecLanc;
     const aPag=pag.filter(p=>p.status==='pendente').reduce((s,p)=>s+p.valor,0);
     const venc=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>p.status!=='recebido'&&Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
 
@@ -60,7 +64,7 @@ const Financeiro = (() => {
         <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" title="Clique para ver recebimentos do período" onclick="Financeiro.drillDown('recebido_periodo')"><div class="kpi-label">Receita do Mês</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(recMes)}</div><div class="kpi-sub">Valores recebidos</div><div class="kpi-icon">📥</div></div>
         <div class="kpi-card" style="--kpi-color:#dc2626;cursor:pointer" title="Clique para ver lançamentos do período" onclick="Financeiro.drillDown('lancamentos')"><div class="kpi-label">Despesas do Mês</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(dspMes)}</div><div class="kpi-sub">Valores pagos</div><div class="kpi-icon">📤</div></div>
         <div class="kpi-card" style="--kpi-color:${res>=0?'#10b981':'#dc2626'}"><div class="kpi-label">Resultado</div><div class="kpi-value" style="font-size:20px;color:${res>=0?'var(--success)':'var(--danger)'}">${Utils.formatCurrency(res)}</div><div class="kpi-sub">${res>=0?'Superávit':'Déficit'} no mês</div><div class="kpi-icon">📊</div></div>
-        <div class="kpi-card" style="--kpi-color:#d97706;cursor:pointer" title="Clique para ver parcelas a vencer" onclick="Financeiro.drillDown('receber_avencer')"><div class="kpi-label">A Receber</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(aRec)}</div><div class="kpi-sub">Lançamentos pendentes</div><div class="kpi-icon">💳</div></div>
+        <div class="kpi-card" style="--kpi-color:#d97706;cursor:pointer" title="Clique para ver parcelas a vencer" onclick="Financeiro.drillDown('receber_avencer')"><div class="kpi-label">A Receber</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(aRec)}</div><div class="kpi-sub">Parcelas + lançamentos em aberto</div><div class="kpi-icon">💳</div></div>
         <div class="kpi-card" style="--kpi-color:#7c3aed;cursor:pointer" title="Clique para ver contas a pagar" onclick="Financeiro.drillDown('pagar_avencer')"><div class="kpi-label">A Pagar</div><div class="kpi-value" style="font-size:20px">${Utils.formatCurrency(aPag)}</div><div class="kpi-sub">Contas em aberto</div><div class="kpi-icon">📋</div></div>
         <div class="kpi-card" style="--kpi-color:#dc2626;cursor:pointer" title="Clique para ver parcelas vencidas" onclick="Financeiro.drillDown('receber_vencido')"><div class="kpi-label">Vencidos</div><div class="kpi-value" style="font-size:20px;color:var(--danger)">${Utils.formatCurrency(venc)}</div><div class="kpi-sub">Parcelas em atraso</div><div class="kpi-icon">⚠️</div></div>
       </div>
@@ -105,7 +109,7 @@ const Financeiro = (() => {
             <select class="filter-select" onchange="Financeiro.setFiltLanc('categoria',this.value)"><option value="">Todas categorias</option>${cats.map(c=>`<option value="${Utils.escHtml(c)}" ${_filtLanc.categoria===c?'selected':''}>${Utils.escHtml(c)}</option>`).join('')}</select>
             <input type="month" class="form-control" style="max-width:140px;padding:5px 8px;font-size:12px" title="De:" value="${_filtLanc.mesInicio}" onchange="Financeiro.setFiltLanc('mesInicio',this.value)">
             <input type="month" class="form-control" style="max-width:140px;padding:5px 8px;font-size:12px" title="Até:" value="${_filtLanc.mesFim}" onchange="Financeiro.setFiltLanc('mesFim',this.value)">
-            <input class="form-control" style="max-width:140px;padding:5px 10px;font-size:12px" placeholder="Buscar..." value="${Utils.escHtml(_filtLanc.busca)}" oninput="Financeiro.setFiltLanc('busca',this.value)">
+            <input class="form-control" id="flBuscaInput" style="max-width:140px;padding:5px 10px;font-size:12px" placeholder="Buscar..." value="${Utils.escHtml(_filtLanc.busca)}" oninput="Financeiro.setFiltLanc('busca',this.value)">
             ${(_filtLanc.tipo||_filtLanc.status||_filtLanc.categoria||_filtLanc.mesInicio||_filtLanc.mesFim||_filtLanc.busca)?`<button class="btn btn-xs btn-ghost" onclick="Financeiro.limparFiltros()">✕ Limpar</button>`:''}
           </div>
           <span class="text-sm text-muted">${list.length} lançamento(s)</span>
@@ -340,7 +344,21 @@ const Financeiro = (() => {
   function getLast3Next3(){const r=[],d=new Date();for(let i=-3;i<=2;i++){const dt=new Date(d.getFullYear(),d.getMonth()+i,1);r.push(dt.toISOString().substring(0,7));}return r;}
 
   /* ---- FILTROS ---- */
-  function setFiltLanc(k,v){_filtLanc[k]=v;renderTab();}
+  let _buscaTimer = null;
+  function setFiltLanc(k,v){
+    _filtLanc[k]=v;
+    if(k==='busca'){
+      // Debounce: sem isso, cada tecla re-renderizava a tela e o campo perdia o foco
+      clearTimeout(_buscaTimer);
+      _buscaTimer=setTimeout(()=>{
+        renderTab();
+        const el=document.getElementById('flBuscaInput');
+        if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}
+      },350);
+      return;
+    }
+    renderTab();
+  }
   function limparFiltros(){_filtLanc={tipo:'',categoria:'',status:'',busca:'',mesInicio:'',mesFim:''};renderTab();}
   function setFiltPagar(k,v){_filtPagar[k]=v;renderTab();}
   function setDreMes(v){_dremes=v;renderTab();}
@@ -363,7 +381,7 @@ const Financeiro = (() => {
       </div>
       <div class="form-group"><label class="form-label">Descrição *</label><input class="form-control" id="flDesc" value="${Utils.escHtml(l?.descricao||'')}" placeholder="Descrição do lançamento"></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="flValor" type="number" value="${l?.valor||''}" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="flValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(l?.valor)}" placeholder="0,00"></div>
         <div class="form-group"><label class="form-label">Data</label><input class="form-control" id="flData" type="date" value="${l?.data||Utils.todayStr()}"></div>
         <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="flStatus">${tipo==='receita'?`<option value="a_receber" ${l?.status==='a_receber'?'selected':''}>A Receber</option><option value="recebido" ${l?.status==='recebido'?'selected':''}>Recebido</option>`:`<option value="a_pagar" ${l?.status==='a_pagar'?'selected':''}>A Pagar</option><option value="pago" ${l?.status==='pago'?'selected':''}>Pago</option>`}</select></div>
       </div>
@@ -384,7 +402,7 @@ const Financeiro = (() => {
 
   function saveLanc(id){
     const desc=document.getElementById('flDesc').value.trim();if(!desc){Toast.error('Descrição obrigatória');return;}
-    const valor=Number(document.getElementById('flValor').value);if(!valor){Toast.error('Informe o valor');return;}
+    const valor=Utils.parseMoney(document.getElementById('flValor').value);if(!valor){Toast.error('Valor inválido — use o formato 1500,00');return;}
     const data={tipo:document.getElementById('flTipo').value,categoria:document.getElementById('flCat').value,descricao:desc,valor,data:document.getElementById('flData').value,status:document.getElementById('flStatus').value,clienteId:document.getElementById('flCliente')?.value||'',observacoes:document.getElementById('flObs').value};
     if(id){DB.update('lancamentos',id,data);Toast.success('Atualizado');}else{DB.create('lancamentos',data);Toast.success('Lançamento criado');}
     Modal.close();renderTab();
@@ -404,7 +422,7 @@ const Financeiro = (() => {
       </div>
       <div class="form-group"><label class="form-label">Descrição</label><input class="form-control" id="fpDesc" value="${Utils.escHtml(p?.descricao||'')}" placeholder="Ex: Honorários maio/2026"></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="fpValor" type="number" value="${p?.valor||''}"></div>
+        <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="fpValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(p?.valor)}" placeholder="0,00"></div>
         <div class="form-group"><label class="form-label">Vencimento</label><input class="form-control" id="fpVenc" type="date" value="${p?.vencimento||''}"></div>
         <div class="form-group"><label class="form-label">Recorrente</label><select class="form-control" id="fpRec"><option value="false" ${!p?.recorrente?'selected':''}>Não</option><option value="true" ${p?.recorrente?'selected':''}>Sim</option></select></div>
       </div>
@@ -414,7 +432,7 @@ const Financeiro = (() => {
   }
   function saveContaPagar(id){
     const forn=document.getElementById('fpForn').value.trim();if(!forn){Toast.error('Fornecedor obrigatório');return;}
-    const valor=Number(document.getElementById('fpValor').value);if(!valor){Toast.error('Informe o valor');return;}
+    const valor=Utils.parseMoney(document.getElementById('fpValor').value);if(!valor){Toast.error('Valor inválido — use o formato 1500,00');return;}
     const data={fornecedor:forn,categoria:document.getElementById('fpCat').value,descricao:document.getElementById('fpDesc').value,valor,vencimento:document.getElementById('fpVenc').value,status:id?(DB.get('contaspagar',id)?.status||'pendente'):'pendente',recorrente:document.getElementById('fpRec').value==='true',observacoes:document.getElementById('fpObs').value};
     if(id){DB.update('contaspagar',id,data);Toast.success('Atualizado');}else{DB.create('contaspagar',data);Toast.success('Conta criada');}
     Modal.close();renderTab();
@@ -442,7 +460,7 @@ const Financeiro = (() => {
     Modal.open({title:id?'Editar Recebível':'+ Novo Recebível',size:'modal-lg',body:`
       <div class="form-row">
         <div class="form-group" style="flex:2"><label class="form-label">Descrição / Contrato *</label><input class="form-control" id="frDesc" value="${Utils.escHtml(r?.descricao||'')}" placeholder="Ex: NR-12 — Bela Vista — BIK-2026-PRJ-001"></div>
-        <div class="form-group"><label class="form-label">Valor Total (R$)</label><input class="form-control" id="frTotal" type="number" value="${r?.valorTotal||''}"></div>
+        <div class="form-group"><label class="form-label">Valor Total (R$)</label><input class="form-control" id="frTotal" type="text" inputmode="decimal" value="${Utils.moneyToInput(r?.valorTotal)}" placeholder="0,00"></div>
       </div>
       <div class="form-group"><label class="form-label">Cliente</label><select class="form-control" id="frCliente"><option value="">— Selecione —</option>${clientes.map(c=>`<option value="${c.id}" ${r?.clienteId===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('')}</select></div>
       <div class="divider"></div>
@@ -452,7 +470,7 @@ const Financeiro = (() => {
     });
   }
   function pfRow(p,i){return`<div class="parcela-row parc-form-row" data-i="${i}">
-    <div class="form-group" style="flex:1;margin:0"><input class="form-control parc-val" type="number" placeholder="Valor" value="${p.valor||''}"></div>
+    <div class="form-group" style="flex:1;margin:0"><input class="form-control parc-val" type="text" inputmode="decimal" placeholder="Valor (0,00)" value="${Utils.moneyToInput(p.valor)}"></div>
     <div class="form-group" style="flex:1;margin:0"><input class="form-control parc-venc" type="date" value="${p.vencimento||''}"></div>
     <select class="form-control parc-status" style="min-width:110px"><option value="a_vencer" ${(p.status||'a_vencer')==='a_vencer'?'selected':''}>A Vencer</option><option value="recebido" ${p.status==='recebido'?'selected':''}>Recebido</option></select>
     <button class="btn btn-xs btn-danger" type="button" onclick="this.closest('.parc-form-row').remove()">✕</button>
@@ -461,8 +479,8 @@ const Financeiro = (() => {
   function saveRecebivel(id){
     const desc=document.getElementById('frDesc').value.trim();if(!desc){Toast.error('Descrição obrigatória');return;}
     const base=id?DB.get('recebiveis',id):null;
-    const parcelas=[...document.querySelectorAll('.parc-form-row')].map((row,i)=>({id:(base?.parcelas?.[i]?.id)||(Date.now().toString(36)+Math.random().toString(36).substr(2,4)),valor:Number(row.querySelector('.parc-val').value)||0,vencimento:row.querySelector('.parc-venc').value,status:row.querySelector('.parc-status').value,dataPagamento:null,nfNumero:''}));
-    const data={descricao:desc,clienteId:document.getElementById('frCliente').value,valorTotal:Number(document.getElementById('frTotal').value)||parcelas.reduce((s,p)=>s+p.valor,0),parcelas};
+    const parcelas=[...document.querySelectorAll('.parc-form-row')].map((row,i)=>({id:(base?.parcelas?.[i]?.id)||(Date.now().toString(36)+Math.random().toString(36).substr(2,4)),valor:Utils.parseMoney(row.querySelector('.parc-val').value),vencimento:row.querySelector('.parc-venc').value,status:row.querySelector('.parc-status').value,dataPagamento:null,nfNumero:''}));
+    const data={descricao:desc,clienteId:document.getElementById('frCliente').value,valorTotal:Utils.parseMoney(document.getElementById('frTotal').value)||parcelas.reduce((s,p)=>s+p.valor,0),parcelas};
     if(id){DB.update('recebiveis',id,data);Toast.success('Atualizado');}else{DB.create('recebiveis',data);Toast.success('Recebível criado');}
     Modal.close();renderTab();
   }
@@ -500,6 +518,10 @@ const Financeiro = (() => {
             items.push({ _clienteNome: clienteNome, _desc: r.descricao, ...p });
           }
         });
+      });
+      // Incluir também lançamentos manuais "a receber" (mesma base do KPI)
+      DB.getAll('lancamentos').filter(l => l.tipo === 'receita' && l.status === 'a_receber').forEach(l => {
+        items.push({ _clienteNome: DB.get('clientes', l.clienteId)?.nome || '—', _desc: (l.descricao || '—') + ' (lançamento)', valor: l.valor, vencimento: l.data });
       });
       cols = ['Cliente', 'Descrição', 'Valor', 'Vencimento'];
       rowFn = p => [
@@ -645,7 +667,7 @@ const Financeiro = (() => {
       <div class="form-group"><label class="form-label">Nome *</label><input class="form-control" id="dfNome" value="${Utils.escHtml(d?.nome||'')}"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Categoria</label><select class="form-control" id="dfCat">${CATS_DF.map(c=>`<option value="${c}" ${d?.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
-        <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="dfValor" type="number" value="${d?.valor||''}"></div>
+        <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="dfValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(d?.valor)}" placeholder="0,00"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Periodicidade</label><select class="form-control" id="dfPer"><option value="Mensal" ${d?.periodicidade==='Mensal'?'selected':''}>Mensal</option><option value="Bimestral" ${d?.periodicidade==='Bimestral'?'selected':''}>Bimestral</option><option value="Trimestral" ${d?.periodicidade==='Trimestral'?'selected':''}>Trimestral</option><option value="Semestral" ${d?.periodicidade==='Semestral'?'selected':''}>Semestral</option><option value="Anual" ${d?.periodicidade==='Anual'?'selected':''}>Anual</option></select></div>
@@ -655,7 +677,7 @@ const Financeiro = (() => {
       <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="dfObs" rows="2">${Utils.escHtml(d?.obs||'')}</textarea></div>`,
       saveCb: () => {
         const nome = document.getElementById('dfNome').value.trim(); if(!nome){Toast.error('Nome obrigatório');return;}
-        const valor = Number(document.getElementById('dfValor').value); if(!valor){Toast.error('Informe o valor');return;}
+        const valor = Utils.parseMoney(document.getElementById('dfValor').value); if(!valor){Toast.error('Valor inválido — use o formato 1500,00');return;}
         const data = { nome, categoria:document.getElementById('dfCat').value, valor, periodicidade:document.getElementById('dfPer').value, vencimento_dia:Number(document.getElementById('dfDia').value)||null, ativo:document.getElementById('dfAtivo').checked, obs:document.getElementById('dfObs').value };
         if(id){DB.update('despesas_fixas',id,data);Toast.success('Atualizado');}else{DB.create('despesas_fixas',data);Toast.success('Despesa fixa criada');}
         Modal.close(); renderTab();
@@ -713,9 +735,9 @@ const Financeiro = (() => {
         <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="dvTipo"><option value="Financiamento" ${d?.tipo==='Financiamento'?'selected':''}>Financiamento</option><option value="Empréstimo" ${d?.tipo==='Empréstimo'?'selected':''}>Empréstimo</option><option value="Parcelamento" ${d?.tipo==='Parcelamento'?'selected':''}>Parcelamento</option><option value="Cartão Corporativo" ${d?.tipo==='Cartão Corporativo'?'selected':''}>Cartão Corporativo</option><option value="Outro" ${d?.tipo==='Outro'?'selected':''}>Outro</option></select></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Valor Total (R$) *</label><input class="form-control" id="dvTotal" type="number" value="${d?.valor_total||''}"></div>
-        <div class="form-group"><label class="form-label">Valor Restante (R$) *</label><input class="form-control" id="dvRest" type="number" value="${d?.valor_restante||''}"></div>
-        <div class="form-group"><label class="form-label">Valor Parcela (R$)</label><input class="form-control" id="dvParc" type="number" value="${d?.valor_parcela||''}"></div>
+        <div class="form-group"><label class="form-label">Valor Total (R$) *</label><input class="form-control" id="dvTotal" type="text" inputmode="decimal" value="${Utils.moneyToInput(d?.valor_total)}" placeholder="0,00"></div>
+        <div class="form-group"><label class="form-label">Valor Restante (R$) *</label><input class="form-control" id="dvRest" type="text" inputmode="decimal" value="${Utils.moneyToInput(d?.valor_restante)}" placeholder="0,00"></div>
+        <div class="form-group"><label class="form-label">Valor Parcela (R$)</label><input class="form-control" id="dvParc" type="text" inputmode="decimal" value="${Utils.moneyToInput(d?.valor_parcela)}" placeholder="0,00"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Parcelas Total</label><input class="form-control" id="dvPtotal" type="number" value="${d?.parcelas_total||''}"></div>
@@ -728,9 +750,9 @@ const Financeiro = (() => {
       <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="dvObs" rows="2">${Utils.escHtml(d?.obs||'')}</textarea></div>`,
       saveCb: () => {
         const credor = document.getElementById('dvCred').value.trim(); if(!credor){Toast.error('Credor obrigatório');return;}
-        const valor_total = Number(document.getElementById('dvTotal').value); if(!valor_total){Toast.error('Valor total obrigatório');return;}
-        const valor_restante = Number(document.getElementById('dvRest').value); if(!valor_restante){Toast.error('Valor restante obrigatório');return;}
-        const data = { credor, tipo:document.getElementById('dvTipo').value, valor_total, valor_restante, valor_parcela:Number(document.getElementById('dvParc').value)||0, parcelas_total:Number(document.getElementById('dvPtotal').value)||0, parcelas_pagas:Number(document.getElementById('dvPpagas').value)||0, vencimento:document.getElementById('dvVenc').value, taxa_juros:Number(document.getElementById('dvJuros').value)||0, obs:document.getElementById('dvObs').value };
+        const valor_total = Utils.parseMoney(document.getElementById('dvTotal').value); if(!valor_total){Toast.error('Valor total inválido — use o formato 1500,00');return;}
+        const valor_restante = Utils.parseMoney(document.getElementById('dvRest').value); if(!valor_restante){Toast.error('Valor restante inválido — use o formato 1500,00');return;}
+        const data = { credor, tipo:document.getElementById('dvTipo').value, valor_total, valor_restante, valor_parcela:Utils.parseMoney(document.getElementById('dvParc').value), parcelas_total:Number(document.getElementById('dvPtotal').value)||0, parcelas_pagas:Number(document.getElementById('dvPpagas').value)||0, vencimento:document.getElementById('dvVenc').value, taxa_juros:Number(document.getElementById('dvJuros').value)||0, obs:document.getElementById('dvObs').value };
         if(id){DB.update('dividas',id,data);Toast.success('Atualizado');}else{DB.create('dividas',data);Toast.success('Dívida criada');}
         Modal.close(); renderTab();
       }
@@ -781,8 +803,8 @@ const Financeiro = (() => {
         <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="atTipo">${TIPOS_AT.map(t=>`<option value="${t}" ${a?.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Valor Aquisição (R$) *</label><input class="form-control" id="atAquisicao" type="number" value="${a?.valor_aquisicao||''}"></div>
-        <div class="form-group"><label class="form-label">Valor Atual (R$) *</label><input class="form-control" id="atAtual" type="number" value="${a?.valor_atual||''}"></div>
+        <div class="form-group"><label class="form-label">Valor Aquisição (R$) *</label><input class="form-control" id="atAquisicao" type="text" inputmode="decimal" value="${Utils.moneyToInput(a?.valor_aquisicao)}" placeholder="0,00"></div>
+        <div class="form-group"><label class="form-label">Valor Atual (R$) *</label><input class="form-control" id="atAtual" type="text" inputmode="decimal" value="${Utils.moneyToInput(a?.valor_atual)}" placeholder="0,00"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Data Aquisição</label><input class="form-control" id="atData" type="date" value="${a?.data_aquisicao||''}"></div>
@@ -791,8 +813,8 @@ const Financeiro = (() => {
       <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="atObs" rows="2">${Utils.escHtml(a?.obs||'')}</textarea></div>`,
       saveCb: () => {
         const nome = document.getElementById('atNome').value.trim(); if(!nome){Toast.error('Nome obrigatório');return;}
-        const valor_aquisicao = Number(document.getElementById('atAquisicao').value); if(!valor_aquisicao){Toast.error('Valor de aquisição obrigatório');return;}
-        const valor_atual = Number(document.getElementById('atAtual').value); if(!valor_atual){Toast.error('Valor atual obrigatório');return;}
+        const valor_aquisicao = Utils.parseMoney(document.getElementById('atAquisicao').value); if(!valor_aquisicao){Toast.error('Valor de aquisição inválido — use o formato 1500,00');return;}
+        const valor_atual = Utils.parseMoney(document.getElementById('atAtual').value); if(!valor_atual){Toast.error('Valor atual inválido — use o formato 1500,00');return;}
         const data = { nome, tipo:document.getElementById('atTipo').value, valor_aquisicao, valor_atual, data_aquisicao:document.getElementById('atData').value, depreciacao_anual:Number(document.getElementById('atDepr').value)||0, obs:document.getElementById('atObs').value };
         if(id){DB.update('ativos_empresa',id,data);Toast.success('Atualizado');}else{DB.create('ativos_empresa',data);Toast.success('Ativo criado');}
         Modal.close(); renderTab();

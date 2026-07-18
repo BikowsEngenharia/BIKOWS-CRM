@@ -58,22 +58,64 @@ const DB = (() => {
     } catch (e) { return null; }
   }
 
+  /* Fila de sincronização: escritas que falharam (conexão fraca, erro no
+     Supabase) ficam aqui e são reenviadas a cada 30s. Antes, a falha era
+     silenciosa — o usuário via "criado" mas o dado só existia neste aparelho. */
+  const _syncQueue = [];
+  let _lastSyncWarn = 0;
+
+  function _notifySyncFail() {
+    const agora = Date.now();
+    if (agora - _lastSyncWarn < 30000) return; // avisa no máximo a cada 30s
+    _lastSyncWarn = agora;
+    if (typeof Toast !== 'undefined') {
+      Toast.warning('⚠ Sem conexão com a nuvem — dados salvos localmente, reenviando automaticamente…');
+    }
+  }
+
+  async function _flushSyncQueue() {
+    if (_syncQueue.length === 0) return;
+    const pendentes = _syncQueue.splice(0, _syncQueue.length);
+    for (const item of pendentes) {
+      if (item.op === 'upsert') await _sbUpsert(item.entity, item.record);
+      else if (item.op === 'delete') await _sbDelete(item.entity, item.id);
+    }
+    if (_syncQueue.length === 0 && pendentes.length > 0 && typeof Toast !== 'undefined') {
+      Toast.success('☁ Sincronização com a nuvem restabelecida');
+    }
+  }
+  setInterval(_flushSyncQueue, 30000);
+  window.addEventListener('online', _flushSyncQueue);
+
   async function _sbUpsert(table, record) {
     try {
       const { error } = await _supabase.from(table).upsert({ id: record.id, data: record });
-      if (error) console.warn('[DB] upsert:', table, error.message);
-      else _saveLocalBackup(table); // atualiza backup após escrita bem-sucedida
+      if (error) {
+        console.warn('[DB] upsert:', table, error.message);
+        _syncQueue.push({ op: 'upsert', entity: table, record });
+        _notifySyncFail();
+      } else {
+        _saveLocalBackup(table); // atualiza backup após escrita bem-sucedida
+      }
     } catch (e) {
       console.warn('[DB] upsert exception:', e);
+      _syncQueue.push({ op: 'upsert', entity: table, record });
+      _notifySyncFail();
     }
   }
 
   async function _sbDelete(table, id) {
     try {
       const { error } = await _supabase.from(table).delete().eq('id', id);
-      if (error) console.warn('[DB] delete:', table, error.message);
+      if (error) {
+        console.warn('[DB] delete:', table, error.message);
+        _syncQueue.push({ op: 'delete', entity: table, id });
+        _notifySyncFail();
+      }
     } catch (e) {
       console.warn('[DB] delete exception:', e);
+      _syncQueue.push({ op: 'delete', entity: table, id });
+      _notifySyncFail();
     }
   }
 

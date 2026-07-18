@@ -1150,9 +1150,21 @@ select.form-control { cursor: pointer; }
   .kanban-card-title { font-size: 13px; }
   .kanban-card-meta { flex-direction: column; align-items: flex-start; }
 
-  /* Tabs */
-  .tabs { gap: 1px; }
-  .tab-btn { padding: 6px 10px; font-size: 11.5px; }
+  /* Tabs — rolagem horizontal em vez de quebrar em várias linhas
+     (o Financeiro tem 9 abas que ocupavam meia tela no celular) */
+  .tabs {
+    gap: 1px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 6px 10px; font-size: 11.5px; flex-shrink: 0; scroll-snap-align: start; }
+
+  /* Parcelas de recebíveis: permitir quebra de linha no celular */
+  .parcela-row { flex-wrap: wrap; gap: 6px; }
 
   /* Cards */
   .card-body { padding: 12px; }

@@ -64,6 +64,28 @@ const Utils = (() => {
     return daysUntil(dateStr) === 0;
   }
 
+  // Converte valor digitado em formato brasileiro para número.
+  // Aceita: "1.500,50" → 1500.5 · "1500,50" → 1500.5 · "1.500" → 1500 · "1500.50" → 1500.5
+  // (inputs type=number rejeitavam ou interpretavam errado valores com vírgula/ponto de milhar)
+  function parseMoney(v) {
+    if (typeof v === 'number') return v;
+    if (!v) return 0;
+    let s = String(v).trim().replace(/[R$\s]/g, '');
+    if (!s) return 0;
+    const temVirgula = s.includes(','), temPonto = s.includes('.');
+    if (temVirgula && temPonto)      s = s.replace(/\./g, '').replace(',', '.'); // 1.500,50
+    else if (temVirgula)             s = s.replace(',', '.');                     // 1500,50
+    else if (temPonto && /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ''); // 1.500 (milhar)
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+  }
+
+  // Valor numérico → string para exibir em campo de edição ("1500.5" → "1500,50")
+  function moneyToInput(v) {
+    if (v == null || v === '') return '';
+    return Number(v).toFixed(2).replace('.', ',');
+  }
+
   // Data local YYYY-MM-DD (evita bug de timezone: toISOString() usa UTC e
   // no Brasil, após as 21h, retornaria a data de amanhã)
   function localDateStr(d = new Date()) {
@@ -271,6 +293,7 @@ const Utils = (() => {
   return {
     formatCurrency, formatDate, formatDateTime, formatCNPJ, formatPhone,
     timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, truncate, escHtml, escJs,
+    parseMoney, moneyToInput,
     LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS,
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,

@@ -658,6 +658,20 @@ const App = (() => {
     if (panel) panel.style.display = 'none';
     const input = document.getElementById('globalSearch');
     if (input) input.value = '';
+    document.querySelector('.search-wrap')?.classList.remove('mobile-open');
+  }
+
+  /* Busca em tela cheia no mobile (o campo fica oculto em telas pequenas) */
+  function toggleMobileSearch(force) {
+    const wrap = document.querySelector('.search-wrap');
+    if (!wrap) return;
+    const open = force !== undefined ? force : !wrap.classList.contains('mobile-open');
+    if (open) {
+      wrap.classList.add('mobile-open');
+      setTimeout(() => document.getElementById('globalSearch')?.focus(), 60);
+    } else {
+      closeSearch();
+    }
   }
 
   function toggleDark() {
@@ -884,7 +898,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

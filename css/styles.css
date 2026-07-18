@@ -1072,8 +1072,28 @@ select.form-control { cursor: pointer; }
   /* Top bar */
   .top-bar { padding: 0 12px; height: 52px; }
   .page-title { font-size: 14px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .search-box { display: none; } /* esconder em mobile, usar busca pelo atalho */
+  .search-box { display: none; }
   .top-right { gap: 4px; }
+
+  /* Busca mobile: botão 🔍 abre overlay em tela cheia */
+  .search-mobile-btn { display: inline-flex !important; }
+  .search-wrap.mobile-open {
+    position: fixed; inset: 0; z-index: 1200;
+    background: var(--bg);
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .search-wrap.mobile-open .search-mobile-close { display: block; }
+  .search-wrap.mobile-open .search-box {
+    display: flex; max-width: none; width: 100%;
+  }
+  .search-wrap.mobile-open .search-input { width: 100%; font-size: 16px; }
+  .search-wrap.mobile-open .search-panel {
+    position: static;
+    min-width: 0;
+    flex: 1; overflow-y: auto;
+    box-shadow: none;
+  }
 
   /* Página */
   .page-content { padding: 10px; }
@@ -1245,6 +1265,18 @@ body.dark-mode .search-result-item:hover, [data-theme="dark"] .search-result-ite
    SEARCH PANEL
    ========================================== */
 .search-wrap { position: relative; }
+/* Botões da busca mobile — ocultos no desktop */
+.search-mobile-btn { display: none !important; }
+.search-mobile-close {
+  display: none;
+  align-self: flex-end;
+  background: none; border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 13px; font-weight: 600;
+  padding: 6px 14px; border-radius: var(--radius-full); cursor: pointer;
+}
+@media (max-width: 640px) {
+  .search-mobile-btn { display: inline-flex !important; }
+}
 .search-panel {
   position: absolute; top: calc(100% + 8px); right: 0; left: 0;
   background: var(--surface); border: 1px solid var(--border);

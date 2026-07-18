@@ -227,6 +227,41 @@ const DB = (() => {
     };
 
     await Promise.all([...fetches, configFetch()]);
+
+    // Backup automático diário (assíncrono, não bloqueia o carregamento)
+    _autoBackup();
+  }
+
+  /* ====================================================
+     BACKUP AUTOMÁTICO — 1x/dia no Supabase Storage
+     Mantém 7 arquivos rotativos (um por dia da semana)
+     + 1 arquivo por mês. Sem limpeza necessária.
+     ==================================================== */
+  async function _autoBackup() {
+    try {
+      const hoje = new Date();
+      const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+      if (localStorage.getItem('crm_last_auto_backup') === hojeStr) return;
+
+      const dump = { geradoEm: new Date().toISOString(), config: _cache.config, dados: {} };
+      ENTITIES.forEach(e => { dump.dados[e] = _cache[e]; });
+      const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
+
+      const dias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+      const paths = [
+        `auto/backup-${dias[hoje.getDay()]}.json`,
+        `mensal/backup-${hojeStr.slice(0, 7)}.json`,
+      ];
+      for (const p of paths) {
+        const { error } = await _supabase.storage.from('backups')
+          .upload(p, blob, { upsert: true, contentType: 'application/json' });
+        if (error) { console.warn('[DB] auto-backup falhou:', p, error.message); return; }
+      }
+      localStorage.setItem('crm_last_auto_backup', hojeStr);
+      console.info('[DB] Backup automático enviado:', hojeStr);
+    } catch (e) {
+      console.warn('[DB] auto-backup erro:', e);
+    }
   }
 
   /* ====================================================

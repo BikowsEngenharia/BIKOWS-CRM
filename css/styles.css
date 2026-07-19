@@ -1044,6 +1044,9 @@ select.form-control { cursor: pointer; }
   /* Forms */
   .fin-kpi { grid-template-columns: repeat(2, 1fr); }
 
+  /* KPIs em tablet: máximo 3 colunas (estilos inline forçavam até 5) */
+  .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
+
   /* Kanban — tablet: 2 colunas visíveis ao mesmo tempo */
   .kanban-board { padding-bottom: 16px; gap: 10px; }
   .kanban-col { min-width: 220px; max-width: 280px; width: 220px; flex: 1 1 220px; }
@@ -1059,8 +1062,16 @@ select.form-control { cursor: pointer; }
 
 /* === MOBILE (≤640px) === */
 @media (max-width: 640px) {
-  /* KPIs: 1 coluna */
-  .kpi-grid { grid-template-columns: 1fr; gap: 8px; margin-bottom: 14px; }
+  /* Grids com colunas fixas em estilo INLINE (repeat(3/4/5,1fr)) vencem
+     as classes — só !important + seletor de atributo os alcança.
+     Exceção: mini-gráficos de barras (height:120px) mantêm as colunas. */
+  [style*="grid-template-columns:repeat(3"]:not([style*="height:120px"]),
+  [style*="grid-template-columns:repeat(4"]:not([style*="height:120px"]),
+  [style*="grid-template-columns:repeat(5"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* KPIs: 1 coluna (depois da regra acima para vencer o empate) */
+  .kpi-grid { grid-template-columns: 1fr !important; gap: 8px; margin-bottom: 14px; }
   .kpi-card { padding: 14px 14px 12px; }
   .kpi-value { font-size: 20px; }
   .kpi-icon { font-size: 20px; }
@@ -1227,6 +1238,16 @@ select.form-control { cursor: pointer; }
   /* Calendário: chips viram barras coloridas (texto ilegível nesse tamanho) */
   .cal-event-chip { font-size: 0; height: 7px; padding: 0; margin-bottom: 3px; border-radius: 3px; }
   .cal-cell { min-height: 48px; }
+}
+
+/* Botões ◀ ▶ de mover etapa no Kanban — só aparecem onde arrastar
+   não funciona (telas touch / mobile) */
+.kanban-move-btns { display: none; gap: 3px; }
+@media (hover: none) and (pointer: coarse) {
+  .kanban-move-btns { display: inline-flex; }
+}
+@media (max-width: 900px) {
+  .kanban-move-btns { display: inline-flex; }
 }
 
 /* === TOUCH DEVICE HELPERS === */

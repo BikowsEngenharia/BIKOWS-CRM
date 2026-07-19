@@ -547,6 +547,10 @@ const Pipeline = (() => {
         <span class="text-xs text-muted">${lead.responsavel || ''}</span>
       </div>
       <div class="kc-actions">
+        <span class="kanban-move-btns">
+          <button class="btn btn-xs btn-secondary" onclick="Pipeline.moverEtapa('${lead.id}',-1)" title="Etapa anterior">◀</button>
+          <button class="btn btn-xs btn-secondary" onclick="Pipeline.moverEtapa('${lead.id}',1)" title="Próxima etapa">▶</button>
+        </span>
         <button class="btn btn-xs btn-secondary" onclick="Pipeline.viewLead('${lead.id}')">Ver</button>
         ${proposta
           ? `<button class="btn btn-xs btn-secondary" onclick="Modal.close();Propostas.view('${proposta.id}')" title="Ver proposta">📄</button>`
@@ -629,13 +633,18 @@ const Pipeline = (() => {
     e.preventDefault();
     e.currentTarget.classList.remove('drag-over');
     if (!dragId) return;
-    const leadId = dragId;
-    const _leadParaDrop = DB.get('leads', leadId);
-    const _statusAnteriorDrop = _leadParaDrop?.status;
+    _aplicarMudancaEtapa(dragId, newStatus);
+  }
+
+  /* Lógica compartilhada de mudança de etapa (drag & drop E botões mobile)
+     — garante que os gatilhos automáticos disparam nos dois caminhos */
+  function _aplicarMudancaEtapa(leadId, newStatus) {
+    const lead = DB.get('leads', leadId);
+    const statusAnterior = lead?.status;
     DB.update('leads', leadId, { status: newStatus, dataMudancaStatus: Utils.todayStr() });
-    Toast.success('Lead movido para ' + Utils.LEAD_STATUS[newStatus]?.label);
-    if (newStatus !== _statusAnteriorDrop) {
-      _autoAtividade(leadId, newStatus, _leadParaDrop?.titulo || '');
+    Toast.success('Lead movido para ' + (Utils.LEAD_STATUS[newStatus]?.label || newStatus));
+    if (newStatus !== statusAnterior) {
+      _autoAtividade(leadId, newStatus, lead?.titulo || '');
     }
     render();
     App.updateNotifBadge();
@@ -652,6 +661,19 @@ const Pipeline = (() => {
     if (newStatus === 'proposta_enviada') {
       setTimeout(() => _criarSequenciaFollowup(leadId), 500);
     }
+  }
+
+  /* Mover etapa pelos botões ◀ ▶ (touch não suporta drag & drop do browser).
+     'fechado_perdido' fica fora da sequência — perder é decisão, não avanço. */
+  const _ORDEM_MOVER = ['lead_identificado','primeiro_contato','qualificacao','proposta_elaboracao','proposta_enviada','negociacao','fechado_ganho','executado'];
+
+  function moverEtapa(leadId, dir) {
+    const lead = DB.get('leads', leadId); if (!lead) return;
+    const idx = _ORDEM_MOVER.indexOf(lead.status);
+    if (idx === -1) { Toast.warning('Edite o lead para alterar a etapa.'); return; }
+    const novoIdx = idx + dir;
+    if (novoIdx < 0 || novoIdx >= _ORDEM_MOVER.length) return;
+    _aplicarMudancaEtapa(leadId, _ORDEM_MOVER[novoIdx]);
   }
 
   /* ---- Sequência automática de follow-up ao enviar proposta ---- */
@@ -1815,7 +1837,7 @@ const Pipeline = (() => {
 
   return {
     render, openForm, saveLead, deleteLead, viewLead, addNew,
-    dragStart, dragEnd, dragOver, dragLeave, drop,
+    dragStart, dragEnd, dragOver, dragLeave, drop, moverEtapa,
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
     relatorioOrigem, filtrarLicitacoes,

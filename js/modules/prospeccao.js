@@ -354,6 +354,32 @@ const Prospeccao = (() => {
       </div>`;
   }
 
+  /* Dedupe: verifica se a empresa encontrada já existe como cliente ou lead
+     (comparação por nome normalizado, ignorando acentos e sufixos LTDA/ME…) */
+  function _normNome(s) {
+    return (s || '').toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/\b(ltda|s\/?a|me|epp|eireli|cia|comercio|industria|do brasil)\b/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  function _jaExiste(r) {
+    const n = _normNome(r.nome);
+    if (!n || n.length < 4) return {};
+    const cli = DB.getAll('clientes').find(c => {
+      const cn = _normNome(c.nome);
+      return cn && cn.length >= 4 && (cn === n || cn.includes(n) || n.includes(cn));
+    });
+    if (cli) return { tipo: 'cliente', nome: cli.nome };
+    const lead = DB.getAll('leads').find(l => {
+      const t = _normNome(l.titulo || '');
+      return t && t.length >= 4 && (t.includes(n) || n.includes(t));
+    });
+    if (lead) return { tipo: 'lead', nome: lead.titulo };
+    return {};
+  }
+
   function _renderResultados(lista) {
     const el = document.getElementById('pResultados');
     if (!el) return;
@@ -370,10 +396,12 @@ const Prospeccao = (() => {
       return;
     }
 
+    const jaNoCrm = lista.filter(r => _jaExiste(r).tipo).length;
     el.innerHTML = `
       <div class="sec-header" style="margin-bottom:16px">
         <h3 style="font-size:14px;font-weight:600;color:var(--text)">
           📋 Resultados — ${lista.length} empresa${lista.length !== 1 ? 's' : ''} encontrada${lista.length !== 1 ? 's' : ''}
+          ${jaNoCrm > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text-muted)"> · ${lista.length - jaNoCrm} nova(s) · ${jaNoCrm} já no CRM</span>` : ''}
         </h3>
         <span style="font-size:12px;color:var(--text-muted)">Clique em "+ Adicionar" para incluir no CRM</span>
       </div>
@@ -385,6 +413,12 @@ const Prospeccao = (() => {
   function _cardResultado(r, idx) {
     const statusColor = r.status === 'OPERATIONAL' ? '#10b981' : r.status === 'CLOSED_TEMPORARILY' ? '#f59e0b' : '#94a3b8';
     const statusLabel = r.status === 'OPERATIONAL' ? 'Ativo' : r.status === 'CLOSED_TEMPORARILY' ? 'Temp. Fechado' : r.status === 'CLOSED_PERMANENTLY' ? 'Fechado' : '';
+    const dup = _jaExiste(r);
+    const dupBadge = dup.tipo === 'cliente'
+      ? `<span style="font-size:10px;font-weight:700;color:#10b981;background:#10b98118;padding:2px 8px;border-radius:99px" title="${Utils.escHtml(dup.nome)}">✔ Já é cliente</span>`
+      : dup.tipo === 'lead'
+        ? `<span style="font-size:10px;font-weight:700;color:#f59e0b;background:#f59e0b18;padding:2px 8px;border-radius:99px" title="${Utils.escHtml(dup.nome)}">💼 Já em prospecção</span>`
+        : '';
 
     const stars = r.rating ? _renderStars(r.rating) : '';
     const ratingText = r.rating ? `<span style="font-size:12px;font-weight:700;color:var(--text)">${r.rating.toFixed(1)}</span> ${stars} <span style="font-size:11px;color:var(--text-muted)">(${r.totalAvaliacoes || 0})</span>` : '';
@@ -398,7 +432,10 @@ const Prospeccao = (() => {
             <div style="width:40px;height:40px;background:var(--primary-light,#eff6ff);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏭</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:14px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:2px">${Utils.escHtml(r.nome || 'Empresa sem nome')}</div>
-              ${statusLabel ? `<span style="font-size:10px;font-weight:700;color:${statusColor};background:${statusColor}18;padding:2px 8px;border-radius:99px">${statusLabel}</span>` : ''}
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                ${statusLabel ? `<span style="font-size:10px;font-weight:700;color:${statusColor};background:${statusColor}18;padding:2px 8px;border-radius:99px">${statusLabel}</span>` : ''}
+                ${dupBadge}
+              </div>
             </div>
           </div>
 
@@ -433,10 +470,10 @@ const Prospeccao = (() => {
 
           <!-- Botões de ação -->
           <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px">
-            <button class="btn btn-primary btn-sm" style="flex:1" onclick="Prospeccao.adicionarLead(${idx})">
+            <button class="btn btn-primary btn-sm" style="flex:1" ${dup.tipo === 'lead' ? 'disabled title="Já existe lead para esta empresa"' : ''} onclick="Prospeccao.adicionarLead(${idx})">
               💼 + Lead
             </button>
-            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="Prospeccao.adicionarCliente(${idx})">
+            <button class="btn btn-secondary btn-sm" style="flex:1" ${dup.tipo === 'cliente' ? 'disabled title="Já cadastrada como cliente"' : ''} onclick="Prospeccao.adicionarCliente(${idx})">
               🏢 + Cliente
             </button>
             ${r.website ? `

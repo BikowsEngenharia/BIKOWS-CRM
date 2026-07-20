@@ -188,7 +188,7 @@ const Metas = (() => {
           <button class="btn btn-ghost btn-sm" onclick="Metas.setAno(${_ano+1})">›</button>
         </div>
       </div>
-      <div class="tab-bar" style="margin-bottom:20px;">
+      <div class="tabs mb-4">
         ${tabs.map(t => `<button class="tab-btn ${_tab===t.id?'active':''}" onclick="Metas.setTab('${t.id}')">${t.label}</button>`).join('')}
       </div>
       <div id="metasContent"></div>
@@ -481,20 +481,20 @@ const Metas = (() => {
       </div>
 
       <!-- BANNER TRIMESTRE SELECIONADO -->
-      <div style="background:linear-gradient(135deg,#0a1628 0%,#1e3a5f 100%);border-radius:14px;padding:22px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
-        <div>
+      <div style="background:linear-gradient(135deg,#0a1628 0%,#1e3a5f 100%);border-radius:14px;padding:20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+        <div style="min-width:0">
           <div style="color:#7a9bbf;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">${isHoje && qi===qAtual?'Trimestre Atual':'Ano '+_ano} · ${TRIMESTRES[qi]}</div>
-          <div style="color:#fff;font-size:28px;font-weight:800;line-height:1;">${Utils.formatCurrency(real.receita)}</div>
+          <div style="color:#fff;font-size:clamp(20px,6vw,28px);font-weight:800;line-height:1.2;">${Utils.formatCurrency(real.receita)}</div>
           <div style="color:#7a9bbf;font-size:13px;margin-top:4px;">de ${Utils.formatCurrency(meta.receita)} · <span style="color:${pctReceita>=100?'#4ade80':pctReceita>=70?'#fbbf24':'#f87171'};font-weight:700;">${pctReceita}% da meta</span></div>
         </div>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div style="position:relative;width:80px;height:80px;flex-shrink:0;">
-            ${_ring(pctReceita, pctReceita>=100?'#4ade80':pctReceita>=70?'#fbbf24':'#f87171', 80)}
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="position:relative;width:64px;height:64px;flex-shrink:0;">
+            ${_ring(pctReceita, pctReceita>=100?'#4ade80':pctReceita>=70?'#fbbf24':'#f87171', 64)}
             <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;">
-              <span style="color:#fff;font-size:14px;font-weight:800;">${Math.min(pctReceita,999)}%</span>
+              <span style="color:#fff;font-size:12px;font-weight:800;">${Math.min(pctReceita,999)}%</span>
             </div>
           </div>
-          <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2);" onclick="Metas.editMeta(${_ano},${qi})">✏ Editar metas</button>
+          <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2);white-space:nowrap" onclick="Metas.editMeta(${_ano},${qi})">✏ Editar</button>
         </div>
       </div>
 
@@ -792,14 +792,14 @@ const Metas = (() => {
       const c = _color(p);
       const isAtual = qi===_trimestreAtual() && new Date().getFullYear()===_ano;
       return `
-        <div style="display:grid;grid-template-columns:80px 1fr 130px 60px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div class="metas-row-trim" style="align-items:center;gap:6px 12px;padding:10px 0;border-bottom:1px solid var(--border);">
           <div style="font-size:13px;font-weight:700;color:${isAtual?'var(--primary)':'var(--text)'};">${Q_LABELS[qi]}${isAtual?' ●':''}</div>
-          <div>
+          <div class="metas-row-trim-bar">
             <div style="height:10px;background:var(--border);border-radius:99px;overflow:hidden;">
               <div style="width:${Math.min(p,100)}%;height:100%;background:${c};border-radius:99px;transition:width .5s ease;"></div>
             </div>
           </div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);">${Utils.formatCurrency(r.receita)} <span style="color:var(--text-muted);font-weight:400;">/ ${Utils.formatCurrency(m.receita)}</span></div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;">${Utils.formatCurrency(r.receita)} <span style="color:var(--text-muted);font-weight:400;">/ ${Utils.formatCurrency(m.receita)}</span></div>
           <div style="text-align:right;font-size:13px;font-weight:700;color:${c};">${p}%</div>
         </div>`;
     }).join('');
@@ -807,9 +807,9 @@ const Metas = (() => {
     return `
       <!-- Mega card anual -->
       <div style="background:linear-gradient(135deg,#0a1628 0%,#1e3a5f 100%);border-radius:14px;padding:24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
-        <div>
+        <div style="min-width:0">
           <div style="color:#7a9bbf;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Resultado Anual ${_ano}</div>
-          <div style="color:#fff;font-size:32px;font-weight:800;line-height:1;">${Utils.formatCurrency(totReal.receita)}</div>
+          <div style="color:#fff;font-size:clamp(22px,7vw,32px);font-weight:800;line-height:1.2;">${Utils.formatCurrency(totReal.receita)}</div>
           <div style="color:#7a9bbf;font-size:13px;margin-top:6px;">de ${Utils.formatCurrency(totMeta.receita)} · <span style="color:${pctAnual>=100?'#4ade80':pctAnual>=70?'#fbbf24':'#f87171'};font-weight:700;">${pctAnual}% da meta anual</span></div>
           <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;">
             <span style="color:#a5c8f0;font-size:12px;">👥 ${totReal.novosClientes} clientes</span>

@@ -228,10 +228,15 @@ const Utils = (() => {
   function confirmDelete(name, cb) {
     Confirm.show(`Excluir "${name}"?`, `Você poderá desfazer por alguns segundos.`, () => {
       cb();
-      // Oferecer desfazer da última exclusão feita pelo callback
+      // Captura o snapshot IMEDIATAMENTE (síncrono, logo após cb() rodar
+      // DB.remove()) — cada toast fica preso ao item que ele mesmo apagou.
+      // Antes lia DB.undoRemove() só no clique, que pegava o exclusão MAIS
+      // RECENTE naquele momento — clicar num toast antigo restaurava o
+      // item errado quando havia várias exclusões seguidas.
+      const snapshot = DB.peekLastDeleted();
       setTimeout(() => {
         Toast.undo(`"${truncate(name, 30)}" excluído`, () => {
-          const r = DB.undoRemove();
+          const r = DB.restoreDeleted(snapshot);
           if (r) {
             Toast.success('Registro restaurado!');
             if (typeof App !== 'undefined') {

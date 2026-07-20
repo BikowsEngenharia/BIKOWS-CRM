@@ -331,11 +331,20 @@ const Licitacoes = (() => {
   }
 
   async function moverKanbanPncp(id, kanban) {
-    _pncpData = _pncpData.map(l => l.id === id ? { ...l, data: { ...l.data, kanban } } : l);
-    await _supabase.from('crm_licitacoes').update({ data: _pncpData.find(l => l.id === id)?.data }).eq('id', id);
-    _loadPncpBadge();
+    const novoData = { ...(_pncpData.find(l => l.id === id)?.data || {}), kanban };
+    _pncpData = _pncpData.map(l => l.id === id ? { ...l, data: novoData } : l);
     const el = document.getElementById('licTabContent');
     if (el && _tab === 'pncp') el.innerHTML = renderPNCPTab();
+
+    const { error } = await _supabase.from('crm_licitacoes').update({ data: novoData }).eq('id', id);
+    if (error) {
+      // Falha ao salvar — sem isto, a mudança "colava" só na tela e
+      // voltava ao estado antigo no próximo recarregamento da aba.
+      Toast.error('Não salvou a mudança de coluna — tente novamente.');
+      console.error('[Licitacoes] moverKanbanPncp:', error.message);
+      return;
+    }
+    _loadPncpBadge();
   }
 
   function importarPncp(id) {

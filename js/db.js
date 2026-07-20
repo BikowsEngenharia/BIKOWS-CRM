@@ -186,27 +186,49 @@ const DB = (() => {
     return _cache[entity][idx];
   }
 
-  // Último registro excluído — permite "Desfazer" logo após a exclusão
+  // Último registro excluído — permite "Desfazer" logo após a exclusão.
+  // BUG CORRIGIDO: era uma variável única global. Se o usuário excluísse
+  // vários itens em sequência (cada um com seu toast "Desfazer" visível
+  // por 6s), clicar num toast MAIS ANTIGO restaurava o item ERRADO — o
+  // último excluído no momento do clique, não o item daquele toast
+  // específico. Agora remove() retorna um snapshot imutável e o toast
+  // guarda ESSA referência, restaurando sempre o item certo.
   let _lastDeleted = null;
 
   function remove(entity, id) {
     const toDelete = _cache[entity].find(r => r.id === id);
-    _lastDeleted = toDelete ? { entity, record: toDelete } : null;
+    const snapshot = toDelete ? { entity, record: toDelete } : null;
+    _lastDeleted = snapshot;
     _auditLog('delete', entity, toDelete);
     _cache[entity] = _cache[entity].filter(r => r.id !== id);
     _saveLocalBackup(entity);
     _sbDelete(entity, id);
+    return snapshot;
   }
 
-  function undoRemove() {
-    if (!_lastDeleted) return null;
-    const { entity, record } = _lastDeleted;
-    _lastDeleted = null;
+  // Restaura um snapshot específico (retornado por remove()) — não lê
+  // estado global mutável, então nunca restaura o item errado.
+  function restoreDeleted(snapshot) {
+    if (!snapshot) return null;
+    const { entity, record } = snapshot;
+    if (_lastDeleted === snapshot) _lastDeleted = null;
     _cache[entity].push(record);
     _saveLocalBackup(entity);
     _sbUpsert(entity, record);
     _auditLog('restore', entity, record);
     return { entity, record };
+  }
+
+  // Mantido para compatibilidade — restaura o último excluído (global)
+  function undoRemove() {
+    return restoreDeleted(_lastDeleted);
+  }
+
+  // Lê o snapshot mais recente sem consumi-lo — usado por Utils.confirmDelete
+  // para capturar QUAL exclusão este toast específico deve desfazer,
+  // no instante em que ela aconteceu (não no instante do clique).
+  function peekLastDeleted() {
+    return _lastDeleted;
   }
 
   function saveConfig(data) {
@@ -589,7 +611,7 @@ const DB = (() => {
   }
 
   return {
-    getAll, get, create, update, remove, undoRemove,
+    getAll, get, create, update, remove, undoRemove, restoreDeleted, peekLastDeleted,
     getConfig, saveConfig,
     loadAll, subscribeRealtime, initSampleData,
     getAuditLog, clearAuditLog,

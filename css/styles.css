@@ -1247,6 +1247,27 @@ select.form-control { cursor: pointer; }
   .cal-cell { min-height: 48px; }
 }
 
+/* Metas — linha de divisão trimestral (Visão Anual): rótulo, barra,
+   valores e percentual lado a lado no desktop; empilha no mobile
+   porque colunas de largura fixa (80px/130px/60px) estouram em
+   telas pequenas com os valores de faturamento por extenso. */
+.metas-row-trim {
+  display: grid;
+  grid-template-columns: 60px 1fr 150px 50px;
+}
+.metas-row-trim-bar { min-width: 0; }
+@media (max-width: 640px) {
+  .metas-row-trim {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "label pct" "bar bar" "valores valores";
+    row-gap: 6px;
+  }
+  .metas-row-trim > :nth-child(1) { grid-area: label; }
+  .metas-row-trim > :nth-child(2) { grid-area: bar; }
+  .metas-row-trim > :nth-child(3) { grid-area: valores; }
+  .metas-row-trim > :nth-child(4) { grid-area: pct; }
+}
+
 /* Botões ◀ ▶ de mover etapa no Kanban — só aparecem onde arrastar
    não funciona (telas touch / mobile) */
 .kanban-move-btns { display: none; gap: 3px; }

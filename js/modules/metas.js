@@ -582,12 +582,74 @@ const Metas = (() => {
         </div>
       </div>
 
+      ${(meta.metasCustom||[]).length > 0 ? `
+      <div style="margin-top:16px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:12px;padding:16px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">🎯 Metas Personalizadas — ${TRIMESTRES[qi]}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">
+          ${meta.metasCustom.map((c, i) => {
+            const auto = _realizadoCustomAuto(c.nome, _ano, qi);
+            const realizado = auto != null ? auto : (c.realizado || 0);
+            const alvo = Number(c.valor) || 0;
+            const p = alvo > 0 ? Math.min(Math.round((realizado / alvo) * 100), 999) : 0;
+            const cor = _color(p);
+            return `
+              <div style="padding:10px 12px;background:var(--surface-2,#f8fafc);border-radius:8px;border:1px solid var(--border);">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${Utils.escHtml(c.nome)}</div>
+                <div style="display:flex;align-items:baseline;gap:4px;">
+                  ${auto != null
+                    ? `<span style="font-size:16px;font-weight:800;color:${cor};">${realizado}</span>`
+                    : `<input type="number" value="${realizado}" onchange="Metas.setRealizadoCustom(${_ano},${qi},${i},this.value)"
+                         style="width:52px;font-size:16px;font-weight:800;color:${cor};border:1px solid var(--border);border-radius:4px;padding:1px 4px;background:var(--surface)">`}
+                  <span style="font-size:12px;color:var(--text-muted);">/ ${alvo} ${Utils.escHtml(c.unidade||'')}</span>
+                </div>
+                <div style="height:3px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:6px;">
+                  <div style="width:${Math.min(p,100)}%;height:100%;background:${cor};border-radius:99px;"></div>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+        <div class="text-xs text-muted mt-2">${_realizadoCustomAuto(meta.metasCustom[0]?.nome, _ano, qi) != null ? '' : 'Números sem contagem automática no CRM — clique no valor para atualizar manualmente.'}</div>
+      </div>` : ''}
+
       ${meta.observacoes ? `
         <div style="margin-top:16px;padding:14px 16px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:12px;border-left:4px solid var(--primary);">
           <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">📝 ESTRATÉGIA / OBSERVAÇÕES</div>
           <p style="font-size:13px;color:var(--text-secondary);white-space:pre-wrap;margin:0;">${Utils.escHtml(meta.observacoes)}</p>
         </div>` : ''}
     `;
+  }
+
+  /* Algumas metas personalizadas podem ser contadas automaticamente a
+     partir de outros módulos do CRM. Retorna null se não houver como
+     rastrear automaticamente (usuário preenche manualmente). */
+  function _realizadoCustomAuto(nome, ano, trimestre) {
+    if (!nome) return null;
+    const n = nome.toLowerCase();
+    const meses = TRIMESTRE_MESES[trimestre];
+    const inicio = Utils.localDateStr(new Date(ano, meses[0], 1));
+    const fim    = Utils.localDateStr(new Date(ano, meses[2]+1, 0));
+    const inP = d => d && d >= inicio && d <= fim;
+
+    if (n.includes('artigo') || n.includes('conteúdo') || n.includes('conteudo')) {
+      return DB.getAll('marketing_posts').filter(p =>
+        p.status === 'publicado' && (p.canal === 'Site/Blog') && inP(p.data)
+      ).length;
+    }
+    if (n.includes('post') && (n.includes('linkedin') || n.includes('rede'))) {
+      return DB.getAll('marketing_posts').filter(p =>
+        p.status === 'publicado' && p.canal !== 'Site/Blog' && inP(p.data)
+      ).length;
+    }
+    return null;
+  }
+
+  function setRealizadoCustom(ano, trimestre, idx, valor) {
+    const meta = DB.getAll('metas').find(m => m.ano === ano && m.trimestre === trimestre);
+    if (!meta || !meta.metasCustom || !meta.metasCustom[idx]) return;
+    const custom = [...meta.metasCustom];
+    custom[idx] = { ...custom[idx], realizado: Number(valor) || 0 };
+    DB.update('metas', meta.id, { metasCustom: custom });
+    _renderTab();
   }
 
   /* ====================================================
@@ -653,6 +715,10 @@ const Metas = (() => {
                     </div>`;
                 }).join('')}
               </div>
+              ${(meta.metasCustom||[]).length > 0 ? `
+              <div style="padding:0 14px 10px;">
+                <span class="badge badge-blue" style="font-size:10px">🎯 ${meta.metasCustom.length} meta(s) personalizada(s)</span>
+              </div>` : ''}
               <div style="padding:0 14px 14px;">
                 <button class="btn btn-sm btn-primary" style="width:100%;" onclick="Metas.editMeta(${_ano},${qi})">✏ Editar metas Q${qi+1}</button>
               </div>
@@ -803,6 +869,7 @@ const Metas = (() => {
      ==================================================== */
   function editMeta(ano, qi) {
     const meta = _getMeta(ano, qi);
+    const custom = meta.metasCustom || [];
     Modal.open({
       title: `🎯 Metas — ${TRIMESTRES[qi]} / ${ano}`,
       size: 'modal-lg',
@@ -816,15 +883,47 @@ const Metas = (() => {
           <div class="form-group"><label class="form-label">📋 Projetos Concluídos</label><input class="form-control" type="number" id="mProjetos" value="${meta.projetosConcluidos}" placeholder="0"></div>
           <div class="form-group"><label class="form-label">🏛 Licitações Ganhas</label><input class="form-control" type="number" id="mLicitacoes" value="${meta.licitacoesGanhas}" placeholder="0"></div>
         </div>
+
+        <div class="flex items-center justify-between mt-3 mb-2">
+          <label class="form-label" style="margin:0">🎯 Metas Personalizadas</label>
+          <button type="button" class="btn btn-xs btn-secondary" onclick="Metas._addCustomEdit()">+ Adicionar</button>
+        </div>
+        <div id="mCustomList">
+          ${custom.map((c,i) => _customEditRow(c,i)).join('')}
+        </div>
+
         <div class="form-group mt-3">
           <label class="form-label">📝 Estratégia / Observações</label>
           <textarea class="form-control" id="mObs" rows="3" placeholder="Foco principal, estratégias, pontos de atenção...">${meta.observacoes||''}</textarea>
         </div>`,
-      onSave: () => saveMeta(ano, qi, meta.id),
+      saveCb: () => saveMeta(ano, qi, meta.id),
     });
   }
 
+  function _customEditRow(c, i) {
+    return `<div class="parcela-row mc-edit-row" data-i="${i}">
+      <input class="form-control mc-nome" style="flex:2" placeholder="Nome" value="${Utils.escHtml(c.nome||'')}">
+      <input class="form-control mc-valor" style="flex:1" type="text" inputmode="decimal" placeholder="Meta" value="${c.valor||''}">
+      <input class="form-control mc-unidade" style="flex:1" placeholder="Unidade" value="${Utils.escHtml(c.unidade||'')}">
+      <input type="hidden" class="mc-realizado" value="${c.realizado||0}">
+      <button type="button" class="btn btn-xs btn-danger" onclick="this.closest('.mc-edit-row').remove()">✕</button>
+    </div>`;
+  }
+  function _addCustomEdit() {
+    const list = document.getElementById('mCustomList'); if (!list) return;
+    const div = document.createElement('div');
+    div.innerHTML = _customEditRow({}, list.querySelectorAll('.mc-edit-row').length);
+    list.appendChild(div.firstElementChild);
+  }
+
   function saveMeta(ano, qi, existingId) {
+    const metasCustom = [...document.querySelectorAll('.mc-edit-row')].map(row => ({
+      nome: row.querySelector('.mc-nome').value.trim(),
+      valor: Utils.parseMoney(row.querySelector('.mc-valor').value) || Number(row.querySelector('.mc-valor').value) || 0,
+      unidade: row.querySelector('.mc-unidade').value.trim(),
+      realizado: Number(row.querySelector('.mc-realizado').value) || 0,
+    })).filter(c => c.nome);
+
     const data = {
       ano, trimestre: qi,
       receita:            parseFloat(document.getElementById('mReceita')?.value)||0,
@@ -836,12 +935,14 @@ const Metas = (() => {
       licitacoesGanhas:   parseInt(document.getElementById('mLicitacoes')?.value)||0,
       observacoes:        document.getElementById('mObs')?.value||'',
       servicosMetas:      existingId ? (_getMeta(ano,qi).servicosMetas||[]) : [],
+      metasCustom,
     };
     if (existingId) DB.update('metas', existingId, data);
     else DB.create('metas', data);
     Modal.close();
     Toast.success('Metas salvas!');
-    _renderTab();
+    _tab = 'painel'; _qDash = qi; _ano = ano;
+    render();
   }
 
   function editServicos(ano, qi) {
@@ -867,7 +968,7 @@ const Metas = (() => {
             }).join('')}
           </tbody>
         </table>`,
-      onSave: () => saveServicos(ano, qi, meta.id, servicos),
+      saveCb: () => saveServicos(ano, qi, meta.id, servicos),
     });
   }
 
@@ -890,5 +991,6 @@ const Metas = (() => {
   function addNew()      { editMeta(_ano, _trimestreAtual()); }
 
   return { render, setTab, setAno, setQDash, addNew, editMeta, saveMeta, editServicos, saveServicos,
-           setDefPeriodo, setDefModo, setDefValor, addCustom, removeCustom, setCustom, salvarDefinicao };
+           setDefPeriodo, setDefModo, setDefValor, addCustom, removeCustom, setCustom, salvarDefinicao,
+           setRealizadoCustom, _addCustomEdit };
 })();

@@ -996,6 +996,10 @@ select.form-control { cursor: pointer; }
 
 /* === TABLET (≤900px) === */
 @media (max-width: 900px) {
+  /* Agenda Pessoal: tablet mostra no máximo 4 colunas por vez
+     (use os botões de dia para navegar) */
+  .agenda-grid { grid-template-columns: repeat(4, 1fr) !important; }
+
   /* Sidebar: drawer overlay */
   .sidebar {
     position: fixed;
@@ -1070,6 +1074,9 @@ select.form-control { cursor: pointer; }
   [style*="grid-template-columns:repeat(5"] {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+  /* Agenda Pessoal: grade semanal (até 7 colunas) vira 1 coluna —
+     use os botões de dia da semana para navegar em telas pequenas */
+  .agenda-grid { grid-template-columns: 1fr !important; }
   /* KPIs: 1 coluna (depois da regra acima para vencer o empate) */
   .kpi-grid { grid-template-columns: 1fr !important; gap: 8px; margin-bottom: 14px; }
   .kpi-card { padding: 14px 14px 12px; }

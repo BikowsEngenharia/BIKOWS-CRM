@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="img/simbolo-bikows.png">
   <link rel="apple-touch-icon" href="img/simbolo-bikows.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/styles.css?v=20260720b">
+  <link rel="stylesheet" href="css/styles.css?v=20260724">
   <!-- Supabase JS SDK — versão fixada para evitar breaking changes -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"
     onerror="document.getElementById('loadingText').innerHTML='Erro ao carregar dependências.<br><button onclick=\'location.reload()\' style=\'margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px\'>🔄 Recarregar</button>'"></script>
@@ -142,9 +142,15 @@
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
         <span>RH / Folha</span>
       </a>
+
+      <div class="nav-section-label">Pessoal</div>
       <a class="nav-link" data-page="pessoal" href="#">
         <svg viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4z"/></svg>
         <span>Meu Financeiro</span>
+      </a>
+      <a class="nav-link" data-page="agenda" href="#">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Agenda Pessoal</span>
       </a>
 
       <div class="nav-section-label">Gestão</div>
@@ -286,7 +292,7 @@
 
 <!-- SCRIPTS — v=20260518 para invalidar cache do browser -->
 <script src="js/supabase-client.js?v=20260523"></script>
-<script src="js/db.js?v=20260723"></script>
+<script src="js/db.js?v=20260724"></script>
 <script src="js/auth.js?v=20260524b"></script>
 <script src="js/utils.js?v=20260719b"></script>
 <script src="js/charts.js?v=20260601"></script>
@@ -299,8 +305,9 @@
 <script src="js/modules/propostas.js?v=20260720"></script>
 <script src="js/modules/proposta_generator.js?v=20260722"></script>
 <script src="js/modules/financeiro.js?v=20260720"></script>
-<script src="js/modules/folha.js?v=20260701"></script>
+<script src="js/modules/folha.js?v=20260724"></script>
 <script src="js/modules/pessoal.js?v=20260720c"></script>
+<script src="js/modules/agenda.js?v=20260724"></script>
 <script src="js/modules/calendario.js?v=20260718b"></script>
 <!-- Google Identity Services (OAuth 2.0 para Google Calendar) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -309,8 +316,8 @@
 <script src="js/modules/licitacoes.js?v=20260708"></script>
 <script src="js/modules/marketing.js?v=20260718"></script>
 <script src="js/modules/trafego.js?v=20260708"></script>
-<script src="js/modules/metas.js?v=20260723"></script>
-<script src="js/modules/plano.js?v=20260723"></script>
+<script src="js/modules/metas.js?v=20260724"></script>
+<script src="js/modules/plano.js?v=20260724"></script>
 <script src="js/modules/contratos.js?v=20260708"></script>
 <script src="js/modules/projeto-financeiro.js?v=20260523"></script>
 <script src="js/modules/relatorios.js?v=20260708"></script>
@@ -318,6 +325,6 @@
 <script src="js/modules/prospeccao.js?v=20260720d"></script>
 <script src="js/modules/documentos.js?v=20260524b"></script>
 <script src="js/notifications.js?v=20260708"></script>
-<script src="js/app.js?v=20260723"></script>
+<script src="js/app.js?v=20260724"></script>
 </body>
 </html>

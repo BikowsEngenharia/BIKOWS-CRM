@@ -55,6 +55,12 @@ const Folha = (() => {
     return Math.round(salario * FGTS_ALIQ * 100) / 100;
   }
 
+  // FGTS é encargo exclusivo de vínculo CLT — não incide sobre pró-labore
+  // de sócio, PJ, autônomo ou estágio.
+  function _temFGTS(func) {
+    return (func.regimeContratacao || 'CLT') === 'CLT';
+  }
+
   function calcFolhaFuncionario(func) {
     const bruto = (func.salarioBase || 0)
       + (func.vt || 0)
@@ -62,7 +68,7 @@ const Folha = (() => {
       + (func.outrosAdicionais || 0);
     const inss = calcINSS(func.salarioBase || 0);
     const irrf = calcIRRF(func.salarioBase || 0, inss, func.dependentes || 0);
-    const fgts = calcFGTS(func.salarioBase || 0);
+    const fgts = _temFGTS(func) ? calcFGTS(func.salarioBase || 0) : 0;
     const planoSaude = func.planoSaude || 0;
     const totalDescontos = inss + irrf + planoSaude;
     const liquido = bruto - totalDescontos;
@@ -111,7 +117,7 @@ const Folha = (() => {
     const demitidos = DB.getAll('funcionarios').filter(f => f.ativo === false);
 
     const totalBruto = funcs.reduce((s, f) => s + (f.salarioBase || 0), 0);
-    const totalFGTS  = funcs.reduce((s, f) => s + calcFGTS(f.salarioBase || 0), 0);
+    const totalFGTS  = funcs.reduce((s, f) => s + (_temFGTS(f) ? calcFGTS(f.salarioBase || 0) : 0), 0);
 
     return `
       <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
@@ -380,12 +386,17 @@ const Folha = (() => {
           <div style="font-size:24px;font-weight:800">${Utils.formatCurrency(r.liquido)}</div>
         </div>
 
+        ${_temFGTS(f) ? `
         <div class="holerite-section">
           <div class="holerite-section-title">Encargos Patronais (não descontados do funcionário)</div>
           <div class="holerite-row"><span>FGTS (8%)</span><span>${Utils.formatCurrency(r.fgts)}</span></div>
           <div class="holerite-row"><span>INSS Patronal (estimado 20%)</span><span>${Utils.formatCurrency(Math.round(r.salarioBase * 0.2 * 100) / 100)}</span></div>
           <div class="holerite-total"><span>Custo Total para Empresa</span><span>${Utils.formatCurrency(r.bruto + r.fgts + Math.round(r.salarioBase * 0.2 * 100) / 100)}</span></div>
-        </div>
+        </div>` : `
+        <div class="holerite-section">
+          <div class="holerite-section-title">Regime: ${Utils.escHtml(f.regimeContratacao || '—')}</div>
+          <div class="text-xs text-muted">Sem FGTS nem INSS patronal — encargos exclusivos de vínculo CLT.</div>
+        </div>`}
 
         <div style="margin-top:32px;display:grid;grid-template-columns:1fr 1fr;gap:40px">
           <div style="border-top:1px solid #cbd5e1;padding-top:8px;text-align:center;font-size:12px;color:#64748b">
@@ -700,7 +711,7 @@ const Folha = (() => {
 
     // Cria lançamento de despesa automaticamente para que o Financeiro reflita
     const totalBruto = funcs.reduce((s, f) => s + (f.salarioBase || 0) + (f.vt || 0) + (f.vr || 0), 0);
-    const encargos   = funcs.reduce((s, f) => s + Math.round(f.salarioBase * 0.08 * 100) / 100, 0); // FGTS
+    const encargos   = funcs.reduce((s, f) => s + (_temFGTS(f) ? Math.round(f.salarioBase * 0.08 * 100) / 100 : 0), 0); // FGTS — só CLT
     if (!DB.getAll('lancamentos').some(l => l.descricao?.includes(_mesFolha) && l.categoria === 'Folha de Pagamento' && l.tipo === 'despesa')) {
       DB.create('lancamentos', {
         tipo: 'despesa', categoria: 'Folha de Pagamento',
@@ -708,12 +719,14 @@ const Folha = (() => {
         valor: Math.round(totalBruto * 100) / 100,
         data: _mesFolha + '-05', status: 'a_pagar', observacoes: `${funcs.length} funcionários`,
       });
-      DB.create('lancamentos', {
-        tipo: 'despesa', categoria: 'Encargos/FGTS',
-        descricao: `Encargos FGTS — ${_mesFolha}`,
-        valor: Math.round(encargos * 100) / 100,
-        data: _mesFolha + '-07', status: 'a_pagar', observacoes: 'FGTS patronal 8%',
-      });
+      if (encargos > 0) {
+        DB.create('lancamentos', {
+          tipo: 'despesa', categoria: 'Encargos/FGTS',
+          descricao: `Encargos FGTS — ${_mesFolha}`,
+          valor: Math.round(encargos * 100) / 100,
+          data: _mesFolha + '-07', status: 'a_pagar', observacoes: 'FGTS patronal 8% — apenas funcionários CLT',
+        });
+      }
     }
     const mesLbl = new Date(_mesFolha + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     Toast.success(`Folha de ${mesLbl} gerada para ${funcs.length} funcionários. Lançamentos criados no Financeiro.`);
@@ -1003,7 +1016,7 @@ const Folha = (() => {
     var sal = func.salarioBase || 0;
     var inss = folhaMes ? (folhaMes.inss || 0) : calcINSS(sal);
     var irrf = folhaMes ? (folhaMes.irrf || 0) : calcIRRF(sal, inss, func.dependentes || 0);
-    var fgts = folhaMes ? (folhaMes.fgts || 0) : Math.round(sal * 0.08 * 100) / 100;
+    var fgts = folhaMes ? (folhaMes.fgts || 0) : (_temFGTS(func) ? Math.round(sal * 0.08 * 100) / 100 : 0);
     var vt = func.vt || 0;
     var vr = func.vr || 0;
     var plano = func.planoSaude || 0;

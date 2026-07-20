@@ -13,7 +13,7 @@ const DB = (() => {
     'trafego_campanhas','trafego_metas',
     'timesheet','arts','socios','documentos',
     'despesas_fixas','dividas','ativos_empresa',
-    'pessoal_lancamentos','plano_acoes',
+    'pessoal_lancamentos','plano_acoes','agenda_pessoal',
   ];
 
   // Cache em memória — populado por loadAll()

@@ -130,6 +130,8 @@ const PropostaGenerator = (() => {
         <button class="tab-btn" onclick="pgTab(this,'pgOpcoes')">6. Opções</button>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
+        <button type="button" class="btn btn-sm" id="btnPreencherIA" onclick="PropostaGenerator.preencherComIA()"
+          style="background:#7c3aed;border-color:#7c3aed;color:#fff" title="Gera objetivo, escopo técnico, cronograma e inclusos automaticamente">✨ Preencher com IA</button>
         <button type="button" class="btn btn-primary btn-sm" onclick="PropostaGenerator.generatePDF()">📄 Gerar PDF</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="PropostaGenerator.downloadHTML()">💾 Baixar HTML</button>
       </div>
@@ -622,6 +624,99 @@ enerlab</textarea>
     setTimeout(() => window.open('proposta_viewer.html', '_blank'), 400);
   }
 
+  /* ================================================================
+     PREENCHIMENTO AUTOMÁTICO COM IA
+     Chama a edge function proposta-ia (Supabase), que gera objetivo,
+     escopo técnico em grupos, cronograma e inclusos no padrão Bikows.
+     ================================================================ */
+  function preencherComIA() {
+    const servico = document.getElementById('gpServico')?.value?.trim() || '';
+    if (!servico) {
+      Toast.error('Informe o "Serviço Solicitado" na aba 1 antes de gerar com IA.');
+      return;
+    }
+    const cliente  = document.getElementById('gpCliNome')?.value?.trim() || '';
+    const cidade   = document.getElementById('gpCliCidade')?.value?.trim() || '';
+    const valor    = Utils.parseMoney(document.getElementById('gpValor')?.value || 0);
+
+    // Segmento vem do cadastro do cliente, quando vinculado
+    const cliSelId = document.getElementById('gpClienteSel')?.value || '';
+    const segmento = cliSelId ? (DB.get('clientes', cliSelId)?.segmento || '') : '';
+
+    Modal.open({
+      title: '✨ Preencher proposta com IA',
+      body: `
+        <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:var(--radius);padding:12px 14px;margin-bottom:14px">
+          <div class="text-sm font-bold" style="color:#6d28d9;margin-bottom:4px">${Utils.escHtml(servico)}</div>
+          <div class="text-xs text-muted">${Utils.escHtml(cliente || 'Cliente não informado')}${cidade ? ' · ' + Utils.escHtml(cidade) : ''}${valor ? ' · ' + Utils.formatCurrency(valor) : ''}</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Detalhes técnicos <span class="text-xs text-muted">(quanto mais específico, melhor a proposta)</span></label>
+          <textarea class="form-control" id="iaDetalhes" rows="5" placeholder="Ex: 3 prensas hidráulicas de 60 toneladas, sem proteção nas zonas de prensagem. Cliente recebeu notificação do MTE. Necessário enclausuramento, cortina de luz e comando bimanual."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de escopo</label>
+          <select class="form-control" id="iaComMateriais">
+            <option value="true">Engenharia + materiais e instalação (Grupo A e B)</option>
+            <option value="false">Somente engenharia e documentação (Grupo A)</option>
+          </select>
+        </div>
+        <div class="text-xs text-muted">A IA vai gerar: objetivo, escopo técnico completo com normas aplicáveis, cronograma de execução, itens inclusos no valor e prazo. Você pode editar tudo depois.</div>
+      `,
+      saveLabel: '✨ Gerar conteúdo',
+      saveCb: () => _executarIA({ servico, cliente, segmento, cidade, valor }),
+    });
+  }
+
+  async function _executarIA(base) {
+    const detalhes     = document.getElementById('iaDetalhes')?.value?.trim() || '';
+    const comMateriais = document.getElementById('iaComMateriais')?.value !== 'false';
+    const btn = document.getElementById('btnModalSave');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Gerando… (até 1 min)'; }
+
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/proposta-ia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON,
+        },
+        body: JSON.stringify({ ...base, detalhes, comMateriais }),
+      });
+      const json = await resp.json();
+
+      if (!json.ok) {
+        Toast.error(json.erro || 'Não foi possível gerar o conteúdo.');
+        if (btn) { btn.disabled = false; btn.textContent = '✨ Gerar conteúdo'; }
+        return;
+      }
+
+      _aplicarConteudoIA(json.dados);
+      Modal.close();
+      Toast.success('✨ Proposta preenchida! Revise o escopo antes de gerar o PDF.', 5000);
+    } catch (err) {
+      console.error('[PropostaGenerator] IA:', err);
+      Toast.error('Erro de conexão ao gerar conteúdo: ' + (err.message || ''));
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Gerar conteúdo'; }
+    }
+  }
+
+  function _aplicarConteudoIA(d) {
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+
+    setVal('gpIntro', d.introTexto);
+    setVal('gpObjetivo', d.objetivo);
+    setVal('gpPrazo', d.prazoEntrega);
+
+    if (Array.isArray(d.escopoSections) && d.escopoSections.length) restoreEscopo(d.escopoSections);
+    if (Array.isArray(d.cronograma) && d.cronograma.length)         restoreCronograma(d.cronograma);
+
+    if (Array.isArray(d.inclui) && d.inclui.length) {
+      const c = document.getElementById('incluiContainer');
+      if (c) c.innerHTML = d.inclui.map((t, i) => renderIncluiRow(t, i)).join('');
+    }
+  }
+
   // ---- Valor por extenso ----
   function valorPorExtenso(n) {
     if (!n || n === 0) return 'zero reais';
@@ -726,5 +821,6 @@ enerlab</textarea>
     open, generate, preencherCliente,
     addEscopoSection, addEscopoItem, addCronogramaRow, addIncluiItem,
     atualizarExtenso, generatePDF, downloadHTML,
+    preencherComIA,
   };
 })();

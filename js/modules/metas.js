@@ -20,7 +20,102 @@ const Metas = (() => {
   function _metaVazia(ano, trimestre) {
     return { ano, trimestre, receita:0, novosClientes:0, novosLeads:0,
       propostas:0, taxaConversao:30, projetosConcluidos:0, licitacoesGanhas:0,
-      servicosMetas:[], observacoes:'' };
+      servicosMetas:[], metasCustom:[], observacoes:'' };
+  }
+
+  /* ====================================================
+     DEFINIÇÃO DE METAS POR PERÍODO (com diluição)
+     Você define no nível que quiser — anual, semestral,
+     trimestral ou mensal — e o sistema distribui pelos
+     trimestres, que são a unidade de acompanhamento.
+     ==================================================== */
+
+  // Indicadores que podem receber meta. 'acumula' = soma ao longo do ano
+  // (receita, leads…); indicadores de taxa não somam, são média.
+  const INDICADORES = [
+    { key:'receita',            label:'Faturamento',        icon:'💰', tipo:'moeda',   acumula:true  },
+    { key:'novosLeads',         label:'Novos Leads',        icon:'💼', tipo:'numero',  acumula:true  },
+    { key:'propostas',          label:'Propostas Enviadas', icon:'📄', tipo:'numero',  acumula:true  },
+    { key:'novosClientes',      label:'Novos Clientes',     icon:'🏢', tipo:'numero',  acumula:true  },
+    { key:'projetosConcluidos', label:'Projetos Concluídos',icon:'📋', tipo:'numero',  acumula:true  },
+    { key:'licitacoesGanhas',   label:'Licitações Ganhas',  icon:'🏛', tipo:'numero',  acumula:true  },
+    { key:'taxaConversao',      label:'Taxa de Conversão',  icon:'📈', tipo:'percent', acumula:false },
+  ];
+
+  const PERIODOS = {
+    anual:      { label:'Anual',      trimestres:[0,1,2,3], sub:'O valor é distribuído nos 4 trimestres' },
+    semestre1:  { label:'1º Semestre',trimestres:[0,1],     sub:'Distribuído em Q1 e Q2' },
+    semestre2:  { label:'2º Semestre',trimestres:[2,3],     sub:'Distribuído em Q3 e Q4' },
+    q0:         { label:'Q1 (Jan–Mar)', trimestres:[0],     sub:'Meta direta do trimestre' },
+    q1:         { label:'Q2 (Abr–Jun)', trimestres:[1],     sub:'Meta direta do trimestre' },
+    q2:         { label:'Q3 (Jul–Set)', trimestres:[2],     sub:'Meta direta do trimestre' },
+    q3:         { label:'Q4 (Out–Dez)', trimestres:[3],     sub:'Meta direta do trimestre' },
+    mensal:     { label:'Mensal (×12)', trimestres:[0,1,2,3], sub:'O valor mensal é multiplicado por 3 em cada trimestre' },
+  };
+
+  // Estado da tela de definição
+  let _defPeriodo = 'anual';
+  let _defModo    = 'linear'; // linear | crescente | manual
+  let _defValores = {};       // { indicadorKey: valorTotalDoPeriodo }
+  let _defAjustes = {};       // { indicadorKey: [v0,v1,v2,v3] } quando modo manual
+  let _defCustom  = [];       // [{nome, valor, unidade}]
+
+  /* Distribui um total entre N períodos conforme o modo escolhido.
+     - linear:    partes iguais
+     - crescente: progressão que reflete crescimento ao longo do ano
+     Sempre fecha exatamente no total (a última parcela absorve o resto). */
+  function _distribuir(total, nPeriodos, modo, inteiro) {
+    if (!total || nPeriodos < 1) return new Array(Math.max(nPeriodos,0)).fill(0);
+    if (nPeriodos === 1) return [inteiro ? Math.round(total) : total];
+
+    let pesos;
+    if (modo === 'crescente') {
+      // Crescimento suave: cada período pesa ~15% mais que o anterior
+      pesos = []; let p = 1;
+      for (let i = 0; i < nPeriodos; i++) { pesos.push(p); p *= 1.15; }
+    } else {
+      pesos = new Array(nPeriodos).fill(1);
+    }
+    const somaPesos = pesos.reduce((s, p) => s + p, 0);
+
+    const out = []; let acumulado = 0;
+    for (let i = 0; i < nPeriodos - 1; i++) {
+      let v = total * (pesos[i] / somaPesos);
+      v = inteiro ? Math.round(v) : Math.round(v * 100) / 100;
+      out.push(v); acumulado += v;
+    }
+    const ultimo = inteiro ? Math.round(total - acumulado) : Math.round((total - acumulado) * 100) / 100;
+    out.push(ultimo);
+    return out;
+  }
+
+  /* Calcula como cada indicador ficará distribuído nos trimestres do período */
+  function _calcularDistribuicao() {
+    const cfg = PERIODOS[_defPeriodo];
+    const qs  = cfg.trimestres;
+    const out = {}; // { key: { q0:v, q1:v, ... } }
+
+    INDICADORES.forEach(ind => {
+      const total = Number(_defValores[ind.key]) || 0;
+      if (!total) return;
+
+      let valores;
+      if (_defModo === 'manual' && _defAjustes[ind.key]) {
+        valores = _defAjustes[ind.key];
+      } else if (_defPeriodo === 'mensal') {
+        // Valor mensal → cada trimestre recebe 3 meses
+        const porTrim = ind.acumula ? total * 3 : total;
+        valores = qs.map(() => ind.tipo === 'moeda' ? porTrim : Math.round(porTrim));
+      } else if (!ind.acumula) {
+        // Taxas não se dividem — o mesmo alvo vale para cada trimestre
+        valores = qs.map(() => total);
+      } else {
+        valores = _distribuir(total, qs.length, _defModo, ind.tipo !== 'moeda');
+      }
+      out[ind.key] = {};
+      qs.forEach((q, i) => { out[ind.key][q] = valores[i] || 0; });
+    });
+    return out;
   }
 
   /* ---- Cálculo de realizados ---- */
@@ -76,6 +171,7 @@ const Metas = (() => {
   function render() {
     const tabs = [
       { id:'painel',     label:'📊 Dashboard' },
+      { id:'definir',    label:'⚙️ Definir Metas' },
       { id:'trimestres', label:'🎯 Por Trimestre' },
       { id:'servicos',   label:'🔧 Por Serviço' },
       { id:'anual',      label:'📅 Visão Anual' },
@@ -104,9 +200,228 @@ const Metas = (() => {
     const el = document.getElementById('metasContent');
     if (!el) return;
     if (_tab === 'painel')     el.innerHTML = _renderPainel();
+    if (_tab === 'definir')    el.innerHTML = _renderDefinir();
     if (_tab === 'trimestres') el.innerHTML = _renderTrimestres();
     if (_tab === 'servicos')   el.innerHTML = _renderServicos();
     if (_tab === 'anual')      el.innerHTML = _renderAnual();
+  }
+
+  /* ====================================================
+     ABA: DEFINIR METAS (períodos flexíveis + diluição)
+     ==================================================== */
+  function _renderDefinir() {
+    const cfg  = PERIODOS[_defPeriodo];
+    const dist = _calcularDistribuicao();
+    const temValor = Object.keys(dist).length > 0 || _defCustom.some(c => c.valor);
+
+    const fmt = (ind, v) =>
+      ind.tipo === 'moeda'   ? Utils.formatCurrency(v)
+    : ind.tipo === 'percent' ? v + '%'
+    : Math.round(v);
+
+    return `
+      <div class="callout-info" style="background:var(--primary-light);border-left:4px solid var(--primary);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px">
+        <div class="text-sm"><strong>Defina no nível que fizer sentido</strong> — anual, semestral, trimestral ou mensal.
+        O sistema distribui automaticamente pelos trimestres, que é como o acompanhamento é feito.</div>
+      </div>
+
+      <!-- 1. PERÍODO -->
+      <div class="card mb-4">
+        <div class="card-header"><div class="card-title">1️⃣ Período da meta — ${_ano}</div></div>
+        <div class="card-body">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${Object.entries(PERIODOS).map(([k, p]) => `
+              <button onclick="Metas.setDefPeriodo('${k}')"
+                style="padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);
+                       border:2px solid ${_defPeriodo===k?'var(--primary)':'var(--border)'};
+                       background:${_defPeriodo===k?'var(--primary)':'var(--surface)'};
+                       color:${_defPeriodo===k?'#fff':'var(--text)'}">${p.label}</button>`).join('')}
+          </div>
+          <div class="text-xs text-muted mt-2">${cfg.sub}</div>
+        </div>
+      </div>
+
+      <!-- 2. MODO DE DISTRIBUIÇÃO -->
+      ${cfg.trimestres.length > 1 && _defPeriodo !== 'mensal' ? `
+      <div class="card mb-4">
+        <div class="card-header"><div class="card-title">2️⃣ Como distribuir entre os trimestres</div></div>
+        <div class="card-body">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm ${_defModo==='linear'?'btn-primary':'btn-secondary'}" onclick="Metas.setDefModo('linear')">
+              ➗ Igual — mesmo valor por trimestre
+            </button>
+            <button class="btn btn-sm ${_defModo==='crescente'?'btn-primary':'btn-secondary'}" onclick="Metas.setDefModo('crescente')">
+              📈 Crescente — sobe ao longo do ano
+            </button>
+          </div>
+          <div class="text-xs text-muted mt-2">
+            ${_defModo === 'crescente'
+              ? 'Cada trimestre recebe ~15% a mais que o anterior — reflete a curva de crescimento do plano.'
+              : 'O total é dividido em partes iguais entre os trimestres do período.'}
+          </div>
+        </div>
+      </div>` : ''}
+
+      <!-- 3. VALORES -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <div class="card-title">${cfg.trimestres.length > 1 && _defPeriodo !== 'mensal' ? '3️⃣' : '2️⃣'} Metas do período</div>
+          <span class="text-xs text-muted">${_defPeriodo === 'mensal' ? 'Informe o valor de UM mês' : 'Informe o total do período'}</span>
+        </div>
+        <div class="card-body">
+          <div class="grid-2" style="gap:12px">
+            ${INDICADORES.map(ind => `
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">${ind.icon} ${ind.label}
+                  ${!ind.acumula ? '<span class="text-xs text-muted">(alvo, não soma)</span>' : ''}</label>
+                <input class="form-control" type="text" inputmode="decimal"
+                  value="${_defValores[ind.key] != null ? (ind.tipo === 'moeda' ? Utils.moneyToInput(_defValores[ind.key]) : _defValores[ind.key]) : ''}"
+                  placeholder="${ind.tipo === 'moeda' ? '0,00' : ind.tipo === 'percent' ? '%' : '0'}"
+                  oninput="Metas.setDefValor('${ind.key}', this.value)">
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. METAS PERSONALIZADAS -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <div class="card-title">🎯 Metas personalizadas</div>
+          <button class="btn btn-sm btn-secondary" onclick="Metas.addCustom()">+ Adicionar</button>
+        </div>
+        <div class="card-body">
+          <div class="text-xs text-muted mb-3">Qualquer indicador do seu planejamento: artigos publicados, contratos de recorrência, conexões no LinkedIn, prospecções por semana…</div>
+          ${_defCustom.length === 0
+            ? '<div class="text-sm text-muted">Nenhuma meta personalizada. Clique em "+ Adicionar".</div>'
+            : _defCustom.map((c, i) => `
+              <div class="parcela-row">
+                <input class="form-control" style="flex:2" placeholder="Nome do indicador" value="${Utils.escHtml(c.nome || '')}"
+                  oninput="Metas.setCustom(${i},'nome',this.value)">
+                <input class="form-control" style="flex:1" type="text" inputmode="decimal" placeholder="Meta" value="${c.valor || ''}"
+                  oninput="Metas.setCustom(${i},'valor',this.value)">
+                <input class="form-control" style="flex:1" placeholder="Unidade" value="${Utils.escHtml(c.unidade || '')}"
+                  oninput="Metas.setCustom(${i},'unidade',this.value)">
+                <button class="btn btn-xs btn-danger" onclick="Metas.removeCustom(${i})">✕</button>
+              </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- 5. PREVIEW -->
+      ${temValor ? `
+      <div class="card mb-4" style="border:2px solid var(--primary)">
+        <div class="card-header" style="background:var(--primary-light)">
+          <div class="card-title">👁 Como vai ficar distribuído</div>
+        </div>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead><tr><th>Indicador</th>${cfg.trimestres.map(q => `<th>${Q_LABELS[q]}</th>`).join('')}<th>Total ano</th></tr></thead>
+            <tbody>
+              ${INDICADORES.filter(ind => dist[ind.key]).map(ind => {
+                const linha = cfg.trimestres.map(q => dist[ind.key][q] || 0);
+                const total = ind.acumula ? linha.reduce((s,v) => s+v, 0) : (linha[0] || 0);
+                return `<tr>
+                  <td class="font-semibold text-sm">${ind.icon} ${ind.label}</td>
+                  ${linha.map(v => `<td class="text-sm">${fmt(ind, v)}</td>`).join('')}
+                  <td class="font-bold text-primary">${fmt(ind, total)}${!ind.acumula ? ' <span class="text-xs text-muted">(alvo)</span>' : ''}</td>
+                </tr>`;
+              }).join('')}
+              ${_defCustom.filter(c => c.nome && c.valor).map(c => {
+                const vals = _distribuir(Utils.parseMoney(c.valor), cfg.trimestres.length, _defModo, true);
+                return `<tr>
+                  <td class="font-semibold text-sm">🎯 ${Utils.escHtml(c.nome)}</td>
+                  ${vals.map(v => `<td class="text-sm">${v} ${Utils.escHtml(c.unidade||'')}</td>`).join('')}
+                  <td class="font-bold text-primary">${Utils.parseMoney(c.valor)} ${Utils.escHtml(c.unidade||'')}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body" style="border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" onclick="Metas.salvarDefinicao()">✅ Aplicar metas em ${_ano}</button>
+          <span class="text-xs text-muted">Sobrescreve apenas os indicadores preenchidos, nos trimestres do período escolhido.</span>
+        </div>
+      </div>` : `
+      <div class="card"><div class="card-body">
+        <div class="empty-state" style="padding:24px">
+          <div class="empty-icon">🎯</div>
+          <div class="empty-title">Preencha ao menos uma meta acima</div>
+          <div class="empty-sub">A prévia da distribuição aparece aqui automaticamente.</div>
+        </div>
+      </div></div>`}
+    `;
+  }
+
+  /* ---- Controles da aba Definir ---- */
+  function setDefPeriodo(p) { _defPeriodo = p; _defAjustes = {}; _renderTab(); }
+  function setDefModo(m)    { _defModo = m; _renderTab(); }
+
+  function setDefValor(key, val) {
+    const ind = INDICADORES.find(i => i.key === key);
+    _defValores[key] = ind?.tipo === 'moeda' ? Utils.parseMoney(val) : (parseFloat(String(val).replace(',', '.')) || 0);
+    _renderPreviewOnly();
+  }
+
+  function addCustom()   { _defCustom.push({ nome:'', valor:'', unidade:'' }); _renderTab(); }
+  function removeCustom(i) { _defCustom.splice(i, 1); _renderTab(); }
+  function setCustom(i, campo, val) {
+    if (!_defCustom[i]) return;
+    _defCustom[i][campo] = val;
+    if (campo !== 'nome') _renderPreviewOnly();
+  }
+
+  // Re-renderiza só quando necessário, preservando o foco do campo em edição
+  let _previewTimer = null;
+  function _renderPreviewOnly() {
+    clearTimeout(_previewTimer);
+    _previewTimer = setTimeout(() => {
+      const ativo = document.activeElement;
+      const id = ativo?.getAttribute?.('oninput') || '';
+      const pos = ativo?.selectionStart;
+      _renderTab();
+      if (id) {
+        const novo = [...document.querySelectorAll('#metasContent input')].find(el => el.getAttribute('oninput') === id);
+        if (novo) { novo.focus(); if (pos != null) novo.setSelectionRange(pos, pos); }
+      }
+    }, 400);
+  }
+
+  function salvarDefinicao() {
+    const cfg  = PERIODOS[_defPeriodo];
+    const dist = _calcularDistribuicao();
+    const customValidos = _defCustom.filter(c => c.nome && c.valor);
+
+    if (Object.keys(dist).length === 0 && customValidos.length === 0) {
+      Toast.error('Preencha ao menos uma meta antes de aplicar.');
+      return;
+    }
+
+    cfg.trimestres.forEach((q, idx) => {
+      const existente = DB.getAll('metas').find(m => m.ano === _ano && m.trimestre === q);
+      const base = existente || _metaVazia(_ano, q);
+      const novo = { ...base };
+
+      // Indicadores padrão — sobrescreve só o que foi preenchido
+      Object.keys(dist).forEach(key => { novo[key] = dist[key][q]; });
+
+      // Metas personalizadas — distribuídas do mesmo modo
+      if (customValidos.length) {
+        const custom = [...(base.metasCustom || [])];
+        customValidos.forEach(c => {
+          const vals = _distribuir(Utils.parseMoney(c.valor), cfg.trimestres.length, _defModo, true);
+          const i = custom.findIndex(x => x.nome === c.nome);
+          const item = { nome: c.nome, valor: vals[idx] || 0, unidade: c.unidade || '' };
+          if (i >= 0) custom[i] = item; else custom.push(item);
+        });
+        novo.metasCustom = custom;
+      }
+
+      if (existente) DB.update('metas', existente.id, novo);
+      else DB.create('metas', novo);
+    });
+
+    Toast.success(`✅ Metas aplicadas em ${cfg.label} de ${_ano}`);
+    _tab = 'painel';
+    render();
   }
 
   /* ====================================================
@@ -574,5 +889,6 @@ const Metas = (() => {
   function setQDash(q)   { _qDash = q; if (_tab === 'painel') _renderTab(); }
   function addNew()      { editMeta(_ano, _trimestreAtual()); }
 
-  return { render, setTab, setAno, setQDash, addNew, editMeta, saveMeta, editServicos, saveServicos };
+  return { render, setTab, setAno, setQDash, addNew, editMeta, saveMeta, editServicos, saveServicos,
+           setDefPeriodo, setDefModo, setDefValor, addCustom, removeCustom, setCustom, salvarDefinicao };
 })();

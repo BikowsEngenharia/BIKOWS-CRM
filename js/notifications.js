@@ -111,8 +111,16 @@ const Notifications = (() => {
 
     if (items.length === 0) return;
 
-    // Evita re-notificar os mesmos itens na mesma sessão
-    const sent = JSON.parse(sessionStorage.getItem(NOTIF_KEY) || '[]');
+    // Evita re-notificar os mesmos itens na mesma sessão.
+    // try/catch: sessionStorage corrompido não pode derrubar as notificações.
+    let sent = [];
+    try {
+      const raw = sessionStorage.getItem(NOTIF_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) sent = parsed;
+    } catch (e) {
+      console.warn('[Notifications] cache de sessão inválido, ignorando:', e);
+    }
     const novos = items.filter(i => !sent.includes(i.tag));
 
     if (novos.length === 0) return;

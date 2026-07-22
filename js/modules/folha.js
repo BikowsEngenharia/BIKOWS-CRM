@@ -55,20 +55,25 @@ const Folha = (() => {
     return Math.round(salario * FGTS_ALIQ * 100) / 100;
   }
 
-  // FGTS é encargo exclusivo de vínculo CLT — não incide sobre pró-labore
-  // de sócio, PJ, autônomo ou estágio.
-  function _temFGTS(func) {
+  // Descontos de folha (INSS, IRRF) e FGTS são exclusivos do vínculo CLT.
+  // Sócio = retirada / distribuição de lucros: valor cheio, sem desconto.
+  // PJ, Autônomo e Parceria recebem por NF/RPA — o líquido é o valor
+  // contratado, sem retenção aqui. Estágio: bolsa isenta.
+  function _ehCLT(func) {
     return (func.regimeContratacao || 'CLT') === 'CLT';
   }
+  // Mantido com o nome antigo para não quebrar as chamadas existentes
+  function _temFGTS(func) { return _ehCLT(func); }
 
   function calcFolhaFuncionario(func) {
     const bruto = (func.salarioBase || 0)
       + (func.vt || 0)
       + (func.vr || 0)
       + (func.outrosAdicionais || 0);
-    const inss = calcINSS(func.salarioBase || 0);
-    const irrf = calcIRRF(func.salarioBase || 0, inss, func.dependentes || 0);
-    const fgts = _temFGTS(func) ? calcFGTS(func.salarioBase || 0) : 0;
+    const clt = _ehCLT(func);
+    const inss = clt ? calcINSS(func.salarioBase || 0) : 0;
+    const irrf = clt ? calcIRRF(func.salarioBase || 0, inss, func.dependentes || 0) : 0;
+    const fgts = clt ? calcFGTS(func.salarioBase || 0) : 0;
     const planoSaude = func.planoSaude || 0;
     const totalDescontos = inss + irrf + planoSaude;
     const liquido = bruto - totalDescontos;
@@ -370,6 +375,7 @@ const Folha = (() => {
           <div class="holerite-total"><span>Total de Proventos</span><span>${Utils.formatCurrency(r.bruto)}</span></div>
         </div>
 
+        ${_ehCLT(f) ? `
         <div class="holerite-section">
           <div class="holerite-section-title">Descontos</div>
           <div class="holerite-row">
@@ -379,10 +385,19 @@ const Folha = (() => {
           ${r.irrf > 0 ? `<div class="holerite-row"><span>IRRF</span><span class="holerite-debit">${Utils.formatCurrency(r.irrf)}</span></div>` : ''}
           ${r.planoSaude ? `<div class="holerite-row"><span>Plano de Saúde</span><span class="holerite-debit">${Utils.formatCurrency(r.planoSaude)}</span></div>` : ''}
           <div class="holerite-total"><span>Total de Descontos</span><span style="color:var(--danger)">${Utils.formatCurrency(r.totalDescontos)}</span></div>
-        </div>
+        </div>` : (r.planoSaude ? `
+        <div class="holerite-section">
+          <div class="holerite-section-title">Descontos</div>
+          <div class="holerite-row"><span>Plano de Saúde</span><span class="holerite-debit">${Utils.formatCurrency(r.planoSaude)}</span></div>
+          <div class="holerite-total"><span>Total de Descontos</span><span style="color:var(--danger)">${Utils.formatCurrency(r.totalDescontos)}</span></div>
+        </div>` : `
+        <div class="holerite-section">
+          <div class="holerite-section-title">Descontos</div>
+          <div class="text-sm text-muted">Sem descontos — ${Utils.escHtml(f.regimeContratacao || '')} não sofre retenção de INSS/IRRF nesta folha.</div>
+        </div>`)}
 
         <div class="holerite-section" style="background:var(--primary);color:#fff;border-radius:var(--radius);padding:16px;display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:16px;font-weight:700">SALÁRIO LÍQUIDO A RECEBER</div>
+          <div style="font-size:16px;font-weight:700">${_ehCLT(f) ? 'SALÁRIO LÍQUIDO A RECEBER' : 'VALOR LÍQUIDO DA RETIRADA'}</div>
           <div style="font-size:24px;font-weight:800">${Utils.formatCurrency(r.liquido)}</div>
         </div>
 
@@ -1014,9 +1029,11 @@ const Folha = (() => {
     var w = window.open('', '_blank');
     if (!w) { Toast.error('Bloqueador de pop-up ativo'); return; }
     var sal = func.salarioBase || 0;
-    var inss = folhaMes ? (folhaMes.inss || 0) : calcINSS(sal);
-    var irrf = folhaMes ? (folhaMes.irrf || 0) : calcIRRF(sal, inss, func.dependentes || 0);
-    var fgts = folhaMes ? (folhaMes.fgts || 0) : (_temFGTS(func) ? Math.round(sal * 0.08 * 100) / 100 : 0);
+    // Sócio/PJ/Autônomo/Parceria/Estágio: sem INSS, IRRF ou FGTS
+    var _clt = _ehCLT(func);
+    var inss = folhaMes ? (folhaMes.inss || 0) : (_clt ? calcINSS(sal) : 0);
+    var irrf = folhaMes ? (folhaMes.irrf || 0) : (_clt ? calcIRRF(sal, inss, func.dependentes || 0) : 0);
+    var fgts = folhaMes ? (folhaMes.fgts || 0) : (_clt ? Math.round(sal * 0.08 * 100) / 100 : 0);
     var vt = func.vt || 0;
     var vr = func.vr || 0;
     var plano = func.planoSaude || 0;
@@ -1053,5 +1070,8 @@ const Folha = (() => {
     openFormSocio, saveSocio, deleteSocio,
     _toggleSocioTipo, _calcSocioPreview,
     imprimirHolerite,
+    // expostos para o módulo Meu Financeiro calcular a retirada do sócio
+    // sem duplicar as regras (fonte única de verdade)
+    calcFolhaFuncionario, ehCLT: _ehCLT,
   };
 })();

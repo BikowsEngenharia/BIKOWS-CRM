@@ -91,22 +91,51 @@ const Pessoal = (() => {
     const meuFuncId = cfg.pessoalFuncId || '';
     const importados = new Set(DB.getAll('pessoal_lancamentos').map(l => l.origemId).filter(Boolean));
 
-    // Salários da folha do funcionário vinculado (ainda não puxados)
-    let folhaHtml = '<div class="text-xs text-muted">Selecione seu nome acima para ver os salários da Folha.</div>';
+    // Salário / retirada do funcionário vinculado.
+    // ANTES: só listava folhas JÁ GERADAS no módulo RH — como a folha
+    // raramente é gerada, a lista vinha vazia com a mensagem enganosa
+    // "nenhum salário pendente" e nada podia ser puxado.
+    // AGORA: lista os últimos 6 meses; usa o líquido da folha quando ela
+    // existe e, quando não existe, calcula do cadastro (mesmas regras do
+    // RH — sócio/PJ sem INSS, IRRF ou FGTS).
+    let folhaHtml = '<div class="text-xs text-muted">Selecione seu nome acima para ver seu salário / retirada.</div>';
     if (meuFuncId) {
-      const folhas = DB.getAll('folha')
-        .filter(r => r.funcionarioId === meuFuncId && !importados.has('folha:' + r.id))
-        .sort((a, b) => (b.mes || '').localeCompare(a.mes || ''))
-        .slice(0, 6);
-      folhaHtml = folhas.length === 0
-        ? '<div class="text-xs text-muted">✓ Nenhum salário pendente de puxar.</div>'
-        : folhas.map(r => `
-          <div class="parcela-row">
-            <div style="flex:1"><div class="text-sm font-semibold">Salário ${Utils.escHtml(r.mes || '—')}</div>
-            <div class="text-xs text-muted">Líquido da Folha</div></div>
-            <div class="font-bold text-success">${Utils.formatCurrency(r.liquido || 0)}</div>
-            <button class="btn btn-xs btn-success" onclick="Pessoal.puxarFolha('${r.id}')">＋ Puxar</button>
-          </div>`).join('');
+      const func = DB.get('funcionarios', meuFuncId);
+      if (!func) {
+        folhaHtml = '<div class="text-xs text-muted">Cadastro de funcionário não encontrado.</div>';
+      } else {
+        const ehSocio = typeof Folha !== 'undefined' && Folha.ehCLT ? !Folha.ehCLT(func) : false;
+        const calc = (typeof Folha !== 'undefined' && Folha.calcFolhaFuncionario)
+          ? Folha.calcFolhaFuncionario(func)
+          : { liquido: func.salarioBase || 0 };
+        const folhasDoFunc = DB.getAll('folha').filter(r => r.funcionarioId === meuFuncId);
+        const rotulo = ehSocio ? 'Retirada' : 'Salário';
+
+        // últimos 6 meses, do mais recente para o mais antigo
+        const linhas = [];
+        for (let i = 0; i < 6; i++) {
+          const m = _addMes(Utils.todayStr().substring(0, 7), -i);
+          const folhaMes = folhasDoFunc.find(r => r.mes === m);
+          const origemId = folhaMes ? 'folha:' + folhaMes.id : 'retirada-cad:' + meuFuncId + ':' + m;
+          if (importados.has(origemId)) continue;               // já puxado
+          const valor = folhaMes ? (folhaMes.liquido || 0) : (calc.liquido || 0);
+          if (!valor) continue;                                  // sem valor cadastrado
+          linhas.push({ mes: m, valor, folhaId: folhaMes?.id || '', origemId });
+        }
+
+        folhaHtml = linhas.length === 0
+          ? `<div class="text-xs text-muted">✓ ${rotulo}s dos últimos 6 meses já lançados.</div>`
+          : `${ehSocio ? '<div class="text-xs text-muted mb-2">Retirada de sócio — valor cheio, sem INSS/IRRF.</div>' : ''}` +
+            linhas.map(l => `
+              <div class="parcela-row">
+                <div style="flex:1">
+                  <div class="text-sm font-semibold">${rotulo} ${_mesLabel(l.mes)}</div>
+                  <div class="text-xs text-muted">${l.folhaId ? 'Líquido da Folha (RH)' : 'Do cadastro em RH / Folha'}</div>
+                </div>
+                <div class="font-bold text-success">${Utils.formatCurrency(l.valor)}</div>
+                <button class="btn btn-xs btn-success" onclick="Pessoal.puxarSalario('${l.mes}')">＋ Puxar</button>
+              </div>`).join('');
+      }
     }
 
     // Lançamentos de despesa da empresa (candidatos a retirada) — últimos 90 dias, não puxados
@@ -154,19 +183,52 @@ const Pessoal = (() => {
     render();
   }
 
-  function puxarFolha(folhaId) {
-    const r = DB.get('folha', folhaId); if (!r) return;
-    const origemId = 'folha:' + folhaId;
+  /* Puxa o salário/retirada de um mês. Usa a folha do RH quando existe;
+     senão calcula do cadastro do funcionário (regras do módulo Folha —
+     sócio/PJ recebem valor cheio, sem INSS/IRRF). */
+  function puxarSalario(mes) {
+    const cfg = DB.getConfig();
+    const meuFuncId = cfg.pessoalFuncId || '';
+    const func = meuFuncId ? DB.get('funcionarios', meuFuncId) : null;
+    if (!func) { Toast.error('Vincule seu nome (funcionário) primeiro.'); return; }
+
+    const folhaMes = DB.getAll('folha').find(r => r.funcionarioId === meuFuncId && r.mes === mes);
+    const ehSocio = typeof Folha !== 'undefined' && Folha.ehCLT ? !Folha.ehCLT(func) : false;
+
+    let valor;
+    if (folhaMes) {
+      valor = folhaMes.liquido || 0;
+    } else if (typeof Folha !== 'undefined' && Folha.calcFolhaFuncionario) {
+      valor = Folha.calcFolhaFuncionario(func).liquido || 0;
+    } else {
+      valor = func.salarioBase || 0;
+    }
+
+    if (!valor) {
+      Toast.error('Sem valor cadastrado. Preencha o salário/retirada em RH / Folha.');
+      return;
+    }
+
+    const origemId = folhaMes ? 'folha:' + folhaMes.id : 'retirada-cad:' + meuFuncId + ':' + mes;
     if (DB.getAll('pessoal_lancamentos').some(l => l.origemId === origemId)) { Toast.warning('Já puxado.'); return; }
+
+    const rotulo = ehSocio ? 'Retirada' : 'Salário';
     DB.create('pessoal_lancamentos', {
-      tipo: 'receita', categoria: 'Salário',
-      descricao: `Salário ${r.mes || ''}`.trim(),
-      valor: r.liquido || 0,
-      data: (r.mes ? r.mes + '-05' : Utils.todayStr()),
+      tipo: 'receita',
+      categoria: ehSocio ? 'Retirada da Empresa' : 'Salário',
+      descricao: `${rotulo} ${_mesLabel(mes)}`,
+      valor,
+      data: mes + '-05',
       origem: 'folha', origemId,
     });
-    Toast.success('💵 Salário puxado para o seu financeiro');
+    Toast.success(`💵 ${rotulo} de ${_mesLabel(mes)} lançada no seu financeiro`);
     render();
+  }
+
+  // Mantida por compatibilidade (folhas geradas antes desta versão)
+  function puxarFolha(folhaId) {
+    const r = DB.get('folha', folhaId); if (!r) return;
+    puxarSalario(r.mes);
   }
 
   function puxarRetirada(lancId) {
@@ -256,5 +318,5 @@ const Pessoal = (() => {
   function irHoje()    { _mes = Utils.todayStr().substring(0, 7); render(); }
   function addNew()    { novaDespesa(); }
 
-  return { render, mudarMes, irHoje, novaReceita, novaDespesa, editar, excluir, setFuncionario, puxarFolha, puxarRetirada, addNew };
+  return { render, mudarMes, irHoje, novaReceita, novaDespesa, editar, excluir, setFuncionario, puxarSalario, puxarFolha, puxarRetirada, addNew };
 })();

@@ -639,15 +639,17 @@ const Contratos = (() => {
         Utils.formatDate(c.dataFim || c.vencimento),
       ];
     } else if (tipo === 'vencendo') {
-      title = 'Vencendo em 30 dias';
+      title = 'Vencidos e vencendo em 30 dias';
       items = contratos.filter(c => {
         const dias = Utils.daysUntil(c.dataFim || c.vencimento);
-        return dias !== null && dias >= 0 && dias <= 30 && _autoStatus(c) !== 'encerrado';
+        return dias !== null && dias <= 30 && _autoStatus(c) !== 'encerrado';
       });
       cols = ['Contrato', 'Cliente', 'Vencimento', 'Dias Restantes'];
       rowFn = c => {
         const dias = Utils.daysUntil(c.dataFim || c.vencimento);
-        const diasStr = dias !== null ? `<span style="color:#f59e0b;font-weight:600">${dias}d</span>` : '—';
+        const diasStr = dias === null ? '—'
+          : dias < 0 ? `<span style="color:#C42B2B;font-weight:700">Vencido há ${Math.abs(dias)}d</span>`
+          : `<span style="color:#f59e0b;font-weight:600">${dias}d</span>`;
         return [
           Utils.escHtml(c.objeto || c.numero || '—'),
           Utils.escHtml(DB.get('clientes', c.clienteId)?.nome || '—'),
@@ -997,12 +999,16 @@ const Contratos = (() => {
   }
 
   // Retorna contratos a vencer em N dias (para o dashboard)
+  // Contratos vencendo em N dias — INCLUI os já vencidos.
+  // Antes exigia d >= 0, então contrato vencido sumia do painel de
+  // Pendências: vencia e ninguém era avisado (crítico para renovação
+  // de laudos, que é a base da receita recorrente).
   function getContratosVencendo(dias = 60) {
     return DB.getAll('contratos').filter(c => {
-      if (['encerrado'].includes(c.status)) return false;
+      if (['encerrado','cancelado'].includes(c.status)) return false;
       const d = Utils.daysUntil(c.dataFim);
-      return d != null && d >= 0 && d <= dias;
-    });
+      return d != null && d <= dias;
+    }).sort((a, b) => (a.dataFim || '').localeCompare(b.dataFim || ''));
   }
 
   // Retorna contratos com laudo vencendo em N dias

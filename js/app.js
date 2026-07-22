@@ -426,10 +426,18 @@ const App = (() => {
           if (typeof Contratos === 'undefined' || !Contratos.getContratosVencendo) return '';
           const cv = Contratos.getContratosVencendo(30);
           if (!cv.length) return '';
-          return '<div class="detail-label mb-2 mt-3">Contratos Vencendo em 30 dias (' + cv.length + ')</div>' +
+          const vencidos = cv.filter(c => Utils.daysUntil(c.dataFim) < 0).length;
+          const titulo = vencidos > 0
+            ? 'Contratos Vencidos e a Vencer (' + cv.length + ' · ' + vencidos + ' já vencido' + (vencidos > 1 ? 's' : '') + ')'
+            : 'Contratos Vencendo em 30 dias (' + cv.length + ')';
+          return '<div class="detail-label mb-2 mt-3">' + titulo + '</div>' +
             cv.map(function(c) {
               const dias = Utils.daysUntil(c.dataFim);
-              return '<div class="followup-item urgent mb-2"><div style="flex:1"><div class="font-bold text-sm">📋 ' + Utils.escHtml(c.objeto||c.numero||'—') + '</div><div class="text-xs">' + Utils.escHtml(Utils.getClientName(c.clienteId)) + ' · Vence: ' + Utils.formatDate(c.dataFim) + '</div></div><span class="badge badge-yellow">' + (dias === 0 ? 'Hoje' : dias + 'd') + '</span><button class="btn btn-xs btn-secondary" onclick="App.navigate(\'contratos\');Modal.close()">Ver</button></div>';
+              const venceu = dias < 0;
+              const badge = venceu
+                ? '<span class="badge badge-red">Vencido há ' + Math.abs(dias) + 'd</span>'
+                : '<span class="badge badge-yellow">' + (dias === 0 ? 'Hoje' : dias + 'd') + '</span>';
+              return '<div class="followup-item urgent mb-2"><div style="flex:1"><div class="font-bold text-sm">📋 ' + Utils.escHtml(c.objeto||c.numero||'—') + '</div><div class="text-xs">' + Utils.escHtml(Utils.getClientName(c.clienteId)) + ' · ' + (venceu ? 'Venceu' : 'Vence') + ': ' + Utils.formatDate(c.dataFim) + '</div></div>' + badge + '<button class="btn btn-xs btn-secondary" onclick="App.navigate(\'contratos\');Modal.close()">Ver</button></div>';
             }).join('');
         })()}
 

@@ -423,10 +423,11 @@ const Dashboard = (() => {
     try {
       const contratos = DB.getAll('contratos').filter(c => c.status !== 'encerrado');
 
+      // Inclui contratos JÁ VENCIDOS (d < 0) — antes sumiam do radar
       const vencendo = contratos.filter(c => {
         if (!c.dataFim) return false;
         const d = Utils.daysUntil(c.dataFim);
-        return d != null && d >= 0 && d <= 90;
+        return d != null && d <= 90;
       });
 
       const laudos = contratos.filter(c => {
@@ -465,10 +466,11 @@ const Dashboard = (() => {
     try {
       const contratos = DB.getAll('contratos').filter(c => c.status !== 'encerrado');
 
+      // Inclui contratos JÁ VENCIDOS (d < 0) — antes sumiam do radar
       const vencendo = contratos.filter(c => {
         if (!c.dataFim) return false;
         const d = Utils.daysUntil(c.dataFim);
-        return d != null && d >= 0 && d <= dias;
+        return d != null && d <= dias;
       }).sort((a, b) => (a.dataFim||'').localeCompare(b.dataFim||''));
 
       const laudos = contratos.filter(c => {

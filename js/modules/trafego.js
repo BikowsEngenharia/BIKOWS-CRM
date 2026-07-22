@@ -963,7 +963,7 @@ const Trafego = (() => {
               </div>
               <div class="form-group">
                 <label class="form-label">Meta de Receita (R$)</label>
-                <input class="form-input" type="number" min="0" step="0.01" id="mReceita" value="${metaAtual?.metaReceita || ''}" placeholder="Ex: 30000">
+                <input class="form-input" type="text" inputmode="decimal" id="mReceita" value="${Utils.moneyToInput(metaAtual?.metaReceita)}" placeholder="Ex: 30000">
               </div>
               <div class="form-group">
                 <label class="form-label">Orçamento Planejado (R$)</label>
@@ -1036,7 +1036,7 @@ const Trafego = (() => {
     const metaLeads        = parseInt(document.getElementById('mLeads')?.value) || 0;
     const metaCPL          = parseFloat(document.getElementById('mCPL')?.value) || 0;
     const metaTaxaConversao = parseFloat(document.getElementById('mConv')?.value) || 0;
-    const metaReceita       = parseFloat(document.getElementById('mReceita')?.value) || 0;
+    const metaReceita       = Utils.parseMoney(document.getElementById('mReceita')?.value) || 0;
     const orcamentoPlanejado = parseFloat(document.getElementById('mOrcamento')?.value) || 0;
     const observacoes       = document.getElementById('mObs')?.value?.trim();
 

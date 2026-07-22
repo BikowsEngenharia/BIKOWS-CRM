@@ -442,7 +442,7 @@ const Propostas = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor Total (R$) *</label>
-            <input class="form-control" id="fpValor" type="number" step="0.01" value="${p?.valor||''}" placeholder="Preenchido automaticamente pelos itens">
+            <input class="form-control" id="fpValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(p?.valor)}" placeholder="Preenchido automaticamente pelos itens">
             <div class="text-xs text-muted mt-1">Preenchido automaticamente ao adicionar itens, ou informe manualmente</div>
           </div>
         </div>
@@ -471,7 +471,7 @@ const Propostas = (() => {
     if (!titulo) { Toast.error('Título obrigatório'); return; }
     // Use items total if items exist, else manual valor
     const autoValor = _formItems.length > 0 ? _sumItems() : 0;
-    const manualValor = Number(document.getElementById('fpValor').value);
+    const manualValor = Utils.parseMoney(document.getElementById('fpValor').value);
     const valor = autoValor > 0 ? autoValor : manualValor;
     if (!valor) { Toast.error('Informe o valor da proposta ou adicione itens'); return; }
 
@@ -1398,7 +1398,7 @@ const Propostas = (() => {
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Valor Total (R$) *</label>
-              <input class="form-control" id="prValor" type="number" step="0.01" placeholder="Ex: 15000" value="${lead?.valorEstimado||''}">
+              <input class="form-control" id="prValor" type="text" inputmode="decimal" placeholder="Ex: 15000" value="${Utils.moneyToInput(lead?.valorEstimado)}">
             </div>
             <div class="form-group">
               <label class="form-label">Prazo de Execução</label>
@@ -1443,7 +1443,7 @@ const Propostas = (() => {
 
   function _gerarPropostaRapida(leadId) {
     if (!_templateSelecionado) { Toast.error('Selecione um tipo de serviço'); return; }
-    const valor = Number(document.getElementById('prValor')?.value);
+    const valor = Utils.parseMoney(document.getElementById('prValor')?.value);
     if (!valor) { Toast.error('Informe o valor total'); return; }
     const t = TEMPLATES_SERVICOS[_templateSelecionado];
     const lead = leadId ? DB.get('leads', leadId) : null;

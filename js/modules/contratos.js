@@ -404,14 +404,14 @@ const Contratos = (() => {
         </div>
         <div class="form-group">
           <label class="form-label">Novo Valor (R$)</label>
-          <input class="form-control" id="rnValor" type="number" value="${c.valor||''}">
+          <input class="form-control" id="rnValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(c.valor)}">
         </div>
       `,
       saveCb: () => {
         DB.update('contratos', id, {
           dataInicio: document.getElementById('rnInicio').value,
           dataFim: document.getElementById('rnFim').value,
-          valor: Number(document.getElementById('rnValor').value) || c.valor,
+          valor: Utils.parseMoney(document.getElementById('rnValor').value) || c.valor,
           status: 'ativo',
         });
         Toast.success('Contrato renovado com sucesso!');
@@ -471,7 +471,7 @@ const Contratos = (() => {
           </div>
           <div class="form-group">
             <label class="form-label">Valor Anual / Total (R$) *</label>
-            <input class="form-control" id="fcValor" type="number" step="0.01" value="${c?.valor||''}">
+            <input class="form-control" id="fcValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(c?.valor)}">
           </div>
         </div>
         <div class="form-row">
@@ -544,7 +544,7 @@ const Contratos = (() => {
   function saveContrato(id) {
     const objeto = document.getElementById('fcObjeto').value.trim();
     if (!objeto) { Toast.error('Objeto do contrato obrigatório'); return; }
-    const valor = Number(document.getElementById('fcValor').value);
+    const valor = Utils.parseMoney(document.getElementById('fcValor').value);
     if (!valor) { Toast.error('Valor obrigatório'); return; }
 
     const data = {
@@ -763,7 +763,7 @@ const Contratos = (() => {
           </div>
           <div class="form-group">
             <label class="form-label">Valor Total (R$) *</label>
-            <input class="form-control" id="fcValor" type="number" step="0.01" value="${p.valor||''}">
+            <input class="form-control" id="fcValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(p.valor)}">
           </div>
         </div>
         <div class="form-row">
@@ -803,7 +803,7 @@ const Contratos = (() => {
       saveCb: () => {
         const objeto = document.getElementById('fcObjeto').value.trim();
         if (!objeto) { Toast.error('Objeto obrigatório'); return; }
-        const valor = Number(document.getElementById('fcValor').value);
+        const valor = Utils.parseMoney(document.getElementById('fcValor').value);
         if (!valor) { Toast.error('Valor obrigatório'); return; }
         const data = {
           numero:             document.getElementById('fContratoNumero').value.trim(),

@@ -516,13 +516,21 @@ const Financeiro = (() => {
     const r=DB.get('recebiveis',rId);if(!r)return;
     const parcela=(r.parcelas||[]).find(p=>p.id===pId);
     if(!parcela||parcela.status==='recebido')return;
+    const valorParcela=Number(parcela.valor)||0;
+    // Sem valor não há o que lançar — antes criava lançamento de R$ 0,00
+    // poluindo o Financeiro e os relatórios.
+    if(valorParcela<=0){
+      Toast.error('Esta parcela está sem valor. Edite o recebível e informe o valor antes de marcar como recebida.');
+      return;
+    }
     DB.update('recebiveis',rId,{parcelas:(r.parcelas||[]).map(p=>p.id===pId?{...p,status:'recebido',dataPagamento:Utils.todayStr()}:p)});
     // Cria lançamento de receita para alimentar KPIs, DRE e relatórios
     DB.create('lancamentos',{
       tipo:'receita',categoria:'Serviços de Engenharia',
       descricao:(r.descricao||'Recebimento')+' — Parcela',
-      valor:parcela.valor,data:Utils.todayStr(),status:'recebido',
-      clienteId:r.clienteId||'',observacoes:'Criado automaticamente ao receber parcela do recebível.',
+      valor:valorParcela,data:Utils.todayStr(),status:'recebido',
+      clienteId:r.clienteId||'',recebivelId:rId,parcelaId:pId,
+      observacoes:'Criado automaticamente ao receber parcela do recebível.',
     });
     Toast.success('Parcela recebida e lançamento registrado');renderTab();
   }

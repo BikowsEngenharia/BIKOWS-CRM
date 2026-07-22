@@ -976,15 +976,15 @@ const Licitacoes = (() => {
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Valor Estimado (Edital)</label>
-              <input class="form-control" id="flValorEst" type="number" step="0.01" value="${l?.valorEstimado||''}" placeholder="0">
+              <input class="form-control" id="flValorEst" type="text" inputmode="decimal" value="${Utils.moneyToInput(l?.valorEstimado)}" placeholder="0">
             </div>
             <div class="form-group">
               <label class="form-label">Nossa Proposta (R$)</label>
-              <input class="form-control" id="flValorProp" type="number" step="0.01" value="${l?.valorProposta||''}" placeholder="0">
+              <input class="form-control" id="flValorProp" type="text" inputmode="decimal" value="${Utils.moneyToInput(l?.valorProposta)}" placeholder="0">
             </div>
             <div class="form-group">
               <label class="form-label">Valor Adjudicado (R$)</label>
-              <input class="form-control" id="flValorAdj" type="number" step="0.01" value="${l?.valorAdjudicado||''}" placeholder="Se ganhou">
+              <input class="form-control" id="flValorAdj" type="text" inputmode="decimal" value="${Utils.moneyToInput(l?.valorAdjudicado)}" placeholder="Se ganhou">
             </div>
           </div>
           <div class="form-row">
@@ -1049,9 +1049,9 @@ const Licitacoes = (() => {
       dataAbertura:    document.getElementById('flDataAbertura').value,
       dataResultado:   document.getElementById('flDataResult').value,
       prazoExecucao:   Number(document.getElementById('flPrazoExec').value) || null,
-      valorEstimado:   Number(document.getElementById('flValorEst').value) || null,
-      valorProposta:   Number(document.getElementById('flValorProp').value) || null,
-      valorAdjudicado: Number(document.getElementById('flValorAdj').value) || null,
+      valorEstimado:   Utils.parseMoney(document.getElementById('flValorEst').value) || null,
+      valorProposta:   Utils.parseMoney(document.getElementById('flValorProp').value) || null,
+      valorAdjudicado: Utils.parseMoney(document.getElementById('flValorAdj').value) || null,
       colocacao:       document.getElementById('flColocacao').value,
       motivoPerda:     document.getElementById('flMotivoPerda').value,
       linkEdital:      document.getElementById('flLinkEdital').value,
@@ -1110,7 +1110,7 @@ const Licitacoes = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor Contratado (R$)</label>
-            <input class="form-control" id="lpValor" type="number" value="${l.valorAdjudicado||l.valorProposta||''}">
+            <input class="form-control" id="lpValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(l.valorAdjudicado||l.valorProposta)}">
           </div>
           <div class="form-group">
             <label class="form-label">Data de Início</label>
@@ -1150,7 +1150,7 @@ const Licitacoes = (() => {
           responsavel: document.getElementById('lpResp').value,
           dataInicio: document.getElementById('lpInicio').value,
           prazo: document.getElementById('lpPrazo').value,
-          valor: Number(document.getElementById('lpValor').value) || 0,
+          valor: Utils.parseMoney(document.getElementById('lpValor').value) || 0,
           status: 'planejado',
           nfEmitida: false,
           pagamentoRecebido: false,
@@ -1262,11 +1262,9 @@ const Licitacoes = (() => {
           // Validate status
           if (!row.status || !STATUS[row.status]) row.status = 'identificada';
 
-          DB.create('licitacoes', {
-            ...row,
-            id: Utils.uuid(),
-            createdAt: new Date().toISOString(),
-          });
+          // DB.create() já gera id e createdAt — chamar Utils.uuid() (que não
+          // existe) quebrava a importação inteira no primeiro registro.
+          DB.create('licitacoes', { ...row });
           imported++;
         }
 

@@ -522,7 +522,7 @@ const Folha = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Salário Base (R$) *</label>
-            <input class="form-control" id="ffSal" type="number" value="${f?.salarioBase||''}">
+            <input class="form-control" id="ffSal" type="text" inputmode="decimal" value="${Utils.moneyToInput(f?.salarioBase)}">
           </div>
           <div class="form-group">
             <label class="form-label">Vale Transporte (R$)</label>
@@ -573,7 +573,7 @@ const Folha = (() => {
   function saveFunc(id) {
     const nome = document.getElementById('ffNome').value.trim();
     const cargo = document.getElementById('ffCargo').value.trim();
-    const sal = Number(document.getElementById('ffSal').value);
+    const sal = Utils.parseMoney(document.getElementById('ffSal').value);
     if (!nome) { Toast.error('Nome obrigatório'); return; }
     if (!cargo) { Toast.error('Cargo obrigatório'); return; }
     if (!sal) { Toast.error('Salário obrigatório'); return; }

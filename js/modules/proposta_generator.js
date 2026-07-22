@@ -281,7 +281,7 @@ const PropostaGenerator = (() => {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Valor Total (R$) *</label>
-          <input class="form-control" id="gpValor" type="number" value="${proposta?.valor||''}" placeholder="0" oninput="PropostaGenerator.atualizarExtenso()">
+          <input class="form-control" id="gpValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(proposta?.valor)}" placeholder="0" oninput="PropostaGenerator.atualizarExtenso()">
         </div>
         <div class="form-group" style="flex:2">
           <label class="form-label">Valor por Extenso</label>
@@ -491,7 +491,7 @@ enerlab</textarea>
 
   // ---- Valor por extenso ----
   function atualizarExtenso() {
-    const val = Number(document.getElementById('gpValor')?.value) || 0;
+    const val = Utils.parseMoney(document.getElementById('gpValor')?.value) || 0;
     if (val > 0) {
       document.getElementById('gpValorExt').value = valorPorExtenso(val);
     }
@@ -540,7 +540,7 @@ enerlab</textarea>
       cronograma,
       cronogramaObs: document.getElementById('gpCronObs')?.value || '',
       fluxoResumo: fluxoRes,
-      valor: Number(document.getElementById('gpValor')?.value) || 0,
+      valor: Utils.parseMoney(document.getElementById('gpValor')?.value) || 0,
       valorPorExtenso: document.getElementById('gpValorExt')?.value || '',
       prazoEntrega: document.getElementById('gpPrazo')?.value || '',
       formaPagamento: document.getElementById('gpPagamento')?.value || '',

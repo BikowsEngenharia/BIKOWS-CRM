@@ -1072,7 +1072,7 @@ const Pipeline = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor (R$) *</label>
-            <input class="form-control" id="cpValor" type="number" value="${lead.valorFechado||lead.valorEstimado||''}">
+            <input class="form-control" id="cpValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(lead.valorFechado||lead.valorEstimado)}">
           </div>
           <div class="form-group">
             <label class="form-label">Data de Início</label>
@@ -1093,7 +1093,7 @@ const Pipeline = (() => {
         </div>`,
       saveCb: () => {
         const titulo = document.getElementById('cpTitulo').value.trim();
-        const valor = Number(document.getElementById('cpValor').value);
+        const valor = Utils.parseMoney(document.getElementById('cpValor').value);
         if (!titulo) { Toast.error('Título obrigatório'); return; }
         DB.create('projetos', {
           titulo, valor,
@@ -1223,11 +1223,11 @@ const Pipeline = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor Estimado (R$)</label>
-            <input class="form-control" id="fValor" type="number" value="${lead?.valorEstimado||''}" placeholder="0">
+            <input class="form-control" id="fValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(lead?.valorEstimado)}" placeholder="0">
           </div>
           <div class="form-group">
             <label class="form-label">Valor Fechado (R$)</label>
-            <input class="form-control" id="fValorFechado" type="number" value="${lead?.valorFechado||''}" placeholder="0">
+            <input class="form-control" id="fValorFechado" type="text" inputmode="decimal" value="${Utils.moneyToInput(lead?.valorFechado)}" placeholder="0">
           </div>
           <div class="form-group">
             <label class="form-label">Responsável</label>
@@ -1347,11 +1347,11 @@ const Pipeline = (() => {
               </div>
               <div class="form-group">
                 <label class="form-label">Valor Estimado pelo Órgão (R$)</label>
-                <input class="form-control" id="fLicValorOrgao" type="number" step="0.01" value="${lead?.licitacao?.valorOrgao||''}" placeholder="Teto declarado no edital">
+                <input class="form-control" id="fLicValorOrgao" type="text" inputmode="decimal" value="${Utils.moneyToInput(lead?.licitacao?.valorOrgao)}" placeholder="Teto declarado no edital">
               </div>
               <div class="form-group">
                 <label class="form-label">Nosso Lance / Proposta (R$)</label>
-                <input class="form-control" id="fLicLance" type="number" step="0.01" value="${lead?.licitacao?.lance||''}" placeholder="Valor que ofertamos">
+                <input class="form-control" id="fLicLance" type="text" inputmode="decimal" value="${Utils.moneyToInput(lead?.licitacao?.lance)}" placeholder="Valor que ofertamos">
               </div>
             </div>
             <div class="form-row">
@@ -1386,8 +1386,8 @@ const Pipeline = (() => {
       status: document.getElementById('fStatus').value,
       clienteId: document.getElementById('fCliente').value,
       segmento: document.getElementById('fSegmento').value,
-      valorEstimado: Number(document.getElementById('fValor').value) || 0,
-      valorFechado: Number(document.getElementById('fValorFechado').value) || 0,
+      valorEstimado: Utils.parseMoney(document.getElementById('fValor').value) || 0,
+      valorFechado: Utils.parseMoney(document.getElementById('fValorFechado').value) || 0,
       responsavel: document.getElementById('fResponsavel').value,
       origemLead: document.getElementById('fOrigem').value,
       campanhaId: campanhaId,
@@ -1397,8 +1397,8 @@ const Pipeline = (() => {
         orgao:       document.getElementById('fLicOrgao')?.value.trim() || '',
         uasg:        document.getElementById('fLicUasg')?.value.trim() || '',
         dataEntrega: document.getElementById('fLicDataEntrega')?.value || '',
-        valorOrgao:  Number(document.getElementById('fLicValorOrgao')?.value) || 0,
-        lance:       Number(document.getElementById('fLicLance')?.value) || 0,
+        valorOrgao:  Utils.parseMoney(document.getElementById('fLicValorOrgao')?.value) || 0,
+        lance:       Utils.parseMoney(document.getElementById('fLicLance')?.value) || 0,
         link:        document.getElementById('fLicLink')?.value.trim() || '',
         resultado:   document.getElementById('fLicResultado')?.value || '',
       } : (existingLead?.licitacao || null),

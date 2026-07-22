@@ -435,7 +435,7 @@ const Projetos = (() => {
           </div>
           <div>
             <div class="text-xs text-muted mb-1">Custo/h (R$)</div>
-            <input class="form-control" id="tsCusto" type="number" step="0.01" placeholder="Ex: 120" style="height:34px;padding:4px 8px">
+            <input class="form-control" id="tsCusto" type="text" inputmode="decimal" placeholder="Ex: 120" style="height:34px;padding:4px 8px">
           </div>
           <div>
             <div class="text-xs text-muted mb-1">Descrição</div>
@@ -469,7 +469,7 @@ const Projetos = (() => {
     const funcionarioNome = document.getElementById('tsFunc')?.value.trim();
     const data = document.getElementById('tsData')?.value;
     const horas = Number(document.getElementById('tsHoras')?.value) || 0;
-    const custoHora = Number(document.getElementById('tsCusto')?.value) || 0;
+    const custoHora = Utils.parseMoney(document.getElementById('tsCusto')?.value) || 0;
     const descricao = document.getElementById('tsDesc')?.value.trim() || '';
     if (!data || horas <= 0) { Toast.error('Data e horas são obrigatórios'); return; }
     DB.create('timesheet', { projetoId, funcionarioNome, data, horas, custoHora, descricao });
@@ -573,7 +573,7 @@ const Projetos = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor da ART (R$)</label>
-            <input class="form-control" id="artValor" type="number" step="0.01" value="${art?.valor||''}" placeholder="0,00">
+            <input class="form-control" id="artValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(art?.valor)}" placeholder="0,00">
           </div>
           <div class="form-group" style="flex:3">
             <label class="form-label">Link / Arquivo (URL)</label>
@@ -595,7 +595,7 @@ const Projetos = (() => {
           dataEmissao: document.getElementById('artDataEmissao').value,
           responsavel: document.getElementById('artResponsavel').value,
           status: document.getElementById('artStatus').value,
-          valor: Number(document.getElementById('artValor').value) || 0,
+          valor: Utils.parseMoney(document.getElementById('artValor').value) || 0,
           link: document.getElementById('artLink').value.trim(),
           observacao: document.getElementById('artObs').value.trim(),
         };
@@ -897,7 +897,7 @@ const Projetos = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor do Contrato (R$)</label>
-            <input class="form-control" id="fpValor" type="number" value="${p?.valor||''}" placeholder="0">
+            <input class="form-control" id="fpValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(p?.valor)}" placeholder="0">
           </div>
           <div class="form-group">
             <label class="form-label">Data de Início</label>
@@ -919,11 +919,11 @@ const Projetos = (() => {
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Custo/Hora (R$)</label>
-              <input class="form-control" id="fpValorHora" type="number" step="0.01" value="${p?.valorHora||''}" placeholder="Ex: 120">
+              <input class="form-control" id="fpValorHora" type="text" inputmode="decimal" value="${Utils.moneyToInput(p?.valorHora)}" placeholder="Ex: 120">
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Custos Diretos (R$)</label>
-              <input class="form-control" id="fpCustosDiretos" type="number" step="0.01" value="${p?.custosDirectos||''}" placeholder="Deslocamento, materiais...">
+              <input class="form-control" id="fpCustosDiretos" type="text" inputmode="decimal" value="${Utils.moneyToInput(p?.custosDirectos)}" placeholder="Deslocamento, materiais...">
             </div>
           </div>
         </div>
@@ -955,7 +955,7 @@ const Projetos = (() => {
           <div class="form-row" style="margin:8px 0 0">
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Valor da ART (R$)</label>
-              <input class="form-control" id="fpArtValor" type="number" step="0.01" value="${p?.art?.valor||''}" placeholder="0,00">
+              <input class="form-control" id="fpArtValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(p?.art?.valor)}" placeholder="0,00">
             </div>
             <div class="form-group" style="flex:3;margin-bottom:0">
               <label class="form-label">Link / Arquivo (URL ou caminho)</label>
@@ -1095,12 +1095,12 @@ const Projetos = (() => {
       clienteId: document.getElementById('fpCliente').value,
       responsavel: document.getElementById('fpResponsavel').value,
       status: document.getElementById('fpStatus').value,
-      valor: Number(document.getElementById('fpValor').value) || 0,
+      valor: Utils.parseMoney(document.getElementById('fpValor').value) || 0,
       dataInicio: document.getElementById('fpInicio').value,
       prazo: document.getElementById('fpPrazo').value,
       horasTrabalhadas: Number(document.getElementById('fpHoras').value) || 0,
-      valorHora: Number(document.getElementById('fpValorHora').value) || 0,
-      custosDirectos: Number(document.getElementById('fpCustosDiretos').value) || 0,
+      valorHora: Utils.parseMoney(document.getElementById('fpValorHora').value) || 0,
+      custosDirectos: Utils.parseMoney(document.getElementById('fpCustosDiretos').value) || 0,
       nfEmitida: document.getElementById('fpNf').checked,
       pagamentoRecebido: document.getElementById('fpPgto').checked,
       npsCliente: Number(document.getElementById('fpNpsCliente').value) || null,
@@ -1109,7 +1109,7 @@ const Projetos = (() => {
         data:          document.getElementById('fpArtData').value,
         engResponsavel:document.getElementById('fpArtEng').value.trim(),
         status:        document.getElementById('fpArtStatus').value,
-        valor:         Number(document.getElementById('fpArtValor').value) || 0,
+        valor:         Utils.parseMoney(document.getElementById('fpArtValor').value) || 0,
         link:          document.getElementById('fpArtLink').value.trim(),
       },
       checklist: checklistItems,

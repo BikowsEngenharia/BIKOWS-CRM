@@ -875,7 +875,7 @@ const Metas = (() => {
       size: 'modal-lg',
       body: `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-          <div class="form-group"><label class="form-label">💰 Faturamento (R$)</label><input class="form-control" type="number" id="mReceita" value="${meta.receita}" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">💰 Faturamento (R$)</label><input class="form-control" type="text" inputmode="decimal" id="mReceita" value="${Utils.moneyToInput(meta.receita)}" placeholder="0"></div>
           <div class="form-group"><label class="form-label">🏢 Novos Clientes</label><input class="form-control" type="number" id="mClientes" value="${meta.novosClientes}" placeholder="0"></div>
           <div class="form-group"><label class="form-label">💼 Novos Leads</label><input class="form-control" type="number" id="mLeads" value="${meta.novosLeads}" placeholder="0"></div>
           <div class="form-group"><label class="form-label">📄 Propostas Enviadas</label><input class="form-control" type="number" id="mPropostas" value="${meta.propostas}" placeholder="0"></div>
@@ -926,7 +926,7 @@ const Metas = (() => {
 
     const data = {
       ano, trimestre: qi,
-      receita:            parseFloat(document.getElementById('mReceita')?.value)||0,
+      receita:            Utils.parseMoney(document.getElementById('mReceita')?.value)||0,
       novosClientes:      parseInt(document.getElementById('mClientes')?.value)||0,
       novosLeads:         parseInt(document.getElementById('mLeads')?.value)||0,
       propostas:          parseInt(document.getElementById('mPropostas')?.value)||0,

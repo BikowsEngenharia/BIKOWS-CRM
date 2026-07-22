@@ -438,7 +438,7 @@ const ProjetoFinanceiro = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor (R$) *</label>
-            <input class="form-control" id="pfRecValor" type="number" step="0.01" placeholder="0,00">
+            <input class="form-control" id="pfRecValor" type="text" inputmode="decimal" placeholder="0,00">
           </div>
           <div class="form-group">
             <label class="form-label">Vencimento *</label>
@@ -466,7 +466,7 @@ const ProjetoFinanceiro = (() => {
   }
 
   function _saveRecebimento(projetoId) {
-    const valor = Number(document.getElementById('pfRecValor').value);
+    const valor = Utils.parseMoney(document.getElementById('pfRecValor').value);
     const vencimento = document.getElementById('pfRecVencimento').value;
     if (!valor || !vencimento) { Toast.error('Valor e vencimento obrigatórios'); return; }
 
@@ -619,7 +619,7 @@ const ProjetoFinanceiro = (() => {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor (R$) *</label>
-            <input class="form-control" id="pfCustoValor" type="number" step="0.01">
+            <input class="form-control" id="pfCustoValor" type="text" inputmode="decimal">
           </div>
           <div class="form-group">
             <label class="form-label">Data</label>
@@ -655,7 +655,7 @@ const ProjetoFinanceiro = (() => {
 
   function _saveCusto(projetoId) {
     const desc = document.getElementById('pfCustoDesc').value.trim();
-    const valor = Number(document.getElementById('pfCustoValor').value);
+    const valor = Utils.parseMoney(document.getElementById('pfCustoValor').value);
     if (!desc || !valor) { Toast.error('Descrição e valor obrigatórios'); return; }
 
     const p = _get(projetoId);
@@ -764,7 +764,7 @@ const ProjetoFinanceiro = (() => {
         <div id="pfParFixoGrp" style="display:none">
           <div class="form-group">
             <label class="form-label">Valor Fixo (R$)</label>
-            <input class="form-control" id="pfParValorFixo" type="number" step="0.01" placeholder="0,00">
+            <input class="form-control" id="pfParValorFixo" type="text" inputmode="decimal" placeholder="0,00">
           </div>
         </div>
 
@@ -805,7 +805,7 @@ const ProjetoFinanceiro = (() => {
     const lancar = document.getElementById('pfParLancar').checked;
 
     const percentual = Number(document.getElementById('pfParPercentual').value) || 0;
-    const valorFixo  = Number(document.getElementById('pfParValorFixo').value) || 0;
+    const valorFixo  = Utils.parseMoney(document.getElementById('pfParValorFixo').value) || 0;
     const vencimento = document.getElementById('pfParVencimento').value;
 
     const valorPagar = tipo === 'comissao'

@@ -743,7 +743,7 @@ const App = (() => {
         <div class="form-group"><label class="form-label">Oportunidade *</label><input class="form-control" id="qcTitulo" placeholder="Ex: Adequação NR-12 — Nome da Empresa" autofocus></div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Cliente</label><select class="form-control" id="qcCliente">${clientOpts}</select></div>
-          <div class="form-group"><label class="form-label">Valor Est. (R$)</label><input class="form-control" id="qcValor" type="number" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">Valor Est. (R$)</label><input class="form-control" id="qcValor" type="text" inputmode="decimal" placeholder="0"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Responsável</label><select class="form-control" id="qcResp">${respOpts}</select></div>
@@ -769,7 +769,7 @@ const App = (() => {
       'qc-conta': `
         <div class="form-group"><label class="form-label">Fornecedor / Descrição *</label><input class="form-control" id="qcTitulo" placeholder="Ex: Combustível campo — maio" autofocus></div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="qcValor" type="number" step="0.01" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="qcValor" type="text" inputmode="decimal" placeholder="0"></div>
           <div class="form-group"><label class="form-label">Vencimento</label><input class="form-control" id="qcVencimento" type="date" value="${hoje}"></div>
         </div>
         <div class="form-group"><label class="form-label">Categoria</label>
@@ -791,7 +791,7 @@ const App = (() => {
         titulo,
         status: 'lead_identificado',
         clienteId: document.getElementById('qcCliente')?.value || '',
-        valorEstimado: Number(document.getElementById('qcValor')?.value) || 0,
+        valorEstimado: Utils.parseMoney(document.getElementById('qcValor')?.value) || 0,
         responsavel: document.getElementById('qcResp')?.value || '',
         dataProximaAcao: document.getElementById('qcDataAcao')?.value || '',
         proximaAcao: 'Primeiro contato',
@@ -822,7 +822,7 @@ const App = (() => {
       });
       Toast.success('Nota registrada!');
     } else if (tipo === 'qc-conta') {
-      const valor = Number(document.getElementById('qcValor')?.value);
+      const valor = Utils.parseMoney(document.getElementById('qcValor')?.value);
       if (!valor) { Toast.error('Valor obrigatório'); return; }
       DB.create('contaspagar', {
         fornecedor: titulo,

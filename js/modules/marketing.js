@@ -322,14 +322,10 @@ const Marketing = (() => {
 
   function deletePost(id) {
     const post = DB.get('marketing_posts', id);
-    Confirm.show({
-      title: 'Excluir post',
-      msg: `Excluir "${post?.titulo || 'este post'}"? Esta ação não pode ser desfeita.`,
-      onConfirm: () => {
-        DB.remove('marketing_posts', id);
-        Toast.success('Post excluído.');
-        _renderCalendario();
-      }
+    Utils.confirmDelete(post?.titulo || 'este post', () => {
+      DB.remove('marketing_posts', id);
+      Toast.success('Post excluído.');
+      _renderCalendario();
     });
   }
 
@@ -591,10 +587,8 @@ const Marketing = (() => {
 
   function deleteCampanha(id) {
     const c = DB.get('marketing_campanhas', id);
-    Confirm.show({
-      title: 'Excluir campanha',
-      msg: `Excluir "${c?.nome || 'esta campanha'}"?`,
-      onConfirm: () => { DB.remove('marketing_campanhas', id); Toast.success('Campanha excluída.'); _renderCampanhas(); }
+    Utils.confirmDelete(c?.nome || 'esta campanha', () => {
+      DB.remove('marketing_campanhas', id); Toast.success('Campanha excluída.'); _renderCampanhas();
     });
   }
 
@@ -748,10 +742,9 @@ const Marketing = (() => {
   function usarIdeia(id) {
     const ideia = DB.get('marketing_ideias', id);
     if (!ideia) return;
-    Confirm.show({
-      title: 'Converter em post',
-      msg: `Converter "${ideia.titulo}" em rascunho de post e remover do banco de ideias?`,
-      onConfirm: () => {
+    Confirm.show('Converter em post',
+      `Converter "${ideia.titulo}" em rascunho de post e remover do banco de ideias?`,
+      () => {
         DB.create('marketing_posts', {
           titulo:    ideia.titulo,
           descricao: ideia.descricao||'',
@@ -768,16 +761,13 @@ const Marketing = (() => {
         Toast.success('Ideia convertida em post!');
         _tab = 'calendario';
         render();
-      }
-    });
+      });
   }
 
   function deleteIdeia(id) {
     const i = DB.get('marketing_ideias', id);
-    Confirm.show({
-      title: 'Excluir ideia',
-      msg: `Excluir "${i?.titulo || 'esta ideia'}"?`,
-      onConfirm: () => { DB.remove('marketing_ideias', id); Toast.success('Ideia excluída.'); _renderIdeias(); }
+    Utils.confirmDelete(i?.titulo || 'esta ideia', () => {
+      DB.remove('marketing_ideias', id); Toast.success('Ideia excluída.'); _renderIdeias();
     });
   }
 

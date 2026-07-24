@@ -317,7 +317,7 @@ const Financeiro = (() => {
     Modal.open({
       title: '💼 Saldo Inicial de Caixa (Capital de Giro)',
       body: `
-        <p class="text-sm text-muted mb-3">Define o saldo com que a empresa inicia o mês de referência — soma-se ao Saldo Acumulado do Fluxo de Caixa a partir desse mês, sem alterar nenhum lançamento já registrado. Use para começar um novo ciclo (ex.: Agosto/2026) com o valor que sobrou depois de quitar as pendências antigas.</p>
+        <p class="text-sm text-muted mb-3">Define o saldo com que a empresa inicia o mês de referência. A partir daí, o Fluxo de Caixa passa a mostrar <b>só esse mês em diante</b> — os meses anteriores saem da tela, evitando contar o resultado antigo e o saldo inicial ao mesmo tempo. Use para começar um novo ciclo (ex.: Agosto/2026) com o valor que sobrou depois de quitar as pendências antigas.</p>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Mês de Referência</label><input type="month" class="form-control" id="siMes" value="${si.mesReferencia||''}"></div>
           <div class="form-group"><label class="form-label">Saldo Inicial (R$)</label><input class="form-control" id="siValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(si.valor)}" placeholder="0,00"></div>
@@ -333,12 +333,22 @@ const Financeiro = (() => {
       }
     });
   }
+  // Quando há Saldo Inicial configurado, o Fluxo de Caixa passa a começar
+  // exatamente no mês de referência (ex.: Agosto/2026) — os meses anteriores
+  // não entram mais na tabela nem no acumulado, pra não contar ao mesmo
+  // tempo o resultado histórico E o saldo inicial (double count).
+  function _addMesStr(m,n){const [y,mo]=m.split('-').map(Number);const d=new Date(y,mo-1+n,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  function _mesesFluxo(){
+    const si=_getSaldoInicial();
+    if(si.mesReferencia){const r=[];for(let i=0;i<=5;i++)r.push(_addMesStr(si.mesReferencia,i));return r;}
+    return getLast3Next3();
+  }
   function buildFluxo() {
-    const meses=getLast3Next3(), lanc=DB.getAll('lancamentos');
+    const meses=_mesesFluxo(), lanc=DB.getAll('lancamentos');
     const despFixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
     const saídaFixaMensal=despFixas.reduce((s,d)=>s+_despFixaMensal(d),0);
     const saldoInicial=_getSaldoInicial();
-    let saldo=0;
+    let saldo=saldoInicial.mesReferencia?(saldoInicial.valor||0):0;
     const hoje=Utils.todayStr().substring(0,7);
     const rows=meses.map(m=>{
       const [,mo]=m.split('-');
@@ -353,7 +363,7 @@ const Financeiro = (() => {
     return `
       <div class="card mb-3" style="border-left:3px solid var(--primary,#1D4F8C)"><div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         ${saldoInicial.mesReferencia ? `
-          <div><div class="text-xs text-muted">💼 Saldo Inicial (Capital de Giro) — a partir de ${_mesLabel(saldoInicial.mesReferencia)}</div><div class="font-extrabold" style="font-size:18px">${Utils.formatCurrency(saldoInicial.valor)}</div></div>
+          <div><div class="text-xs text-muted">💼 Saldo Inicial (Capital de Giro) — ponto de partida em ${_mesLabel(saldoInicial.mesReferencia)}, meses anteriores não entram mais nesta tela</div><div class="font-extrabold" style="font-size:18px">${Utils.formatCurrency(saldoInicial.valor)}</div></div>
         ` : `<div class="text-sm text-muted">Nenhum saldo inicial configurado — o Saldo Acumulado abaixo considera só os lançamentos já registrados.</div>`}
         <button class="btn btn-xs btn-secondary" onclick="Financeiro.openSaldoInicial()">${saldoInicial.mesReferencia?'✏ Ajustar':'+ Definir Saldo Inicial'}</button>
       </div></div>
@@ -361,9 +371,8 @@ const Financeiro = (() => {
       <div class="card"><div class="card-header"><div class="card-title">📋 Detalhamento Mensal</div></div>
         <div class="table-wrap"><table class="tbl"><thead><tr><th>Mês</th><th>Entradas</th><th>Saídas</th><th>Resultado</th><th>Saldo Acumulado</th></tr></thead>
         <tbody>${rows.map(r=>{
-          if(saldoInicial.mesReferencia&&r.m===saldoInicial.mesReferencia)saldo+=saldoInicial.valor;
           saldo+=r.r;const fut=r.m>hoje;return `<tr style="${fut?'opacity:.65;font-style:italic':''}">
-          <td class="font-bold">${r.lb}${fut?' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">Proj.</span>':''}${saldoInicial.mesReferencia===r.m?' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">+ Saldo Inicial</span>':''}</td>
+          <td class="font-bold">${r.lb}${fut?' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">Proj.</span>':''}${saldoInicial.mesReferencia===r.m?' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">Início (+ Saldo Inicial)</span>':''}</td>
           <td class="text-success font-bold">${Utils.formatCurrency(r.e)}</td>
           <td class="text-danger font-bold">${Utils.formatCurrency(r.s)}</td>
           <td class="font-extrabold ${r.r>=0?'text-success':'text-danger'}">${Utils.formatCurrency(r.r)}</td>
@@ -389,7 +398,7 @@ const Financeiro = (() => {
     Charts.bar({containerId:'chartDRE',data:lbs.map((l,i)=>{const r=lanc.filter(x=>x.tipo==='receita'&&x.data?.startsWith(meses[i])&&x.status==='recebido').reduce((s,x)=>s+x.valor,0);const d=lanc.filter(x=>x.tipo==='despesa'&&x.data?.startsWith(meses[i])&&x.status==='pago').reduce((s,x)=>s+x.valor,0);return{label:l,value:r-d,color:r-d>=0?'#10b981':'#dc2626'};}),height:190,showValues:false});
   }
   function renderFluxoChart() {
-    const meses=getLast3Next3(),lanc=DB.getAll('lancamentos');
+    const meses=_mesesFluxo(),lanc=DB.getAll('lancamentos');
     const hoje=Utils.todayStr().substring(0,7);
     const lbs=meses.map(m=>{const[,mo]=m.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1];});
     Charts.bar({containerId:'chartFluxo',data:lbs.map((l,i)=>{const proj=_projecaoMes(meses[i],hoje);const e=lanc.filter(x=>x.tipo==='receita'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.e;const s=lanc.filter(x=>x.tipo==='despesa'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.s;return{label:l,value:e-s,color:e-s>=0?'#10b981':'#dc2626'};}),height:190,showValues:false});

@@ -245,11 +245,28 @@ const Financeiro = (() => {
     const mult = { Mensal:1, Bimestral:1/2, Trimestral:1/3, Semestral:1/6, Anual:1/12 };
     return (d.valor||0) * (mult[d.periodicidade] || 1);
   }
+  /* Projeção de despesas fixas de UM mês específico, sem contar em dobro:
+     uma fixa Mensal que já foi gerada (⚡ Gerar Contas do Mês) pra esse mês
+     já aparece como lançamento/conta real — não soma a estimativa de novo.
+     Periodicidades não-mensais (Bimestral, Trimestral...) não têm rastreio
+     de geração automática, então mantém a estimativa proporcional sempre. */
+  function _despFixaProjMes(mes) {
+    const fixas = DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
+    const contas = DB.getAll('contaspagar');
+    let total=0, count=0;
+    fixas.forEach(d=>{
+      if ((d.periodicidade||'Mensal')==='Mensal') {
+        const jaGerada = contas.some(c=>c.despesaFixaId===d.id&&(c.vencimento||'').startsWith(mes));
+        if (jaGerada) return;
+      }
+      total += _despFixaMensal(d); count++;
+    });
+    return { total, count };
+  }
 
   function buildDRE() {
     const lanc=DB.getAll('lancamentos');
-    const despFixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
-    const totalDespFixaMensal=despFixas.reduce((s,d)=>s+_despFixaMensal(d),0);
+    const {total:totalDespFixaMensal, count:despFixasCount}=_despFixaProjMes(_dremes);
 
     const d=(mes)=>{
       const r=lanc.filter(l=>l.tipo==='receita'&&l.data?.startsWith(mes)&&l.status==='recebido').reduce((s,l)=>s+l.valor,0);
@@ -283,7 +300,7 @@ const Financeiro = (() => {
             <div class="dre-row dre-section"><div class="dre-label">(-) DESPESAS OPERACIONAIS</div></div>
             <div class="dre-row"><div class="dre-label">Folha de Pagamento</div><div class="dre-value neg">- ${Utils.formatCurrency(v.fl)}</div></div>
             <div class="dre-row"><div class="dre-label">Outras Despesas (lançamentos)</div><div class="dre-value neg">- ${Utils.formatCurrency(v.out)}</div></div>
-            ${totalDespFixaMensal > 0 ? `<div class="dre-row"><div class="dre-label">Despesas Fixas (${despFixas.length} item${despFixas.length>1?'s':''})</div><div class="dre-value neg">- ${Utils.formatCurrency(totalDespFixaMensal)}</div></div>` : ''}
+            ${totalDespFixaMensal > 0 ? `<div class="dre-row"><div class="dre-label">Despesas Fixas Projetadas (${despFixasCount} item${despFixasCount>1?'s':''} ainda não lançado${despFixasCount>1?'s':''})</div><div class="dre-value neg">- ${Utils.formatCurrency(totalDespFixaMensal)}</div></div>` : ''}
             <div class="dre-row dre-total" style="font-size:15px"><div class="dre-label">= EBITDA <span style="font-size:11px;font-weight:400;color:var(--text-muted)">— Margem ${mg(ebitda)}</span></div><div class="dre-value ${ebitda>=0?'pos':'neg'}">${Utils.formatCurrency(ebitda)}</div></div>
           </div>
         </div>
@@ -345,8 +362,6 @@ const Financeiro = (() => {
   }
   function buildFluxo() {
     const meses=_mesesFluxo(), lanc=DB.getAll('lancamentos');
-    const despFixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
-    const saídaFixaMensal=despFixas.reduce((s,d)=>s+_despFixaMensal(d),0);
     const saldoInicial=_getSaldoInicial();
     let saldo=saldoInicial.mesReferencia?(saldoInicial.valor||0):0;
     const hoje=Utils.todayStr().substring(0,7);
@@ -356,8 +371,9 @@ const Financeiro = (() => {
       const proj=_projecaoMes(m,hoje);
       const e=lanc.filter(l=>l.tipo==='receita'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0)+proj.e;
       const sLanc=lanc.filter(l=>l.tipo==='despesa'&&l.data?.startsWith(m)).reduce((s,l)=>s+l.valor,0);
-      // Saídas: lançamentos + contas pendentes do mês + despesas fixas
-      const s=sLanc+proj.s+(saídaFixaMensal>0?saídaFixaMensal:0);
+      // Saídas: lançamentos + contas pendentes do mês + despesas fixas AINDA NÃO lançadas nesse mês
+      // (evita contar 2x quando a fixa já foi gerada/paga — ela já está em sLanc/proj.s)
+      const s=sLanc+proj.s+_despFixaProjMes(m).total;
       return {m,lb,e,s,r:e-s};
     });
     return `
@@ -401,7 +417,7 @@ const Financeiro = (() => {
     const meses=_mesesFluxo(),lanc=DB.getAll('lancamentos');
     const hoje=Utils.todayStr().substring(0,7);
     const lbs=meses.map(m=>{const[,mo]=m.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1];});
-    Charts.bar({containerId:'chartFluxo',data:lbs.map((l,i)=>{const proj=_projecaoMes(meses[i],hoje);const e=lanc.filter(x=>x.tipo==='receita'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.e;const s=lanc.filter(x=>x.tipo==='despesa'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.s;return{label:l,value:e-s,color:e-s>=0?'#10b981':'#dc2626'};}),height:190,showValues:false});
+    Charts.bar({containerId:'chartFluxo',data:lbs.map((l,i)=>{const proj=_projecaoMes(meses[i],hoje);const e=lanc.filter(x=>x.tipo==='receita'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.e;const s=lanc.filter(x=>x.tipo==='despesa'&&x.data?.startsWith(meses[i])).reduce((s,x)=>s+x.valor,0)+proj.s+_despFixaProjMes(meses[i]).total;return{label:l,value:e-s,color:e-s>=0?'#10b981':'#dc2626'};}),height:190,showValues:false});
   }
 
   function getLast6(){const r=[],d=new Date();for(let i=5;i>=0;i--){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);r.push(dt.toISOString().substring(0,7));}return r;}

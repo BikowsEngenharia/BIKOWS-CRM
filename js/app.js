@@ -250,20 +250,35 @@ const App = (() => {
     document.getElementById('sidebarRole').textContent = user.cargo || 'Admin';
   }
 
+  function _notifDismissed() {
+    return DB.getConfig().notificacoesStatus || {};
+  }
+
+  function dismissNotif(tag, status) {
+    const cfg = DB.getConfig();
+    const map = { ...(cfg.notificacoesStatus || {}) };
+    map[tag] = { status, data: Utils.todayStr() };
+    DB.saveConfig({ ...cfg, notificacoesStatus: map });
+    updateNotifBadge();
+    // Se a modal de pendências estiver aberta, re-renderiza sem o item removido
+    if (document.getElementById('modalBackdrop')?.classList.contains('open')) showPendencias();
+  }
+
   function updateNotifBadge() {
-    const atividades = DB.getAll('atividades');
-    const pendentes = atividades.filter(a => a.status === 'pendente').length;
+    const dispensados = _notifDismissed();
+    const isLive = tag => !dispensados[tag];
+
     const leads = DB.getAll('leads');
     const followupsVencidos = leads.filter(l =>
       !['fechado_ganho','executado','fechado_perdido'].includes(l.status) &&
-      l.dataProximaAcao && Utils.isOverdue(l.dataProximaAcao)
+      l.dataProximaAcao && Utils.isOverdue(l.dataProximaAcao) && isLive('lead_'+l.id)
     ).length;
 
     const recebiveis = DB.getAll('recebiveis');
     let vencidos = 0;
     recebiveis.forEach(r => {
       (r.parcelas||[]).forEach(p => {
-        if (p.status !== 'recebido' && Utils.isOverdue(p.vencimento)) vencidos++;
+        if (p.status !== 'recebido' && Utils.isOverdue(p.vencimento) && isLive('parc_'+p.id)) vencidos++;
       });
     });
 
@@ -272,13 +287,13 @@ const App = (() => {
     const licsUrgentes = licitacoes.filter(l => {
       if (['ganhou','perdeu','deserta','cancelada'].includes(l.status)) return false;
       const d = Utils.daysUntil(l.dataAbertura);
-      return d != null && d >= 0 && d <= 3;
+      return d != null && d >= 0 && d <= 3 && isLive('lic_'+l.id);
     }).length;
 
     // Projetos atrasados
     const projetos = DB.getAll('projetos');
     const projetosAtrasados = projetos.filter(p =>
-      p.status === 'em_andamento' && Utils.isOverdue(p.prazo)
+      p.status === 'em_andamento' && Utils.isOverdue(p.prazo) && isLive('proj_'+p.id)
     ).length;
 
     // ARTs pendentes em projetos em andamento
@@ -286,10 +301,11 @@ const App = (() => {
     const artsPendentes = projetos.filter(p =>
       p.status === 'em_andamento' &&
       !DB.getAll('arts').some(a => a.projetoId === p.id) &&
-      !p.art?.numero
+      !p.art?.numero &&
+      isLive('art_'+p.id)
     ).length;
 
-    var contratosVencendo = (typeof Contratos !== 'undefined' && Contratos.getContratosVencendo) ? Contratos.getContratosVencendo(30).length : 0;
+    var contratosVencendo = (typeof Contratos !== 'undefined' && Contratos.getContratosVencendo) ? Contratos.getContratosVencendo(30).filter(c => isLive('contrato_'+c.id)).length : 0;
     const total = followupsVencidos + vencidos + licsUrgentes + projetosAtrasados + artsPendentes + contratosVencendo;
     const badge = document.getElementById('notifBadge');
     if (badge) {
@@ -298,30 +314,51 @@ const App = (() => {
     }
   }
 
+  function _notifActions(tag) {
+    return `<button class="btn btn-xs btn-ghost" onclick="App.dismissNotif('${tag}','lida')" title="Marcar como lida">✓ Lida</button>
+      <button class="btn btn-xs btn-ghost" onclick="App.dismissNotif('${tag}','excluida')" title="Excluir notificação">🗑</button>`;
+  }
+
   function showPendencias() {
+    const dispensados = _notifDismissed();
+    const isLive = tag => !dispensados[tag];
+
     const leads = DB.getAll('leads');
     const atividades = DB.getAll('atividades');
     const recebiveis = DB.getAll('recebiveis');
     const licitacoes = DB.getAll('licitacoes').filter(l => {
       if (['ganhou','perdeu','deserta','cancelada'].includes(l.status)) return false;
       const d = Utils.daysUntil(l.dataAbertura);
-      return d != null && d >= 0 && d <= 7;
+      return d != null && d >= 0 && d <= 7 && isLive('lic_'+l.id);
     });
 
     const followups = leads.filter(l =>
       !['fechado_ganho','executado','fechado_perdido'].includes(l.status) &&
-      l.dataProximaAcao && Utils.isOverdue(l.dataProximaAcao)
+      l.dataProximaAcao && Utils.isOverdue(l.dataProximaAcao) && isLive('lead_'+l.id)
     );
-    const atrasadas = atividades.filter(a => a.status === 'pendente' && Utils.isOverdue(a.data));
+    const atrasadas = atividades.filter(a => a.status === 'pendente' && Utils.isOverdue(a.data) && isLive('atv_'+a.id));
     const parcelasVencidas = [];
     recebiveis.forEach(r => {
       const c = DB.get('clientes', r.clienteId);
       (r.parcelas||[]).forEach(p => {
-        if (p.status !== 'recebido' && Utils.isOverdue(p.vencimento)) {
+        if (p.status !== 'recebido' && Utils.isOverdue(p.vencimento) && isLive('parc_'+p.id)) {
           parcelasVencidas.push({ ...p, clienteNome: c?.nome||'—', descricao: r.descricao });
         }
       });
     });
+    const projetosAtrasados = DB.getAll('projetos').filter(p =>
+      p.status === 'em_andamento' && Utils.isOverdue(p.prazo) && isLive('proj_'+p.id)
+    );
+    const artsAll = DB.getAll('arts');
+    const projSemArt = DB.getAll('projetos').filter(p =>
+      p.status === 'em_andamento' &&
+      !artsAll.some(a => a.projetoId === p.id) &&
+      !p.art?.numero &&
+      isLive('art_'+p.id)
+    );
+    const contratosVencendoLista = (typeof Contratos !== 'undefined' && Contratos.getContratosVencendo)
+      ? Contratos.getContratosVencendo(30).filter(c => isLive('contrato_'+c.id))
+      : [];
 
     Modal.open({
       title: '⚠ Pendências',
@@ -345,6 +382,7 @@ const App = (() => {
               <div class="text-xs">${Utils.escHtml(l.titulo)} · ${Utils.escHtml(l.proximaAcao||'')}</div></div>
               <span class="badge badge-red">${Math.abs(Utils.daysUntil(l.dataProximaAcao))}d atraso</span>
               ${wppBtn}
+              ${_notifActions('lead_'+l.id)}
             </div>`;
           }).join('')}
         ` : ''}
@@ -358,6 +396,7 @@ const App = (() => {
               <div style="flex:1"><div class="font-bold text-sm">${Utils.escHtml(a.titulo)}</div>
               <div class="text-xs">${Utils.escHtml(Utils.getClientName(a.clienteId))} · ${Utils.formatDate(a.data)}</div></div>
               <span class="badge badge-red">${Math.abs(Utils.daysUntil(a.data))}d</span>
+              ${_notifActions('atv_'+a.id)}
             </div>`;
           }).join('')}
         ` : ''}
@@ -368,6 +407,7 @@ const App = (() => {
             <div style="flex:1"><div class="font-bold text-sm">${Utils.escHtml(p.clienteNome)}</div>
             <div class="text-xs">${Utils.escHtml(p.descricao||'')} · Venc: ${Utils.formatDate(p.vencimento)}</div></div>
             <span class="font-bold text-danger">${Utils.formatCurrency(p.valor)}</span>
+            ${_notifActions('parc_'+p.id)}
           </div>`).join('')}
         ` : ''}
 
@@ -379,17 +419,12 @@ const App = (() => {
               <div style="flex:1"><div class="font-bold text-sm">🏛 ${Utils.escHtml(l.numero||'—')}</div>
               <div class="text-xs">${Utils.escHtml(Utils.truncate(l.orgao||'',40))}</div></div>
               <span class="badge ${dias===0?'badge-red':dias<=3?'badge-red':'badge-yellow'}">Abertura em ${dias}d</span>
+              ${_notifActions('lic_'+l.id)}
             </div>`;
           }).join('')}
         ` : ''}
 
-        ${(() => {
-          // Projetos atrasados
-          const projetosAtrasados = DB.getAll('projetos').filter(p =>
-            p.status === 'em_andamento' && Utils.isOverdue(p.prazo)
-          );
-          if (!projetosAtrasados.length) return '';
-          return `
+        ${projetosAtrasados.length > 0 ? `
             <div class="detail-label mb-2 mt-3">Projetos Atrasados (${projetosAtrasados.length})</div>
             ${projetosAtrasados.map(p => `<div class="followup-item urgent mb-2">
               <div style="flex:1">
@@ -398,19 +433,10 @@ const App = (() => {
               </div>
               <span class="badge badge-red">${Math.abs(Utils.daysUntil(p.prazo))}d atraso</span>
               <button class="btn btn-xs btn-secondary" onclick="App.navigate('projetos');Modal.close()">Ver</button>
-            </div>`).join('')}`;
-        })()}
+              ${_notifActions('proj_'+p.id)}
+            </div>`).join('')}` : ''}
 
-        ${(() => {
-          // ARTs sem número em projetos em andamento
-          const artsAll = DB.getAll('arts');
-          const projSemArt = DB.getAll('projetos').filter(p =>
-            p.status === 'em_andamento' &&
-            !artsAll.some(a => a.projetoId === p.id) &&
-            !p.art?.numero
-          );
-          if (!projSemArt.length) return '';
-          return `
+        ${projSemArt.length > 0 ? `
             <div class="detail-label mb-2 mt-3">Projetos sem ART Registrada (${projSemArt.length})</div>
             ${projSemArt.map(p => `<div class="followup-item urgent mb-2">
               <div style="flex:1">
@@ -419,31 +445,28 @@ const App = (() => {
               </div>
               <span class="badge badge-yellow">Sem ART</span>
               <button class="btn btn-xs btn-primary" onclick="Projetos.view('${p.id}','arts')">+ ART</button>
-            </div>`).join('')}`;
-        })()}
+              ${_notifActions('art_'+p.id)}
+            </div>`).join('')}` : ''}
 
         ${(() => {
-          if (typeof Contratos === 'undefined' || !Contratos.getContratosVencendo) return '';
-          const cv = Contratos.getContratosVencendo(30);
-          if (!cv.length) return '';
-          const vencidos = cv.filter(c => Utils.daysUntil(c.dataFim) < 0).length;
+          if (!contratosVencendoLista.length) return '';
+          const vencidos = contratosVencendoLista.filter(c => Utils.daysUntil(c.dataFim) < 0).length;
           const titulo = vencidos > 0
-            ? 'Contratos Vencidos e a Vencer (' + cv.length + ' · ' + vencidos + ' já vencido' + (vencidos > 1 ? 's' : '') + ')'
-            : 'Contratos Vencendo em 30 dias (' + cv.length + ')';
+            ? 'Contratos Vencidos e a Vencer (' + contratosVencendoLista.length + ' · ' + vencidos + ' já vencido' + (vencidos > 1 ? 's' : '') + ')'
+            : 'Contratos Vencendo em 30 dias (' + contratosVencendoLista.length + ')';
           return '<div class="detail-label mb-2 mt-3">' + titulo + '</div>' +
-            cv.map(function(c) {
+            contratosVencendoLista.map(function(c) {
               const dias = Utils.daysUntil(c.dataFim);
               const venceu = dias < 0;
               const badge = venceu
                 ? '<span class="badge badge-red">Vencido há ' + Math.abs(dias) + 'd</span>'
                 : '<span class="badge badge-yellow">' + (dias === 0 ? 'Hoje' : dias + 'd') + '</span>';
-              return '<div class="followup-item urgent mb-2"><div style="flex:1"><div class="font-bold text-sm">📋 ' + Utils.escHtml(c.objeto||c.numero||'—') + '</div><div class="text-xs">' + Utils.escHtml(Utils.getClientName(c.clienteId)) + ' · ' + (venceu ? 'Venceu' : 'Vence') + ': ' + Utils.formatDate(c.dataFim) + '</div></div>' + badge + '<button class="btn btn-xs btn-secondary" onclick="App.navigate(\'contratos\');Modal.close()">Ver</button></div>';
+              return '<div class="followup-item urgent mb-2"><div style="flex:1"><div class="font-bold text-sm">📋 ' + Utils.escHtml(c.objeto||c.numero||'—') + '</div><div class="text-xs">' + Utils.escHtml(Utils.getClientName(c.clienteId)) + ' · ' + (venceu ? 'Venceu' : 'Vence') + ': ' + Utils.formatDate(c.dataFim) + '</div></div>' + badge + '<button class="btn btn-xs btn-secondary" onclick="App.navigate(\'contratos\');Modal.close()">Ver</button>' + _notifActions('contrato_'+c.id) + '</div>';
             }).join('');
         })()}
 
         ${followups.length === 0 && atrasadas.length === 0 && parcelasVencidas.length === 0 && licitacoes.length === 0 &&
-          DB.getAll('projetos').filter(p => p.status === 'em_andamento' && Utils.isOverdue(p.prazo)).length === 0 &&
-          DB.getAll('projetos').filter(p => p.status === 'em_andamento' && !DB.getAll('arts').some(a => a.projetoId === p.id) && !p.art?.numero).length === 0 ?
+          projetosAtrasados.length === 0 && projSemArt.length === 0 && contratosVencendoLista.length === 0 ?
           '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Tudo em dia!</div><div class="empty-sub">Nenhuma pendência no momento.</div></div>' : ''}
       `,
     });
@@ -910,7 +933,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

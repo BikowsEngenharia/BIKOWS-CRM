@@ -98,7 +98,7 @@ const Notifications = (() => {
      ==================================================== */
   function _checkAll() {
     const prefs = getPrefs();
-    const items = [];
+    let items = [];
 
     items.push(..._checkAtividades(prefs));
     items.push(..._checkLeads(prefs));
@@ -108,6 +108,11 @@ const Notifications = (() => {
     items.push(..._checkARTPendente(prefs));
     items.push(..._checkMarketing(prefs));
     items.push(..._checkCPLTrafico(prefs));
+
+    // Remove itens que o usuário já marcou como lida/excluída no sino de notificações
+    // (persistido em config — evita repetir o mesmo alerta a cada nova sessão/aba)
+    const dispensados = DB.getConfig().notificacoesStatus || {};
+    items = items.filter(i => !dispensados[i.tag]);
 
     if (items.length === 0) return;
 

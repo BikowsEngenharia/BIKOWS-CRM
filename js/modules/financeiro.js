@@ -208,7 +208,10 @@ const Financeiro = (() => {
             <select class="filter-select" onchange="Financeiro.setFiltPagar('status',this.value)"><option value="">Todos status</option><option value="pendente" ${_filtPagar.status==='pendente'?'selected':''}>Pendente</option><option value="pago" ${_filtPagar.status==='pago'?'selected':''}>Pago</option></select>
             <select class="filter-select" onchange="Financeiro.setFiltPagar('categoria',this.value)"><option value="">Todas categorias</option>${cats.map(c=>`<option value="${Utils.escHtml(c)}" ${_filtPagar.categoria===c?'selected':''}>${Utils.escHtml(c)}</option>`).join('')}</select>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="Financeiro.novaContaPagar()">+ Conta a Pagar</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-ghost" onclick="Financeiro.openQuitarAteModal()" title="Marca em massa como pagas as contas pendentes até um mês de corte">🧹 Quitar até...</button>
+            <button class="btn btn-sm btn-secondary" onclick="Financeiro.novaContaPagar()">+ Conta a Pagar</button>
+          </div>
         </div>
         <div class="table-wrap">
           ${list.length===0?'<div class="empty-state"><div class="empty-icon">📤</div><div class="empty-title">Nenhuma conta</div></div>':`
@@ -300,10 +303,41 @@ const Financeiro = (() => {
     return{e,s};
   }
 
+  function _getSaldoInicial(){
+    const cfg=DB.getConfig();
+    return cfg.saldoInicialCaixa || { valor:0, mesReferencia:'' };
+  }
+  function _mesLabel(m){
+    if(!m)return '';
+    const [ano,mo]=m.split('-');
+    return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1]+'/'+ano;
+  }
+  function openSaldoInicial(){
+    const si=_getSaldoInicial();
+    Modal.open({
+      title: '💼 Saldo Inicial de Caixa (Capital de Giro)',
+      body: `
+        <p class="text-sm text-muted mb-3">Define o saldo com que a empresa inicia o mês de referência — soma-se ao Saldo Acumulado do Fluxo de Caixa a partir desse mês, sem alterar nenhum lançamento já registrado. Use para começar um novo ciclo (ex.: Agosto/2026) com o valor que sobrou depois de quitar as pendências antigas.</p>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Mês de Referência</label><input type="month" class="form-control" id="siMes" value="${si.mesReferencia||''}"></div>
+          <div class="form-group"><label class="form-label">Saldo Inicial (R$)</label><input class="form-control" id="siValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(si.valor)}" placeholder="0,00"></div>
+        </div>`,
+      saveCb: () => {
+        const mesReferencia=document.getElementById('siMes').value;
+        const valor=Utils.parseMoney(document.getElementById('siValor').value)||0;
+        if(!mesReferencia){Toast.error('Selecione o mês de referência');return;}
+        const cfg=DB.getConfig();
+        DB.saveConfig({...cfg,saldoInicialCaixa:{valor,mesReferencia}});
+        Toast.success('Saldo inicial definido');
+        Modal.close(); renderTab();
+      }
+    });
+  }
   function buildFluxo() {
     const meses=getLast3Next3(), lanc=DB.getAll('lancamentos');
     const despFixas=DB.getAll('despesas_fixas').filter(d=>d.ativo!==false);
     const saídaFixaMensal=despFixas.reduce((s,d)=>s+_despFixaMensal(d),0);
+    const saldoInicial=_getSaldoInicial();
     let saldo=0;
     const hoje=Utils.todayStr().substring(0,7);
     const rows=meses.map(m=>{
@@ -317,11 +351,19 @@ const Financeiro = (() => {
       return {m,lb,e,s,r:e-s};
     });
     return `
+      <div class="card mb-3" style="border-left:3px solid var(--primary,#1D4F8C)"><div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        ${saldoInicial.mesReferencia ? `
+          <div><div class="text-xs text-muted">💼 Saldo Inicial (Capital de Giro) — a partir de ${_mesLabel(saldoInicial.mesReferencia)}</div><div class="font-extrabold" style="font-size:18px">${Utils.formatCurrency(saldoInicial.valor)}</div></div>
+        ` : `<div class="text-sm text-muted">Nenhum saldo inicial configurado — o Saldo Acumulado abaixo considera só os lançamentos já registrados.</div>`}
+        <button class="btn btn-xs btn-secondary" onclick="Financeiro.openSaldoInicial()">${saldoInicial.mesReferencia?'✏ Ajustar':'+ Definir Saldo Inicial'}</button>
+      </div></div>
       <div class="card mb-4"><div class="card-header"><div class="card-title">🔄 Fluxo de Caixa — 6 Meses</div><span class="text-xs text-muted">Meses futuros incluem parcelas a receber e contas a pagar em aberto</span></div><div class="card-body"><div id="chartFluxo" style="height:190px"></div></div></div>
       <div class="card"><div class="card-header"><div class="card-title">📋 Detalhamento Mensal</div></div>
         <div class="table-wrap"><table class="tbl"><thead><tr><th>Mês</th><th>Entradas</th><th>Saídas</th><th>Resultado</th><th>Saldo Acumulado</th></tr></thead>
-        <tbody>${rows.map(r=>{saldo+=r.r;const fut=r.m>hoje;return `<tr style="${fut?'opacity:.65;font-style:italic':''}">
-          <td class="font-bold">${r.lb}${fut?' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">Proj.</span>':''}</td>
+        <tbody>${rows.map(r=>{
+          if(saldoInicial.mesReferencia&&r.m===saldoInicial.mesReferencia)saldo+=saldoInicial.valor;
+          saldo+=r.r;const fut=r.m>hoje;return `<tr style="${fut?'opacity:.65;font-style:italic':''}">
+          <td class="font-bold">${r.lb}${fut?' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">Proj.</span>':''}${saldoInicial.mesReferencia===r.m?' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">+ Saldo Inicial</span>':''}</td>
           <td class="text-success font-bold">${Utils.formatCurrency(r.e)}</td>
           <td class="text-danger font-bold">${Utils.formatCurrency(r.s)}</td>
           <td class="font-extrabold ${r.r>=0?'text-success':'text-danger'}">${Utils.formatCurrency(r.r)}</td>
@@ -450,9 +492,12 @@ const Financeiro = (() => {
     if(id){DB.update('contaspagar',id,data);Toast.success('Atualizado');}else{DB.create('contaspagar',data);Toast.success('Conta criada');}
     Modal.close();renderTab();
   }
-  function pagarConta(id){
-    const p=DB.get('contaspagar',id);if(!p||p.status==='pago')return;
-    DB.update('contaspagar',id,{status:'pago',dataPagamento:Utils.todayStr()});
+  /* Núcleo de "pagar 1 conta": usado tanto pelo pagamento individual quanto
+     pela quitação em massa (openQuitarAteModal), pra manter sempre o mesmo
+     efeito colateral (lançamento de despesa + geração da recorrência). */
+  function _quitarContaCore(id, obsExtra){
+    const p=DB.get('contaspagar',id);if(!p||p.status==='pago')return false;
+    DB.update('contaspagar',id,{status:'pago',dataPagamento:Utils.todayStr(),observacoes:obsExtra?(p.observacoes?p.observacoes+' · ':'')+obsExtra:p.observacoes});
     // Cria lançamento de despesa para alimentar KPIs, DRE e relatórios
     DB.create('lancamentos',{
       tipo:'despesa',categoria:p.categoria||'Outros',
@@ -472,12 +517,48 @@ const Financeiro = (() => {
           valor:p.valor,vencimento:proxVenc,status:'pendente',recorrente:true,
           observacoes:'Gerada automaticamente (conta recorrente).',
         });
-        Toast.success(`🔁 Conta recorrente: próxima gerada para ${Utils.formatDate(proxVenc)}`);
       }
     }
+    return true;
+  }
+  function pagarConta(id){
+    if(!_quitarContaCore(id))return;
     Toast.success('Conta paga e lançamento registrado');renderTab();
   }
   function deleteContaPagar(id){Utils.confirmDelete('esta conta a pagar',()=>{DB.remove('contaspagar',id);Toast.success('Removida');renderTab();});}
+
+  /* ---- Quitação em massa (reorganização do início de ciclo, ex.: fechar tudo até Julho/2026) ---- */
+  function _pendentesAte(mes){
+    return DB.getAll('contaspagar').filter(c=>c.status==='pendente'&&(c.vencimento||'')<=(mes+'-31'));
+  }
+  function openQuitarAteModal(){
+    const mesDefault=Utils.todayStr().substring(0,7);
+    Modal.open({
+      title: '🧹 Quitar Pendências Até um Mês de Corte',
+      body: `
+        <p class="text-sm text-muted mb-3">Marca como <b>pago</b> todas as contas a pagar pendentes com vencimento até o mês selecionado (gera o lançamento de despesa correspondente para cada uma) — use para fechar de uma vez as pendências antigas ao iniciar um novo ciclo financeiro.</p>
+        <div class="form-group"><label class="form-label">Quitar tudo até (mês/ano)</label><input type="month" class="form-control" id="qtMes" value="${mesDefault}" onchange="Financeiro._atualizarPreviaQuitar()"></div>
+        <div id="qtPreview" class="text-sm text-muted mt-2"></div>`,
+      saveCb: () => {
+        const mes=document.getElementById('qtMes').value;
+        if(!mes){Toast.error('Selecione o mês');return;}
+        const pend=_pendentesAte(mes);
+        if(pend.length===0){Toast.warning('Nenhuma conta pendente até esse mês.');Modal.close();return;}
+        let count=0;
+        pend.forEach(c=>{ if(_quitarContaCore(c.id,'Quitado no acerto de saldo até '+mes)) count++; });
+        Toast.success(`✅ ${count} conta(s) marcada(s) como paga(s) e lançada(s)`);
+        Modal.close(); renderTab(); if(typeof App!=='undefined')App.updateNotifBadge();
+      }
+    });
+    setTimeout(_atualizarPreviaQuitar,50);
+  }
+  function _atualizarPreviaQuitar(){
+    const mes=document.getElementById('qtMes')?.value; if(!mes)return;
+    const pend=_pendentesAte(mes);
+    const tot=pend.reduce((s,c)=>s+c.valor,0);
+    const el=document.getElementById('qtPreview');
+    if(el)el.innerHTML = pend.length ? `<b>${pend.length}</b> conta(s) pendente(s), totalizando <b>${Utils.formatCurrency(tot)}</b>, serão marcadas como pagas.` : 'Nenhuma conta pendente até esse mês.';
+  }
 
   /* ---- CRUD RECEBÍVEIS ---- */
   function novoRecebivel(){openFormRecebivel(null);}
@@ -912,5 +993,5 @@ const Financeiro = (() => {
   }
   function deleteAtivo(id){Utils.confirmDelete('este ativo',()=>{DB.remove('ativos_empresa',id);Toast.success('Removido');renderTab();});}
 
-  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew,drillDown,openFormDespFixa,toggleDespFixa,deleteDespFixa,gerarContasDoMes,openFormDivida,deleteDivida,pagarParcelaDivida,openFormAtivo,deleteAtivo};
+  return {render,setTab,setFiltLanc,limparFiltros,setFiltPagar,setDreMes,novoLancamento,novaDespesa,editLanc,marcarPago,deleteLanc,novoRecebivel,editRecebivel,marcarRecebido,addParcela,deleteRecebivel,novaContaPagar,editContaPagar,pagarConta,deleteContaPagar,_trocarTipo,_addPF,addNew,drillDown,openFormDespFixa,toggleDespFixa,deleteDespFixa,gerarContasDoMes,openFormDivida,deleteDivida,pagarParcelaDivida,openFormAtivo,deleteAtivo,openQuitarAteModal,_atualizarPreviaQuitar,openSaldoInicial};
 })();

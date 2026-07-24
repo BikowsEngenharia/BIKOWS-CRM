@@ -54,6 +54,8 @@ const Pessoal = (() => {
 
       ${_buildImportar()}
 
+      ${_buildDespesasFixas()}
+
       <div class="card">
         <div class="card-header">
           <div class="card-title">📋 Lançamentos de ${_mesLabel(_mes)}</div>
@@ -65,7 +67,8 @@ const Pessoal = (() => {
           <tbody>${[...doMes].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(l => {
             const iR = l.tipo === 'receita';
             const origemBadge = l.origem === 'folha' ? '<span class="badge badge-blue" style="font-size:9px">Folha</span>'
-                              : l.origem === 'retirada' ? '<span class="badge badge-purple" style="font-size:9px">Empresa</span>' : '';
+                              : l.origem === 'retirada' ? '<span class="badge badge-purple" style="font-size:9px">Empresa</span>'
+                              : l.origem === 'despesa_fixa' ? '<span class="badge badge-gray" style="font-size:9px">Fixa</span>' : '';
             return `<tr>
               <td><span class="badge ${iR?'badge-green':'badge-red'}">${iR?'⬆':'⬇'}</span></td>
               <td class="font-semibold text-sm">${Utils.escHtml(Utils.truncate(l.descricao, 40))} ${origemBadge}</td>
@@ -180,6 +183,87 @@ const Pessoal = (() => {
 
   function setFuncionario(id) {
     DB.saveConfig({ pessoalFuncId: id });
+    render();
+  }
+
+  /* ---- DESPESAS FIXAS PESSOAIS (recorrentes) ---- */
+  function _buildDespesasFixas() {
+    const list = DB.getAll('pessoal_despesas_fixas');
+    const totalMensal = list.filter(d => d.ativo !== false).reduce((s, d) => s + (d.valor || 0), 0);
+    return `
+      <div class="card mb-4">
+        <div class="card-header" style="flex-wrap:wrap;gap:8px">
+          <div class="card-title">📌 Despesas Fixas Recorrentes <span class="text-xs text-muted font-normal">— total mensal ${Utils.formatCurrency(totalMensal)}</span></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-success" onclick="Pessoal.gerarLancamentosDoMes()" title="Cria os lançamentos deste mês a partir das despesas fixas ativas">⚡ Gerar Lançamentos do Mês</button>
+            <button class="btn btn-sm btn-primary" onclick="Pessoal.openFormDespFixa(null)">+ Despesa Fixa</button>
+          </div>
+        </div>
+        ${list.length === 0 ? '<div class="card-body"><div class="empty-state"><div class="empty-icon">📌</div><div class="empty-title">Nenhuma despesa fixa cadastrada</div><div class="empty-sub">Ex: aluguel, plano de saúde, escola, assinaturas...</div></div></div>' : `
+        <div class="table-wrap"><table class="tbl"><thead><tr><th>Nome</th><th>Categoria</th><th>Valor</th><th>Dia Venc.</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>${list.map(d => `<tr>
+          <td class="font-semibold text-sm">${Utils.escHtml(d.nome || '—')}</td>
+          <td class="text-xs text-muted">${Utils.escHtml(d.categoria || '—')}</td>
+          <td class="font-bold">${Utils.formatCurrency(d.valor || 0)}</td>
+          <td class="text-sm">${d.diaVencimento || '—'}</td>
+          <td><span class="badge ${d.ativo !== false ? 'badge-green' : 'badge-gray'}">${d.ativo !== false ? 'Ativa' : 'Inativa'}</span></td>
+          <td><div class="tbl-actions">
+            <button class="btn btn-xs btn-secondary" onclick="Pessoal.openFormDespFixa('${d.id}')">✏</button>
+            <button class="btn btn-xs ${d.ativo !== false ? 'btn-ghost' : 'btn-success'}" onclick="Pessoal.toggleDespFixa('${d.id}')">${d.ativo !== false ? 'Desativar' : 'Ativar'}</button>
+            <button class="btn btn-xs btn-danger" onclick="Pessoal.deleteDespFixa('${d.id}')">🗑</button>
+          </div></td>
+        </tr>`).join('')}</tbody></table></div>`}
+      </div>`;
+  }
+
+  function openFormDespFixa(id) {
+    const d = id ? DB.get('pessoal_despesas_fixas', id) : null;
+    Modal.open({
+      title: id ? 'Editar Despesa Fixa' : '+ Nova Despesa Fixa Pessoal',
+      body: `
+        <div class="form-group"><label class="form-label">Nome *</label><input class="form-control" id="pdfNome" value="${Utils.escHtml(d?.nome || '')}" placeholder="Ex: Aluguel, Plano de saúde, Escola..."></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Categoria</label><select class="form-control" id="pdfCat">${CATS_DESP.map(c => `<option value="${c}" ${d?.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+          <div class="form-group"><label class="form-label">Valor (R$) *</label><input class="form-control" id="pdfValor" type="text" inputmode="decimal" value="${Utils.moneyToInput(d?.valor)}" placeholder="0,00"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Dia de Vencimento</label><input class="form-control" id="pdfDia" type="number" min="1" max="31" value="${d?.diaVencimento || ''}"></div>
+        <div class="form-group"><label class="form-label"><input type="checkbox" id="pdfAtivo" ${d?.ativo !== false ? 'checked' : ''}> Ativa</label></div>`,
+      saveCb: () => {
+        const nome = document.getElementById('pdfNome').value.trim(); if (!nome) { Toast.error('Nome obrigatório'); return; }
+        const valor = Utils.parseMoney(document.getElementById('pdfValor').value); if (!valor) { Toast.error('Valor inválido — use o formato 1500,00'); return; }
+        const data = { nome, categoria: document.getElementById('pdfCat').value, valor, diaVencimento: Number(document.getElementById('pdfDia').value) || null, ativo: document.getElementById('pdfAtivo').checked };
+        if (id) { DB.update('pessoal_despesas_fixas', id, data); Toast.success('Atualizado'); }
+        else { DB.create('pessoal_despesas_fixas', data); Toast.success('Despesa fixa criada'); }
+        Modal.close(); render();
+      }
+    });
+  }
+
+  function toggleDespFixa(id) { const d = DB.get('pessoal_despesas_fixas', id); if (!d) return; DB.update('pessoal_despesas_fixas', id, { ativo: d.ativo === false }); Toast.success('Status alterado'); render(); }
+  function deleteDespFixa(id) { Utils.confirmDelete('esta despesa fixa', () => { DB.remove('pessoal_despesas_fixas', id); Toast.success('Removida'); render(); }); }
+
+  /* Gera os lançamentos do mês atual a partir das despesas fixas ativas.
+     Idempotente: não duplica se já foi gerada (marca origemId). */
+  function gerarLancamentosDoMes() {
+    const mes = Utils.todayStr().substring(0, 7);
+    const fixas = DB.getAll('pessoal_despesas_fixas').filter(d => d.ativo !== false);
+    if (fixas.length === 0) { Toast.warning('Nenhuma despesa fixa ativa cadastrada.'); return; }
+    const existentes = new Set(DB.getAll('pessoal_lancamentos').map(l => l.origemId).filter(Boolean));
+    let criadas = 0;
+    fixas.forEach(d => {
+      const origemId = 'dfp:' + d.id + ':' + mes;
+      if (existentes.has(origemId)) return;
+      const dia = Math.min(Math.max(d.diaVencimento || 10, 1), 28);
+      DB.create('pessoal_lancamentos', {
+        tipo: 'despesa', categoria: d.categoria || 'Outros',
+        descricao: `${d.nome} — ${_mesLabel(mes)}`, valor: d.valor,
+        data: `${mes}-${String(dia).padStart(2, '0')}`,
+        origem: 'despesa_fixa', origemId,
+      });
+      criadas++;
+    });
+    if (criadas > 0) Toast.success(`⚡ ${criadas} lançamento(s) do mês gerado(s)`);
+    else Toast.warning('Todas as despesas fixas deste mês já foram geradas.');
     render();
   }
 
@@ -318,5 +402,5 @@ const Pessoal = (() => {
   function irHoje()    { _mes = Utils.todayStr().substring(0, 7); render(); }
   function addNew()    { novaDespesa(); }
 
-  return { render, mudarMes, irHoje, novaReceita, novaDespesa, editar, excluir, setFuncionario, puxarSalario, puxarFolha, puxarRetirada, addNew };
+  return { render, mudarMes, irHoje, novaReceita, novaDespesa, editar, excluir, setFuncionario, puxarSalario, puxarFolha, puxarRetirada, addNew, openFormDespFixa, toggleDespFixa, deleteDespFixa, gerarLancamentosDoMes };
 })();

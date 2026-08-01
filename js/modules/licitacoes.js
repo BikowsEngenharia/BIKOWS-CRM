@@ -208,12 +208,58 @@ const Licitacoes = (() => {
 
     // Carregar badge PNCP em background
     _loadPncpBadge();
+    _autoExpirarVencidasPncp();
 
     // Auto-lançar no pipeline (10 dias antes da abertura)
     setTimeout(() => _autoLancarNoPipeline(), 200);
   }
 
   /* ── PNCP Monitor ─────────────────────────────────────────────────────── */
+
+  /* Move automaticamente para "Descartada" as licitações "Novas" cujo prazo
+     de proposta já venceu sem nunca terem sido analisadas — sem isso, o
+     PNCP Monitor acumula pra sempre oportunidades mortas que não servem
+     mais pra nada, poluindo a coluna "Novas". Só mexe em itens ainda em
+     "nova" — o que já foi movido manualmente (analisando/proposta/
+     participar) reflete uma decisão humana e não é tocado aqui. */
+  async function _autoExpirarVencidasPncp() {
+    try {
+      const { data, error } = await _supabase
+        .from('crm_licitacoes').select('id,data')
+        .eq('data->>kanban', 'nova');
+      if (error || !data) return;
+      const hoje = new Date();
+      const vencidas = data.filter(l => {
+        const enc = l.data?.dataEncerramento ? new Date(l.data.dataEncerramento) : null;
+        return enc && !isNaN(enc) && enc < hoje;
+      });
+      if (vencidas.length === 0) return;
+      for (const l of vencidas) {
+        await _supabase.from('crm_licitacoes').update({
+          data: { ...l.data, kanban: 'descartada', descartadoMotivo: 'Prazo de proposta expirado sem análise', descartadoEm: Utils.todayStr() }
+        }).eq('id', l.id);
+      }
+      Toast.show(`🗑 ${vencidas.length} licitação(ões) com prazo vencido movida(s) automaticamente para Descartada.`, 6000);
+      _loadPncpBadge();
+      if (_tab === 'pncp') recarregarPncp();
+    } catch (e) { console.warn('[Licitacoes] autoExpirarVencidasPncp:', e); }
+  }
+
+  /* Exclui permanentemente as licitações descartadas do monitor PNCP —
+     sem isso a coluna "Descartada" também cresce pra sempre. */
+  async function limparDescartadasPncp() {
+    const descartadas = _pncpData.filter(l => (l.data?.kanban || 'nova') === 'descartada');
+    if (!descartadas.length) { Toast.success('Nenhuma licitação descartada para excluir.'); return; }
+    if (!confirm(`Excluir permanentemente ${descartadas.length} licitação(ões) descartada(s) do monitor PNCP?\n\nEsta ação não pode ser desfeita.`)) return;
+    const ids = descartadas.map(l => l.id);
+    const { error } = await _supabase.from('crm_licitacoes').delete().in('id', ids);
+    if (error) { Toast.error('Erro ao excluir: ' + error.message); return; }
+    _pncpData = _pncpData.filter(l => !ids.includes(l.id));
+    Toast.success(`${descartadas.length} licitação(ões) descartada(s) removida(s) permanentemente.`);
+    _loadPncpBadge();
+    const el = document.getElementById('licTabContent');
+    if (el && _tab === 'pncp') el.innerHTML = renderPNCPTab();
+  }
 
   async function _loadPncpBadge() {
     try {
@@ -271,6 +317,7 @@ const Licitacoes = (() => {
                 <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid ${col.color};margin-bottom:8px">
                   <div style="font-size:12px;font-weight:700;color:${col.color}">${col.label}</div>
                   <div style="font-size:11px;color:var(--text-muted)">${cards.length} licitação(ões)</div>
+                  ${col.key === 'descartada' && cards.length > 0 ? `<button class="btn btn-xs btn-danger" style="margin-top:6px;width:100%;font-size:10px" onclick="Licitacoes.limparDescartadasPncp()">🗑 Limpar Descartadas</button>` : ''}
                 </div>
                 ${cards.map(l => _renderPncpCard(l, kanbanCols)).join('')}
               </div>`;
@@ -294,7 +341,10 @@ const Licitacoes = (() => {
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
           <div style="font-size:12px;font-weight:700;color:var(--primary)">${valor}</div>
           ${diasEnc != null && diasEnc >= 0 ? `<span style="font-size:10px;color:${encAlert?'#ef4444':'#94a3b8'};font-weight:600">📅 ${diasEnc}d restantes</span>` : ''}
+          ${diasEnc != null && diasEnc < 0 ? `<span style="font-size:10px;color:#94a3b8;font-weight:600">Vencida há ${Math.abs(diasEnc)}d</span>` : ''}
         </div>
+        ${d.analiseIA ? `<div style="font-size:10px;color:var(--text-muted);margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)">🤖 <b>${Utils.escHtml(d.analiseIA.aderencia||'')}</b>${d.analiseIA.servicoSugerido?' · '+Utils.escHtml(d.analiseIA.servicoSugerido):''}<br>${Utils.escHtml(Utils.truncate(d.analiseIA.justificativa||'',90))}</div>` : ''}
+        ${!d.analiseIA && d.descartadoMotivo ? `<div style="font-size:10px;color:#94a3b8;margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)">ℹ ${Utils.escHtml(d.descartadoMotivo)}</div>` : ''}
         <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
           ${d.linkPNCP ? `<a href="${Utils.escHtml(d.linkPNCP)}" target="_blank" class="btn btn-xs btn-secondary" style="font-size:10px">🔗 Edital</a>` : ''}
           <button class="btn btn-xs btn-primary" style="font-size:10px" onclick="Licitacoes.importarPncp('${l.id}')">↗ Criar Licitação</button>
@@ -1294,6 +1344,6 @@ const Licitacoes = (() => {
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,
     filtrarKanban, recarregarPncp, moverKanbanPncp, importarPncp,
-    limparEncerradas,
+    limparEncerradas, limparDescartadasPncp,
   };
 })();

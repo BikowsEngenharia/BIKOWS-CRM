@@ -319,7 +319,10 @@ const App = (() => {
       <button class="btn btn-xs btn-ghost" onclick="App.dismissNotif('${tag}','excluida')" title="Excluir notificação">🗑</button>`;
   }
 
-  function showPendencias() {
+  /* Recalcula as mesmas listas usadas no sino/Pendências — centralizado
+     aqui pra showPendencias() e dismissAllNotifs() nunca ficarem
+     dessincronizados sobre o que conta como "pendência visível". */
+  function _pendenciasAtuais() {
     const dispensados = _notifDismissed();
     const isLive = tag => !dispensados[tag];
 
@@ -360,10 +363,41 @@ const App = (() => {
       ? Contratos.getContratosVencendo(30).filter(c => isLive('contrato_'+c.id))
       : [];
 
+    return { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista };
+  }
+
+  function dismissAllNotifs() {
+    const p = _pendenciasAtuais();
+    const tags = [
+      ...p.followups.map(l => 'lead_'+l.id),
+      ...p.atrasadas.map(a => 'atv_'+a.id),
+      ...p.parcelasVencidas.map(pc => 'parc_'+pc.id),
+      ...p.licitacoes.map(l => 'lic_'+l.id),
+      ...p.projetosAtrasados.map(pr => 'proj_'+pr.id),
+      ...p.projSemArt.map(pr => 'art_'+pr.id),
+      ...p.contratosVencendoLista.map(c => 'contrato_'+c.id),
+    ];
+    if (tags.length === 0) { Toast.success('Nenhuma pendência para excluir.'); return; }
+    if (!confirm(`Excluir todas as ${tags.length} notificação(ões) pendente(s) do sino?\n\nOs registros originais (atividades, leads, contas, etc.) continuam intactos — só a notificação some.`)) return;
+    const cfg = DB.getConfig();
+    const map = { ...(cfg.notificacoesStatus || {}) };
+    const hoje = Utils.todayStr();
+    tags.forEach(t => { map[t] = { status: 'excluida', data: hoje }; });
+    DB.saveConfig({ ...cfg, notificacoesStatus: map });
+    updateNotifBadge();
+    Toast.success(`${tags.length} notificação(ões) removida(s) do sino.`);
+    showPendencias();
+  }
+
+  function showPendencias() {
+    const { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista } = _pendenciasAtuais();
+    const totalPendencias = followups.length + atrasadas.length + parcelasVencidas.length + licitacoes.length + projetosAtrasados.length + projSemArt.length + contratosVencendoLista.length;
+
     Modal.open({
       title: '⚠ Pendências',
       size: 'modal-lg',
       body: `
+        ${totalPendencias > 0 ? `<div class="mb-3" style="text-align:right"><button class="btn btn-xs btn-danger" onclick="App.dismissAllNotifs()">🗑 Excluir Todas (${totalPendencias})</button></div>` : ''}
         ${followups.length > 0 ? `
           <div class="detail-label mb-2">Follow-ups Vencidos (${followups.length})</div>
           ${followups.map(l => {
@@ -933,7 +967,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

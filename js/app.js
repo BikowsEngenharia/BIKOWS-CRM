@@ -264,49 +264,16 @@ const App = (() => {
     if (document.getElementById('modalBackdrop')?.classList.contains('open')) showPendencias();
   }
 
+  // Reaproveita _pendenciasAtuais() (mesma fonte usada pela modal de
+  // Pendências) em vez de recalcular tudo de novo aqui — as duas listas
+  // já divergiram uma vez (Contas a Pagar/Marketing só existiam num dos
+  // dois lados) e isso é justamente o que causava notificação reaparecendo
+  // mesmo depois de excluída.
   function updateNotifBadge() {
-    const dispensados = _notifDismissed();
-    const isLive = tag => !dispensados[tag];
-
-    const leads = DB.getAll('leads');
-    const followupsVencidos = leads.filter(l =>
-      !['fechado_ganho','executado','fechado_perdido'].includes(l.status) &&
-      l.dataProximaAcao && Utils.isOverdue(l.dataProximaAcao) && isLive('lead_'+l.id)
-    ).length;
-
-    const recebiveis = DB.getAll('recebiveis');
-    let vencidos = 0;
-    recebiveis.forEach(r => {
-      (r.parcelas||[]).forEach(p => {
-        if (p.status !== 'recebido' && Utils.isOverdue(p.vencimento) && isLive('parc_'+p.id)) vencidos++;
-      });
-    });
-
-    // Licitações com abertura em ≤3 dias
-    const licitacoes = DB.getAll('licitacoes');
-    const licsUrgentes = licitacoes.filter(l => {
-      if (['ganhou','perdeu','deserta','cancelada'].includes(l.status)) return false;
-      const d = Utils.daysUntil(l.dataAbertura);
-      return d != null && d >= 0 && d <= 3 && isLive('lic_'+l.id);
-    }).length;
-
-    // Projetos atrasados
-    const projetos = DB.getAll('projetos');
-    const projetosAtrasados = projetos.filter(p =>
-      p.status === 'em_andamento' && Utils.isOverdue(p.prazo) && isLive('proj_'+p.id)
-    ).length;
-
-    // ARTs pendentes em projetos em andamento
-    // Projeto "sem ART" = nenhum registro na entidade arts E sem ART inline (campo legado p.art.numero)
-    const artsPendentes = projetos.filter(p =>
-      p.status === 'em_andamento' &&
-      !DB.getAll('arts').some(a => a.projetoId === p.id) &&
-      !p.art?.numero &&
-      isLive('art_'+p.id)
-    ).length;
-
-    var contratosVencendo = (typeof Contratos !== 'undefined' && Contratos.getContratosVencendo) ? Contratos.getContratosVencendo(30).filter(c => isLive('contrato_'+c.id)).length : 0;
-    const total = followupsVencidos + vencidos + licsUrgentes + projetosAtrasados + artsPendentes + contratosVencendo;
+    const p = _pendenciasAtuais();
+    const total = p.followups.length + p.atrasadas.length + p.parcelasVencidas.length + p.licitacoes.length +
+      p.projetosAtrasados.length + p.projSemArt.length + p.contratosVencendoLista.length +
+      p.contasPagarVencendo.length + p.marketingProximos.length;
     const badge = document.getElementById('notifBadge');
     if (badge) {
       badge.textContent = total;
@@ -363,7 +330,19 @@ const App = (() => {
       ? Contratos.getContratosVencendo(30).filter(c => isLive('contrato_'+c.id))
       : [];
 
-    return { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista };
+    // Estas duas existiam no aviso do navegador (notifications.js) mas nunca
+    // apareciam aqui no sino — por isso não tinham como ser excluídas e
+    // voltavam a notificar em toda sessão nova, mesmo com o resto já limpo.
+    const contasPagarVencendo = DB.getAll('contaspagar').filter(c => c.status === 'pendente' && c.vencimento).filter(c => {
+      const d = Utils.daysUntil(c.vencimento);
+      return d != null && d <= 3 && d >= -7 && isLive('cp_'+c.id);
+    });
+    const marketingProximos = DB.getAll('marketing_posts').filter(p => p.status === 'agendado' && p.dataPublicacao).filter(p => {
+      const d = Utils.daysUntil(p.dataPublicacao);
+      return d != null && d <= 1 && d >= 0 && isLive('mkt_'+p.id);
+    });
+
+    return { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos };
   }
 
   function dismissAllNotifs() {
@@ -376,6 +355,8 @@ const App = (() => {
       ...p.projetosAtrasados.map(pr => 'proj_'+pr.id),
       ...p.projSemArt.map(pr => 'art_'+pr.id),
       ...p.contratosVencendoLista.map(c => 'contrato_'+c.id),
+      ...p.contasPagarVencendo.map(c => 'cp_'+c.id),
+      ...p.marketingProximos.map(m => 'mkt_'+m.id),
     ];
     if (tags.length === 0) { Toast.success('Nenhuma pendência para excluir.'); return; }
     if (!confirm(`Excluir todas as ${tags.length} notificação(ões) pendente(s) do sino?\n\nOs registros originais (atividades, leads, contas, etc.) continuam intactos — só a notificação some.`)) return;
@@ -390,8 +371,8 @@ const App = (() => {
   }
 
   function showPendencias() {
-    const { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista } = _pendenciasAtuais();
-    const totalPendencias = followups.length + atrasadas.length + parcelasVencidas.length + licitacoes.length + projetosAtrasados.length + projSemArt.length + contratosVencendoLista.length;
+    const { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos } = _pendenciasAtuais();
+    const totalPendencias = followups.length + atrasadas.length + parcelasVencidas.length + licitacoes.length + projetosAtrasados.length + projSemArt.length + contratosVencendoLista.length + contasPagarVencendo.length + marketingProximos.length;
 
     Modal.open({
       title: '⚠ Pendências',
@@ -499,8 +480,37 @@ const App = (() => {
             }).join('');
         })()}
 
+        ${contasPagarVencendo.length > 0 ? `
+          <div class="detail-label mb-2 mt-3">Contas a Pagar (${contasPagarVencendo.length})</div>
+          ${contasPagarVencendo.map(c => {
+            const dias = Utils.daysUntil(c.vencimento);
+            const venceu = dias < 0;
+            return `<div class="followup-item urgent mb-2">
+              <div style="flex:1"><div class="font-bold text-sm">💸 ${Utils.escHtml(c.fornecedor||'—')}</div>
+              <div class="text-xs">${Utils.escHtml(c.categoria||'')} · ${venceu ? 'Venceu' : 'Vence'}: ${Utils.formatDate(c.vencimento)}</div></div>
+              <span class="badge ${venceu?'badge-red':'badge-yellow'}">${venceu ? 'Vencida há '+Math.abs(dias)+'d' : (dias===0?'Hoje':dias+'d')}</span>
+              <span class="font-bold">${Utils.formatCurrency(c.valor)}</span>
+              ${_notifActions('cp_'+c.id)}
+            </div>`;
+          }).join('')}
+        ` : ''}
+
+        ${marketingProximos.length > 0 ? `
+          <div class="detail-label mb-2 mt-3">Posts Agendados (${marketingProximos.length})</div>
+          ${marketingProximos.map(m => {
+            const dias = Utils.daysUntil(m.dataPublicacao);
+            return `<div class="followup-item urgent mb-2">
+              <div style="flex:1"><div class="font-bold text-sm">📢 ${Utils.escHtml(Utils.truncate(m.titulo||'',50))}</div>
+              <div class="text-xs">${Utils.escHtml(m.canal||'')} · Publica: ${Utils.formatDate(m.dataPublicacao)}</div></div>
+              <span class="badge badge-blue">${dias===0?'Hoje':`em ${dias}d`}</span>
+              ${_notifActions('mkt_'+m.id)}
+            </div>`;
+          }).join('')}
+        ` : ''}
+
         ${followups.length === 0 && atrasadas.length === 0 && parcelasVencidas.length === 0 && licitacoes.length === 0 &&
-          projetosAtrasados.length === 0 && projSemArt.length === 0 && contratosVencendoLista.length === 0 ?
+          projetosAtrasados.length === 0 && projSemArt.length === 0 && contratosVencendoLista.length === 0 &&
+          contasPagarVencendo.length === 0 && marketingProximos.length === 0 ?
           '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Tudo em dia!</div><div class="empty-sub">Nenhuma pendência no momento.</div></div>' : ''}
       `,
     });

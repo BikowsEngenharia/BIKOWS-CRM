@@ -210,8 +210,6 @@ const Licitacoes = (() => {
     _loadPncpBadge();
     _autoExpirarVencidasPncp();
 
-    // Auto-lançar no pipeline (10 dias antes da abertura)
-    setTimeout(() => _autoLancarNoPipeline(), 200);
   }
 
   /* ── PNCP Monitor ─────────────────────────────────────────────────────── */
@@ -444,47 +442,14 @@ const Licitacoes = (() => {
     render();
   }
 
-  /* ── Auto-lançamento no pipeline ──────────────────────────────────────── */
+  /* ── Lançamento no pipeline (só manual) ───────────────────────────────────
+     Removido o gatilho automático (disparava sozinho quando a abertura
+     caía a ≤10 dias) — ele poluía o Pipeline comercial com licitações que
+     muitas vezes nem eram pra participar de verdade. Agora só entra no
+     Pipeline quando o usuário clica "Lançar agora" numa licitação que
+     realmente está sendo disputada. ────────────────────────────────────── */
 
-  const _DIAS_ANTECEDENCIA = 10;
   const _TERMINAL = ['ganhou', 'perdeu', 'deserta', 'cancelada'];
-
-  function _autoLancarNoPipeline() {
-    const lics = DB.getAll('licitacoes');
-    let lancadas = 0;
-
-    lics.forEach(l => {
-      // Ignorar terminais e as que já têm lead vinculado
-      if (_TERMINAL.includes(l.status)) return;
-      if (l.leadId) return; // já está no pipeline
-
-      const dias = Utils.daysUntil(l.dataAbertura);
-      if (dias == null) return;                    // sem data de abertura
-      if (dias > _DIAS_ANTECEDENCIA) return;       // ainda não é hora
-      if (dias < -30) return;                      // abertura muito no passado, ignora
-
-      // Chegou a hora — criar lead no pipeline
-      _criarLeadNoPipeline(l);
-      lancadas++;
-    });
-
-    if (lancadas > 0) {
-      Toast.show(
-        `🏛 ${lancadas} licitação(ões) lançada(s) automaticamente no pipeline ` +
-        `(abertura em ≤${_DIAS_ANTECEDENCIA} dias).`,
-        6000
-      );
-      // Re-render silencioso para mostrar badge
-      const licsAtt = DB.getAll('licitacoes');
-      let list = [...licsAtt].sort((a, b) => (a.dataAbertura||'').localeCompare(b.dataAbertura||''));
-      if (_filter.status) list = list.filter(l => l.status === _filter.status);
-      if (_filter.modalidade) list = list.filter(l => l.modalidade === _filter.modalidade);
-      const el = document.getElementById('licTabContent');
-      if (el && _tab === 'lista') {
-        el.innerHTML = renderLista(list, licsAtt, DB.getConfig());
-      }
-    }
-  }
 
   function _criarLeadNoPipeline(lic) {
     // Calcular próxima ação: 3 dias antes da abertura (ou amanhã se < 3 dias)
@@ -519,7 +484,7 @@ const Licitacoes = (() => {
         link:        lic.linkEdital || lic.linkPortal || '',
         resultado:   'Em disputa',
       },
-      observacoes: `Auto-lançado pelo módulo de Licitações ${_DIAS_ANTECEDENCIA} dias antes da abertura.`,
+      observacoes: `Lançado manualmente a partir do módulo de Licitações.`,
     });
 
     // Gravar leadId de volta na licitação para rastreamento
@@ -587,12 +552,9 @@ const Licitacoes = (() => {
                     <div class="text-xs text-muted" style="margin-top:2px">${Utils.formatDate(l.dataLancamentoPipeline)}</div>`;
                 } else if (terminal) {
                   pipelineCell = `<span class="text-xs text-muted">—</span>`;
-                } else if (dias != null && dias <= _DIAS_ANTECEDENCIA) {
-                  pipelineCell = `<span style="font-size:11px;color:#f97316;font-weight:600">⏳ Lançando...</span>`;
                 } else {
-                  const faltam = dias != null ? `em ${dias}d` : 'data indefinida';
-                  pipelineCell = `<span class="text-xs text-muted">Automático ${faltam}</span>
-                    <br><button class="btn btn-xs btn-secondary" style="margin-top:3px" onclick="Licitacoes.lancarNoPipeline('${l.id}')" title="Lançar agora manualmente">↗ Agora</button>`;
+                  pipelineCell = `<span class="text-xs text-muted">Não lançada</span>
+                    <br><button class="btn btn-xs btn-secondary" style="margin-top:3px" onclick="Licitacoes.lancarNoPipeline('${l.id}')" title="Lançar manualmente no Pipeline comercial">↗ Lançar</button>`;
                 }
 
                 // Alerta de abertura próxima
@@ -850,13 +812,11 @@ const Licitacoes = (() => {
             </div>`;
           }
           if (_TERMINAL.includes(l.status)) return '';
-          const diasAbertura = Utils.daysUntil(l.dataAbertura);
-          const faltam = diasAbertura != null ? `${diasAbertura} dias` : 'data indefinida';
           return `<div style="background:#fffbeb;border:1px solid #f59e0b44;border-radius:var(--radius);padding:12px;margin-top:12px;display:flex;align-items:center;gap:12px">
-            <span style="font-size:22px">⏳</span>
+            <span style="font-size:22px">🏛</span>
             <div style="flex:1">
-              <div class="font-bold text-sm">Lançamento automático no pipeline</div>
-              <div class="text-xs text-muted">Faltam <strong>${faltam}</strong> para a abertura · será lançada automaticamente ${diasAbertura != null && diasAbertura <= _DIAS_ANTECEDENCIA ? '<strong style="color:#f97316">agora (≤10 dias)</strong>' : `quando restar ${_DIAS_ANTECEDENCIA} dias`}</div>
+              <div class="font-bold text-sm">Ainda não está no Pipeline comercial</div>
+              <div class="text-xs text-muted">Lance manualmente só quando estiver realmente participando/disputando esta licitação.</div>
             </div>
             <button class="btn btn-sm btn-secondary" onclick="Licitacoes.lancarNoPipeline('${id}')">↗ Lançar agora</button>
           </div>`;

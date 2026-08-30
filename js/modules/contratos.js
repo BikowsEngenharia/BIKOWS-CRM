@@ -75,10 +75,15 @@ const Contratos = (() => {
     if (_filter.status) list = list.filter(c => _autoStatus(c) === _filter.status);
     if (_filter.clienteId) list = list.filter(c => c.clienteId === _filter.clienteId);
 
-    const ativos    = contratosFiltrados.filter(c => _autoStatus(c) === 'ativo').length;
-    const renovando = contratosFiltrados.filter(c => _autoStatus(c) === 'renovando').length;
-    const vencidos  = contratosFiltrados.filter(c => _autoStatus(c) === 'vencido').length;
-    const valorTotal = contratosFiltrados.filter(c => ['ativo','renovando'].includes(_autoStatus(c))).reduce((s,c)=>s+(c.valor||0),0);
+    /* Ativo/renovando/vencido são ESTADO ATUAL, não fluxo do período: um
+       contrato assinado em maio continua vigente hoje. Filtrar pela data de
+       início escondia 10 dos 12 contratos vigentes quando o período era
+       "Este Mês". O recorte por período fica só em "assinados no período". */
+    const ativos    = contratos.filter(c => _autoStatus(c) === 'ativo').length;
+    const renovando = contratos.filter(c => _autoStatus(c) === 'renovando').length;
+    const vencidos  = contratos.filter(c => _autoStatus(c) === 'vencido').length;
+    const valorTotal = contratos.filter(c => ['ativo','renovando'].includes(_autoStatus(c))).reduce((s,c)=>s+(c.valor||0),0);
+    const assinadosPeriodo = contratosFiltrados.length;
 
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
@@ -95,7 +100,7 @@ const Contratos = (() => {
         <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" onclick="Contratos.drillDown('ativos')"><div class="kpi-label">Ativos</div><div class="kpi-value">${ativos}</div><div class="kpi-icon">📋</div></div>
         <div class="kpi-card" style="--kpi-color:#f59e0b;cursor:pointer" onclick="Contratos.drillDown('vencendo')"><div class="kpi-label">Renovando em 30d</div><div class="kpi-value">${renovando}</div><div class="kpi-icon">🔄</div></div>
         <div class="kpi-card" style="--kpi-color:#ef4444;cursor:pointer" onclick="Contratos.drillDown('vencidos')"><div class="kpi-label">Vencidos</div><div class="kpi-value">${vencidos}</div><div class="kpi-icon">⚠</div></div>
-        <div class="kpi-card" style="--kpi-color:#1a56db;cursor:pointer" onclick="Contratos.drillDown('encerrados')"><div class="kpi-label">Valor em Vigência</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(valorTotal)}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:#1a56db;cursor:pointer" onclick="Contratos.drillDown('encerrados')"><div class="kpi-label">Valor em Vigência <span style="font-size:10px;font-weight:400;opacity:.7">(total ativo)</span></div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(valorTotal)}</div><div class="kpi-sub">${assinadosPeriodo} assinado(s) em ${periodoLabels[_periodo]}</div><div class="kpi-icon">💰</div></div>
       </div>
 
       ${renovando > 0 || vencidos > 0 ? `

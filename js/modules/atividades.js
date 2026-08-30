@@ -48,9 +48,12 @@ const Atividades = (() => {
     if (_filter.tipo) list = list.filter(a => a.tipo === _filter.tipo);
     if (_filter.responsavel) list = list.filter(a => a.responsavel === _filter.responsavel);
 
-    const pendentes = atividadesFiltradas.filter(a => a.status === 'pendente').length;
-    const atrasadas = atividadesFiltradas.filter(a => a.status === 'pendente' && Utils.isOverdue(a.data)).length;
-    const hoje = atividadesFiltradas.filter(a => a.status === 'pendente' && Utils.isToday(a.data)).length;
+    // Pendente/atrasada/hoje são ESTADO ATUAL: uma tarefa atrasada de julho
+    // continua atrasada hoje e não pode sumir do painel por causa do período.
+    const pendentes = atividades.filter(a => a.status === 'pendente').length;
+    const atrasadas = atividades.filter(a => a.status === 'pendente' && Utils.isOverdue(a.data)).length;
+    const hoje = atividades.filter(a => a.status === 'pendente' && Utils.isToday(a.data)).length;
+    // Concluídas é fluxo — aí sim vale o recorte do período.
     const concluidas = atividadesFiltradas.filter(a => a.status === 'concluida').length;
 
     document.getElementById('pageContent').innerHTML = `
@@ -412,7 +415,7 @@ const Atividades = (() => {
 
     if (tipo === 'atrasadas') {
       title = 'Atrasadas';
-      items = atividadesFiltradas.filter(a => a.status === 'pendente' && a.data && a.data < hoje);
+      items = atividades.filter(a => a.status === 'pendente' && a.data && a.data < hoje);
       cols = ['Atividade', 'Tipo', 'Data', 'Responsável'];
       rowFn = a => [
         Utils.escHtml(a.titulo),
@@ -422,7 +425,7 @@ const Atividades = (() => {
       ];
     } else if (tipo === 'hoje') {
       title = 'Para Hoje';
-      items = atividadesFiltradas.filter(a => a.status === 'pendente' && a.data === hoje);
+      items = atividades.filter(a => a.status === 'pendente' && a.data === hoje);
       cols = ['Atividade', 'Tipo', 'Hora', 'Responsável'];
       rowFn = a => [
         Utils.escHtml(a.titulo),
@@ -432,7 +435,7 @@ const Atividades = (() => {
       ];
     } else if (tipo === 'pendentes') {
       title = 'Pendentes';
-      items = atividadesFiltradas.filter(a => a.status === 'pendente');
+      items = atividades.filter(a => a.status === 'pendente');
       cols = ['Atividade', 'Tipo', 'Data', 'Responsável'];
       rowFn = a => [
         Utils.escHtml(a.titulo),

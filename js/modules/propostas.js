@@ -126,9 +126,11 @@ const Propostas = (() => {
     let list = propostasAll;
     if (_filter.status) list = list.filter(p => p.status === _filter.status);
 
-    const totalEnviadas = propostas.filter(p => ['enviada','negociacao'].includes(p.status)).length;
+    // Proposta enviada e ainda sem resposta é ESTADO ATUAL — uma de julho
+    // continua em aberto hoje e precisa seguir contando.
+    const totalEnviadas = propostasAll.filter(p => ['enviada','negociacao'].includes(p.status)).length;
     const totalAprovadas = propostas.filter(p => p.status === 'aprovada').length;
-    const valorEmAberto = Utils.sum(propostas.filter(p => ['enviada','negociacao'].includes(p.status)), 'valor');
+    const valorEmAberto = Utils.sum(propostasAll.filter(p => ['enviada','negociacao'].includes(p.status)), 'valor');
     const valorAprovado = Utils.sum(propostas.filter(p => p.status === 'aprovada'), 'valor');
     const taxa = propostas.length > 0 ? ((totalAprovadas / propostas.length) * 100).toFixed(0) : 0;
 

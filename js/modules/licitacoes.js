@@ -122,7 +122,8 @@ const Licitacoes = (() => {
     const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
     const licsFiltradas = _filtrarPorPeriodo(lics, 'dataAbertura');
 
-    const emAndamento = licsFiltradas.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
+    // Em andamento = estado atual (não some porque a abertura foi noutro mês).
+    const emAndamento = lics.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
     const ganhou      = licsFiltradas.filter(l => l.status === 'ganhou');
     const perdeu      = licsFiltradas.filter(l => l.status === 'perdeu');
     const valorDisputa = emAndamento.reduce((s, l) => s + (l.valorEstimado || 0), 0);

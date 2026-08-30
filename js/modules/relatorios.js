@@ -78,11 +78,17 @@ const Relatorios = (() => {
   function renderComercial() {
     const leadsAll = DB.getAll('leads');
     const leads = _filtrarPorPeriodo(leadsAll, 'dataEntrada');
-    const ganhos = leads.filter(l => ['fechado_ganho','executado'].includes(l.status));
-    const perdidos = leads.filter(l => l.status === 'fechado_perdido');
-    const ativos = leads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
-    const taxa = leads.length ? ((ganhos.length/leads.length)*100).toFixed(1) : 0;
-    const ticketMedio = ganhos.length ? Utils.sum(ganhos,'valorFechado') / ganhos.length : 0;
+    // Ganhos/perdidos do período contam pela data da DECISÃO, não da entrada.
+    const ganhosPeriodo = _filtrarPorPeriodo(leadsAll.filter(l => ['fechado_ganho','executado'].includes(l.status)), 'dataMudancaStatus');
+    const perdidosPeriodo = _filtrarPorPeriodo(leadsAll.filter(l => l.status === 'fechado_perdido'), 'dataMudancaStatus');
+    const ganhos = ganhosPeriodo;
+    const perdidos = perdidosPeriodo;
+    // Pipeline ativo é foto do agora, não recorte de quem entrou no período.
+    const ativos = leadsAll.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
+    const decididos = ganhos.length + perdidos.length;
+    const taxa = decididos ? ((ganhos.length/decididos)*100).toFixed(1) : 0;
+    const _valorGanho = l => Number(l.valorFechado) || Number(l.valorEstimado) || 0;
+    const ticketMedio = ganhos.length ? ganhos.reduce((a,l)=>a+_valorGanho(l),0) / ganhos.length : 0;
     const byStatus = Utils.groupBy(leads, 'status');
     const byOrigem = Utils.groupBy(leads, 'origemLead');
     const bySegmento = Utils.groupBy(leads, 'segmento');
@@ -116,14 +122,14 @@ const Relatorios = (() => {
               <thead><tr><th>Responsável</th><th>Total Leads</th><th>Ganhos</th><th>Tx. Conversão</th><th>Valor Fechado</th></tr></thead>
               <tbody>
                 ${Object.entries(byResp).map(([resp, rLeads]) => {
-                  const rGanhos = rLeads.filter(l=>l.status==='fechado_ganho');
+                  const rGanhos = rLeads.filter(l=>['fechado_ganho','executado'].includes(l.status));
                   const tx = ((rGanhos.length/rLeads.length)*100).toFixed(0);
                   return `<tr>
                     <td class="font-bold">${Utils.escHtml(resp||'N/D')}</td>
                     <td>${rLeads.length}</td>
                     <td><span class="badge badge-green">${rGanhos.length}</span></td>
                     <td>${tx}%</td>
-                    <td class="font-bold text-primary">${Utils.formatCurrency(Utils.sum(rGanhos,'valorFechado'))}</td>
+                    <td class="font-bold text-primary">${Utils.formatCurrency(rGanhos.reduce((a,l)=>a+_valorGanho(l),0))}</td>
                   </tr>`;
                 }).join('')}
               </tbody>

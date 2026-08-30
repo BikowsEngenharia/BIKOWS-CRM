@@ -264,6 +264,12 @@ const Pipeline = (() => {
   }
 
   /* ---- Receita ponderada (valor × probabilidade por etapa) ---- */
+  /* Mesmo critério do Dashboard: negócio ganho sem "valor fechado" preenchido
+     cai no valor estimado, senão a receita aparece zerada. */
+  function _valorGanho(l) {
+    return Number(l.valorFechado) || Number(l.valorEstimado) || 0;
+  }
+
   function _receitaPonderada(leads) {
     return leads
       .filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status))
@@ -316,11 +322,16 @@ const Pipeline = (() => {
 
     const leadsFiltrados = _filtrarPorPeriodo(leads, 'dataEntrada');
     const FECHADOS = ['fechado_ganho','executado','fechado_perdido'];
-    const ativos = leadsFiltrados.filter(l => !FECHADOS.includes(l.status));
-    const ganhos = leadsFiltrados.filter(l => ['fechado_ganho','executado'].includes(l.status));
+    // Pipeline em aberto = foto do agora (não filtra por data de entrada:
+    // oportunidade de maio ainda está aberta hoje).
+    const ativos = leads.filter(l => !FECHADOS.includes(l.status));
+    // Ganhos/perdidos pela data da DECISÃO, não da entrada.
+    const ganhos = _filtrarPorPeriodo(leads.filter(l => ['fechado_ganho','executado'].includes(l.status)), 'dataMudancaStatus');
+    const perdidosPeriodo = _filtrarPorPeriodo(leads.filter(l => l.status === 'fechado_perdido'), 'dataMudancaStatus');
+    const fechadosPeriodo = ganhos.length + perdidosPeriodo.length;
     const totalPipeline = Utils.sum(ativos, 'valorEstimado');
-    const receitaPond = _receitaPonderada(leadsFiltrados);
-    const taxa = leadsFiltrados.length ? ((ganhos.length / leadsFiltrados.length)*100).toFixed(0) : 0;
+    const receitaPond = _receitaPonderada(ativos);
+    const taxa = fechadosPeriodo ? ((ganhos.length / fechadosPeriodo)*100).toFixed(0) : 0;
     const frios = ativos.filter(l => _isLeadFrio(l)).length;
     const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
 
@@ -400,7 +411,7 @@ const Pipeline = (() => {
 
       <div class="pipeline-summary mb-4">
         <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads ativos" onclick="Pipeline.drillDown('pipeline_total')">
-          <div class="ps-label">Total em Pipeline <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
+          <div class="ps-label">Total em Pipeline <span style="font-size:10px;opacity:.7">(em aberto agora)</span></div>
           <div class="ps-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="ps-count">${ativos.length} oportunidades abertas</div>
         </div>
@@ -411,19 +422,19 @@ const Pipeline = (() => {
         </div>
         <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver receita fechada" onclick="Pipeline.drillDown('receita_fechada')">
           <div class="ps-label">Fechado / Ganho <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
-          <div class="ps-value">${Utils.formatCurrency(Utils.sum(ganhos,'valorFechado'))}</div>
+          <div class="ps-value">${Utils.formatCurrency(ganhos.reduce((a,l)=>a+_valorGanho(l),0))}</div>
           <div class="ps-count">${ganhos.length} negócios</div>
         </div>
         <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads frios" onclick="Pipeline.drillDown('leads_frios')">
           <div class="ps-label">Taxa de Conversão <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
           <div class="ps-value">${taxa}%</div>
-          <div class="ps-count">${leadsFiltrados.filter(l=>l.status==='fechado_perdido').length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
+          <div class="ps-count">${perdidosPeriodo.length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
         </div>
       </div>
 
       <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;width:fit-content">
         <button onclick="Pipeline.setPipelineTab('ativo')" style="padding:8px 20px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='ativo'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">📋 Pipeline Ativo</button>
-        <button onclick="Pipeline.setPipelineTab('historico')" style="padding:8px 20px;border:none;border-left:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='historico'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">🗂 Histórico <span style="font-size:11px;opacity:.85">(${leadsFiltrados.filter(l=>['fechado_ganho','executado','fechado_perdido'].includes(l.status)).length})</span></button>
+        <button onclick="Pipeline.setPipelineTab('historico')" style="padding:8px 20px;border:none;border-left:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='historico'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">🗂 Histórico <span style="font-size:11px;opacity:.85">(${leads.filter(l=>['fechado_ganho','executado','fechado_perdido'].includes(l.status)).length})</span></button>
       </div>
 
       ${_pipelineTab === 'ativo' ? _renderProbabilidadeLegend() : ''}
@@ -641,7 +652,13 @@ const Pipeline = (() => {
   function _aplicarMudancaEtapa(leadId, newStatus) {
     const lead = DB.get('leads', leadId);
     const statusAnterior = lead?.status;
-    DB.update('leads', leadId, { status: newStatus, dataMudancaStatus: Utils.todayStr() });
+    const mudanca = { status: newStatus, dataMudancaStatus: Utils.todayStr() };
+    // Ao ganhar sem valor fechado informado, herda o estimado — antes o negócio
+    // ficava com valorFechado 0 e sumia da receita do Dashboard.
+    if (['fechado_ganho','executado'].includes(newStatus) && !Number(lead?.valorFechado)) {
+      mudanca.valorFechado = Number(lead?.valorEstimado) || 0;
+    }
+    DB.update('leads', leadId, mudanca);
     Toast.success('Lead movido para ' + (Utils.LEAD_STATUS[newStatus]?.label || newStatus));
     if (newStatus !== statusAnterior) {
       _autoAtividade(leadId, newStatus, lead?.titulo || '');
@@ -1418,6 +1435,10 @@ const Pipeline = (() => {
       const wasNotGanho = existingLead?.status !== 'fechado_ganho';
       const statusAnteriorSave = existingLead?.status;
       if (data.status !== statusAnteriorSave) { data.dataMudancaStatus = Utils.todayStr(); }
+      // Ganho sem valor fechado informado herda o estimado (mesma regra do kanban)
+      if (['fechado_ganho','executado'].includes(data.status) && !data.valorFechado) {
+        data.valorFechado = Number(data.valorEstimado) || 0;
+      }
       DB.update('leads', id, data);
       Toast.success('Lead atualizado');
       if (data.status !== statusAnteriorSave) {
@@ -1432,6 +1453,9 @@ const Pipeline = (() => {
         return;
       }
     } else {
+      // Sem isto o lead nascia sem data de entrada e toda métrica por período
+      // tinha de adivinhar pelo createdAt.
+      data.dataEntrada = data.dataEntrada || Utils.todayStr();
       DB.create('leads', data);
       Toast.success('Lead criado');
       // Notificar equipe via Telegram

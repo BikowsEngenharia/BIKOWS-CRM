@@ -424,8 +424,9 @@ const DB = (() => {
     create('contatos', { clienteId: c3.id, nome: 'Fernanda Souza', cargo: 'Eng. de Segurança', email: 'fernanda@agrosul.coop.br', telefone: '(45) 98833-5566', principal: true });
 
     const hoje = new Date();
-    const d = (offset) => { const dt = new Date(hoje); dt.setDate(dt.getDate() + offset); return dt.toISOString().split('T')[0]; };
-    const m = (monthOffset, day = 10) => { const dt = new Date(hoje); dt.setMonth(dt.getMonth() + monthOffset); dt.setDate(day); return dt.toISOString().split('T')[0]; };
+    // Data LOCAL: toISOString() devolve UTC e, no Brasil, depois das 21h isso vira "amanhã".
+    const d = (offset) => { const dt = new Date(hoje); dt.setDate(dt.getDate() + offset); return Utils.localDateStr(dt); };
+    const m = (monthOffset, day = 10) => { const dt = new Date(hoje); dt.setMonth(dt.getMonth() + monthOffset); dt.setDate(day); return Utils.localDateStr(dt); };
 
     /* ---- Leads ---- */
     create('leads', { clienteId: c1.id, titulo: 'Adequação NR-12 Linha de Abate', segmento: 'Alimentos', valorEstimado: 85000, status: 'qualificacao', origemLead: 'Indicação', decisor: 'Roberto Alves', servicoInteresse: ['NR-12', 'Laudo Técnico'], proximaAcao: 'Visita técnica para levantamento de campo', dataProximaAcao: d(2), responsavel: 'Marcos', observacoes: 'Cliente tem prazo de 60 dias para regularizar. Alta prioridade.' });

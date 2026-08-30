@@ -74,6 +74,13 @@ const Dashboard = (() => {
     </div>`;
   }
 
+  /* Valor de um negócio ganho. Quando o "valor fechado" nunca foi preenchido
+     (fechamento rápido pelo kanban), cai no valor estimado — sem isso a
+     Receita Fechada aparecia R$ 0,00 mesmo com negócios ganhos no mês. */
+  function _valorGanho(l) {
+    return Number(l.valorFechado) || Number(l.valorEstimado) || 0;
+  }
+
   function setPeriodo(p) {
     _periodo = p;
     render();
@@ -95,20 +102,27 @@ const Dashboard = (() => {
     const periodoLabels = { mes: 'Este Mês', trimestre: 'Trimestre', semestre: 'Semestre', ano: 'Este Ano', tudo: 'Tudo' };
     const periodoLabel = periodoLabels[_periodo] || '';
 
-    const ativos = leadsFiltrados.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
-    const ganhos = leadsFiltrados.filter(l => ['fechado_ganho','executado'].includes(l.status));
-    const perdidos = leadsFiltrados.filter(l => l.status === 'fechado_perdido');
+    // Pipeline aberto é FOTO DO AGORA: uma oportunidade que entrou em maio
+    // continua aberta hoje — filtrá-la pela data de entrada escondia quase
+    // todo o pipeline sempre que o período era "Este Mês".
+    const ativos = leads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
     const totalPipeline = Utils.sum(ativos, 'valorEstimado');
-    const receitaFechada = Utils.sum(ganhos, 'valorFechado');
-    const taxaConversao = (leadsFiltrados.length > 0) ? ((ganhos.length / leadsFiltrados.length) * 100).toFixed(0) : 0;
 
-    // Período anterior para comparativo
-    const leadsAnt = _filtrarPeriodoAnterior(leads, 'dataEntrada');
-    const ativosAnt = leadsAnt.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
-    const ganhosAnt = leadsAnt.filter(l => ['fechado_ganho','executado'].includes(l.status));
-    const totalPipelineAnt = Utils.sum(ativosAnt, 'valorEstimado');
-    const receitaFechadaAnt = Utils.sum(ganhosAnt, 'valorFechado');
-    const taxaConversaoAnt = leadsAnt.length > 0 ? (ganhosAnt.length / leadsAnt.length) * 100 : 0;
+    // Ganhos/perdidos contam pela data da DECISÃO (dataMudancaStatus), não pela
+    // data de entrada: um negócio fechado hoje que entrou meses atrás precisa
+    // aparecer na receita DESTE mês.
+    const ganhos = _filtrarPorPeriodo(leads.filter(l => ['fechado_ganho','executado'].includes(l.status)), 'dataMudancaStatus');
+    const perdidos = _filtrarPorPeriodo(leads.filter(l => l.status === 'fechado_perdido'), 'dataMudancaStatus');
+    const receitaFechada = ganhos.reduce((s, l) => s + _valorGanho(l), 0);
+    const decididos = ganhos.length + perdidos.length;
+    const taxaConversao = decididos > 0 ? ((ganhos.length / decididos) * 100).toFixed(0) : 0;
+
+    // Período anterior para comparativo (mesma régua: data da decisão)
+    const ganhosAnt = _filtrarPeriodoAnterior(leads.filter(l => ['fechado_ganho','executado'].includes(l.status)), 'dataMudancaStatus');
+    const perdidosAnt = _filtrarPeriodoAnterior(leads.filter(l => l.status === 'fechado_perdido'), 'dataMudancaStatus');
+    const receitaFechadaAnt = ganhosAnt.reduce((s, l) => s + _valorGanho(l), 0);
+    const decididosAnt = ganhosAnt.length + perdidosAnt.length;
+    const taxaConversaoAnt = decididosAnt > 0 ? (ganhosAnt.length / decididosAnt) * 100 : 0;
 
     const pendentes = atividadesFiltradas.filter(a => a.status === 'pendente');
     const atrasadas = pendentes.filter(a => Utils.isOverdue(a.data));
@@ -181,10 +195,9 @@ const Dashboard = (() => {
       <!-- KPIs -->
       <div class="kpi-grid">
         <div class="kpi-card" style="--kpi-color:#1a56db;cursor:pointer" onclick="Dashboard.drillDown('leads_ativos')">
-          <div class="kpi-label">Pipeline Ativo <span style="font-size:10px;font-weight:400;opacity:.7">(${periodoLabel})</span></div>
+          <div class="kpi-label">Pipeline Ativo <span style="font-size:10px;font-weight:400;opacity:.7">(em aberto agora)</span></div>
           <div class="kpi-value">${Utils.formatCurrency(totalPipeline)}</div>
           <div class="kpi-sub">${ativos.length} oportunidades abertas</div>
-          ${_trendHtml(totalPipeline, totalPipelineAnt)}
           <div class="kpi-icon">💼</div>
         </div>
         <div class="kpi-card" style="--kpi-color:#10b981;cursor:pointer" onclick="Dashboard.drillDown('leads_ganhos')">
@@ -368,7 +381,7 @@ const Dashboard = (() => {
       containerId: 'chartFunnel',
       data: statusOrder.map(s => ({
         label: Utils.LEAD_STATUS[s].label,
-        value: leadsFiltrados.filter(l => l.status === s).length,
+        value: ativos.filter(l => l.status === s).length,
         color: Utils.LEAD_STATUS[s].color,
       })).filter(d => d.value > 0),
     });
@@ -919,9 +932,9 @@ const Dashboard = (() => {
       },
       'leads_ganhos': {
         title: '🏆 Leads Ganhos',
-        get items() { return DB.getAll('leads').filter(l => l.status === 'fechado_ganho'); },
+        get items() { return _filtrarPorPeriodo(DB.getAll('leads').filter(l => ['fechado_ganho','executado'].includes(l.status)), 'dataMudancaStatus'); },
         cols: ['Lead','Valor Fechado','Responsável'],
-        row: l => [Utils.escHtml(l.titulo||'—'), Utils.formatCurrency(l.valorFechado||0), Utils.escHtml(l.responsavel||'—')],
+        row: l => [Utils.escHtml(l.titulo||'—'), Utils.formatCurrency(_valorGanho(l)), Utils.escHtml(l.responsavel||'—')],
         action: l => `onclick="App.navigate('pipeline');Modal.close()"`,
       },
       'leads_novos': {

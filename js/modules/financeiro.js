@@ -614,7 +614,25 @@ const Financeiro = (() => {
     const desc=document.getElementById('frDesc').value.trim();if(!desc){Toast.error('Descrição obrigatória');return;}
     const base=id?DB.get('recebiveis',id):null;
     const parcelas=[...document.querySelectorAll('.parc-form-row')].map((row,i)=>({id:(base?.parcelas?.[i]?.id)||(Date.now().toString(36)+Math.random().toString(36).substr(2,4)),valor:Utils.parseMoney(row.querySelector('.parc-val').value),vencimento:row.querySelector('.parc-venc').value,status:row.querySelector('.parc-status').value,dataPagamento:null,nfNumero:''}));
-    const data={descricao:desc,clienteId:document.getElementById('frCliente').value,valorTotal:Utils.parseMoney(document.getElementById('frTotal').value)||parcelas.reduce((s,p)=>s+p.valor,0),parcelas};
+    const totalInformado=Utils.parseMoney(document.getElementById('frTotal').value)||0;
+    const somaParcelas=parcelas.reduce((s,p)=>s+(Number(p.valor)||0),0);
+    /* Antes: dava para salvar "Valor Total = 13.000" com as parcelas em branco.
+       O recebível parecia certo na lista (que mostra o total), mas TODO o resto
+       do sistema — "A Receber", Dashboard, Fluxo de Caixa — soma as PARCELAS,
+       então o dinheiro simplesmente sumia. Agora o total se distribui nas
+       parcelas quando elas vierem zeradas, e avisamos se não bater. */
+    if(totalInformado>0 && somaParcelas===0 && parcelas.length>0){
+      const base=Math.floor((totalInformado/parcelas.length)*100)/100;
+      let acum=0;
+      parcelas.forEach((p,i)=>{
+        p.valor = (i===parcelas.length-1) ? Math.round((totalInformado-acum)*100)/100 : base;
+        acum += p.valor;
+      });
+      Toast.warning(`Parcelas estavam sem valor — distribuí ${Utils.formatCurrency(totalInformado)} em ${parcelas.length}x.`);
+    } else if(totalInformado>0 && somaParcelas>0 && Math.abs(totalInformado-somaParcelas)>0.01){
+      Toast.warning(`Atenção: soma das parcelas (${Utils.formatCurrency(somaParcelas)}) difere do valor total (${Utils.formatCurrency(totalInformado)}).`);
+    }
+    const data={descricao:desc,clienteId:document.getElementById('frCliente').value,valorTotal:totalInformado||parcelas.reduce((s,p)=>s+(Number(p.valor)||0),0),parcelas};
     if(id){DB.update('recebiveis',id,data);Toast.success('Atualizado');}else{DB.create('recebiveis',data);Toast.success('Recebível criado');}
     Modal.close();renderTab();
   }

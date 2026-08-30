@@ -466,6 +466,7 @@ const Licitacoes = (() => {
       titulo: `${lic.numero} — ${Utils.truncate(lic.objeto || '', 70)}`,
       origemLead: 'Licitação Pública',
       status: 'proposta_elaboracao', // já está em elaboração de proposta
+      dataEntrada: Utils.todayStr(),
       clienteId: null,
       segmento: 'Governo / Órgão Público',
       valorEstimado: lic.valorEstimado || 0,

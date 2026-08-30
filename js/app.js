@@ -50,7 +50,12 @@ const App = (() => {
 
   function refreshIfNeeded(entity) {
     const page = _ENTITY_PAGE[entity];
-    if (page && page === _currentPage) {
+    // Dashboard e Relatórios agregam TODAS as entidades — precisam recarregar
+    // com qualquer mudança, não só com a da "própria" entidade. Sem isto, um
+    // negócio fechado em outra aba/dispositivo não refletia no Dashboard.
+    if (_currentPage === 'dashboard' || _currentPage === 'relatorios') {
+      try { PAGES[_currentPage]?.module?.render?.(); } catch (e) { /* silencioso */ }
+    } else if (page && page === _currentPage) {
       try { PAGES[page]?.module?.render?.(); } catch (e) { /* silencioso */ }
     }
     updateNotifBadge();
@@ -865,6 +870,7 @@ const App = (() => {
       DB.create('leads', {
         titulo,
         status: 'lead_identificado',
+        dataEntrada: Utils.todayStr(),
         clienteId: document.getElementById('qcCliente')?.value || '',
         valorEstimado: Utils.parseMoney(document.getElementById('qcValor')?.value) || 0,
         responsavel: document.getElementById('qcResp')?.value || '',

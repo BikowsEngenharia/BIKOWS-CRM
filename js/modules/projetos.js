@@ -1172,12 +1172,39 @@ const Projetos = (() => {
     render();
   }
 
+  /* Excluir projeto deixava para trás atividades e contratos apontando para um
+     projeto que não existe mais — foi assim que nasceram os itens duplicados da
+     Siloé (projeto recriado, mas o contrato e as atividades do antigo ficaram).
+     Agora: avisa o que está vinculado, apaga as tarefas pendentes do projeto,
+     PRESERVA as concluídas (histórico de trabalho executado) e desvincula
+     documentos financeiros/contratuais em vez de apagá-los. */
   function deleteProjeto(id) {
     const p = DB.get('projetos', id);
-    Utils.confirmDelete(p?.titulo || 'este projeto', () => {
+    const ativs      = DB.getAll('atividades').filter(a => a.projetoId === id);
+    const pendentes  = ativs.filter(a => a.status !== 'concluida');
+    const concluidas = ativs.filter(a => a.status === 'concluida');
+    const contratos  = DB.getAll('contratos').filter(c => c.projetoId === id);
+    const recebiveis = DB.getAll('recebiveis').filter(r => r.projetoId === id);
+
+    const avisos = [];
+    if (pendentes.length)  avisos.push(pendentes.length + ' tarefa(s) pendente(s) serão excluídas');
+    if (concluidas.length) avisos.push(concluidas.length + ' concluída(s) mantidas no histórico');
+    if (contratos.length)  avisos.push(contratos.length + ' contrato(s) desvinculados, não excluídos');
+    if (recebiveis.length) avisos.push(recebiveis.length + ' recebível(is) desvinculados, não excluídos');
+
+    const msg = avisos.length
+      ? 'Ao excluir: ' + avisos.join(' · ') + '. Deseja continuar?'
+      : 'Esta ação não pode ser desfeita.';
+
+    Confirm.show('Excluir "' + (p?.titulo || 'este projeto') + '"?', msg, () => {
+      pendentes.forEach(a => DB.remove('atividades', a.id));
+      concluidas.forEach(a => DB.update('atividades', a.id, { projetoId: '' }));
+      contratos.forEach(c => DB.update('contratos', c.id, { projetoId: '' }));
+      recebiveis.forEach(r => DB.update('recebiveis', r.id, { projetoId: '' }));
       DB.remove('projetos', id);
-      Toast.success('Projeto removido');
+      Toast.success('Projeto removido' + (avisos.length ? ' — vínculos ajustados' : ''));
       render();
+      if (typeof App !== 'undefined') App.updateNotifBadge();
     });
   }
 

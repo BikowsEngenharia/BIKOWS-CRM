@@ -224,7 +224,7 @@ const Notifications = (() => {
   function _checkLicitacoes(prefs) {
     const ant = prefs.antecedencia?.licitacoes ?? 3;
     return DB.getAll('licitacoes')
-      .filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status) && l.dataAbertura)
+      .filter(l => !Utils.licEncerrada(l.status) && l.dataAbertura)
       .filter(l => {
         const d = _daysUntil(l.dataAbertura);
         return d !== null && d <= ant && d >= 0;

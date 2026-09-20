@@ -151,7 +151,7 @@ const Dashboard = (() => {
 
     // Licitações
     const licitacoes = DB.getAll('licitacoes');
-    const licsAtivas = licitacoes.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
+    const licsAtivas = licitacoes.filter(l => !Utils.licEncerrada(l.status));
     const licsUrgentes = licsAtivas.filter(l => { const d = Utils.daysUntil(l.dataAbertura); return d != null && d >= 0 && d <= 7; }).length;
     const valorLics = licsAtivas.reduce((s,l) => s + (l.valorEstimado||0), 0);
 
@@ -998,7 +998,7 @@ const Dashboard = (() => {
         title: '🏛 Licitações — Abertura em ≤7 dias',
         get items() {
           return DB.getAll('licitacoes').filter(l => {
-            if (['ganhou','perdeu','deserta','cancelada'].includes(l.status)) return false;
+            if (Utils.licEncerrada(l.status)) return false;
             const d = Utils.daysUntil(l.dataAbertura);
             return d != null && d >= 0 && d <= 7;
           });

@@ -161,6 +161,11 @@ const Utils = (() => {
     nota:     { label: 'Nota',       icon: '📝', bg: '#fef3c7' },
   };
 
+  // Status de licitação que NÃO contam como "em disputa" (encerradas). Fonte
+  // única para Dashboard, Relatórios, sino de pendências e o próprio módulo.
+  const LIC_ENCERRADAS = ['ganhou', 'perdeu', 'deserta', 'cancelada', 'expirada', 'descartada'];
+  function licEncerrada(status) { return LIC_ENCERRADAS.includes(status); }
+
   const ATIV_STATUS = {
     pendente:  { label: 'Pendente',  badge: 'badge-yellow' },
     concluida: { label: 'Concluída', badge: 'badge-green'  },
@@ -299,7 +304,7 @@ const Utils = (() => {
     formatCurrency, formatDate, formatDateTime, formatCNPJ, formatPhone,
     timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, truncate, escHtml, escJs,
     parseMoney, moneyToInput,
-    LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS,
+    LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS, LIC_ENCERRADAS, licEncerrada,
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,
     validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn,

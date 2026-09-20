@@ -448,7 +448,7 @@ const Relatorios = (() => {
     const lics = DB.getAll('licitacoes');
     const ganhou = lics.filter(l => l.status === 'ganhou');
     const perdeu = lics.filter(l => l.status === 'perdeu');
-    const emAndamento = lics.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
+    const emAndamento = lics.filter(l => !Utils.licEncerrada(l.status));
     const taxa = lics.length > 0 ? ((ganhou.length / lics.length)*100).toFixed(1) : 0;
     const valorGanho = ganhou.reduce((s,l) => s + (l.valorAdjudicado||l.valorProposta||0), 0);
     const valorDisputa = emAndamento.reduce((s,l) => s + (l.valorEstimado||0), 0);

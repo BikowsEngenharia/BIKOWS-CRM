@@ -302,7 +302,7 @@ const App = (() => {
     const atividades = DB.getAll('atividades');
     const recebiveis = DB.getAll('recebiveis');
     const licitacoes = DB.getAll('licitacoes').filter(l => {
-      if (['ganhou','perdeu','deserta','cancelada'].includes(l.status)) return false;
+      if (Utils.licEncerrada(l.status)) return false;
       const d = Utils.daysUntil(l.dataAbertura);
       return d != null && d >= 0 && d <= 7 && isLive('lic_'+l.id);
     });

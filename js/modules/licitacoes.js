@@ -28,6 +28,7 @@ const Licitacoes = (() => {
     perdeu:              { label: '❌ Perdeu',                badge: 'badge-red',    color: '#dc2626', desc: 'Outro licitante foi adjudicado' },
     deserta:             { label: '🚫 Deserta/Fracassada',    badge: 'badge-gray',   color: '#94a3b8', desc: 'Sem proposta válida ou revogada' },
     cancelada:           { label: '🗑 Cancelada',             badge: 'badge-gray',   color: '#94a3b8', desc: 'Licitação cancelada ou revogada' },
+    expirada:            { label: '⌛ Expirada',              badge: 'badge-gray',   color: '#94a3b8', desc: 'Abertura passou sem participação da Bikows' },
   };
 
   const CHECKLIST_GRUPOS = {
@@ -110,6 +111,8 @@ const Licitacoes = (() => {
   }
 
   let _filter = { status: '', modalidade: '' };
+  let _mostrarEncerradas = false; // lista/kanban escondem expiradas/perdidas por padrão
+  let _autoExpirouSessao = false;  // roda 1x por sessão
   let _tab = 'lista'; // 'lista' | 'kanban' | 'pncp'
   let _pncpData = [];   // cache dos dados PNCP
   let _pncpLoading = false;
@@ -123,7 +126,7 @@ const Licitacoes = (() => {
     const licsFiltradas = _filtrarPorPeriodo(lics, 'dataAbertura');
 
     // Em andamento = estado atual (não some porque a abertura foi noutro mês).
-    const emAndamento = lics.filter(l => !['ganhou','perdeu','deserta','cancelada'].includes(l.status));
+    const emAndamento = lics.filter(l => !Utils.licEncerrada(l.status));
     const ganhou      = licsFiltradas.filter(l => l.status === 'ganhou');
     const perdeu      = licsFiltradas.filter(l => l.status === 'perdeu');
     const valorDisputa = emAndamento.reduce((s, l) => s + (l.valorEstimado || 0), 0);
@@ -138,6 +141,7 @@ const Licitacoes = (() => {
 
     let list = [...lics].sort((a, b) => (a.dataAbertura || '').localeCompare(b.dataAbertura || ''));
     if (_filter.status) list = list.filter(l => l.status === _filter.status);
+    else if (!_mostrarEncerradas) list = list.filter(l => !Utils.licEncerrada(l.status));
     if (_filter.modalidade) list = list.filter(l => l.modalidade === _filter.modalidade);
 
     document.getElementById('pageContent').innerHTML = `
@@ -210,8 +214,35 @@ const Licitacoes = (() => {
     // Carregar badge PNCP em background
     _loadPncpBadge();
     _autoExpirarVencidasPncp();
+    _autoExpirarLicitacoesCrm();
 
   }
+
+  /* Licitações do CRM cuja abertura já passou sem a Bikows ter enviado
+     proposta (ainda em identificada/análise/habilitação/preparando) viram
+     "Expirada": saem do "Em disputa" e da lista padrão, mas NADA é apagado —
+     o registro continua no histórico com o status anterior guardado. */
+  function _autoExpirarLicitacoesCrm() {
+    if (_autoExpirouSessao) return;
+    _autoExpirouSessao = true;
+    const PRE_PROPOSTA = ['identificada', 'em_analise', 'habilitacao', 'proposta_preparando'];
+    const hoje = Utils.todayStr();
+    const vencidas = DB.getAll('licitacoes').filter(l =>
+      PRE_PROPOSTA.includes(l.status) && l.dataAbertura && l.dataAbertura < hoje && !l.leadId
+    );
+    if (!vencidas.length) return;
+    setTimeout(() => {
+      vencidas.forEach(l => DB.update('licitacoes', l.id, {
+        status: 'expirada', statusAnterior: l.status, expiradaEm: hoje,
+        motivoPerda: l.motivoPerda || 'Abertura passou sem participação',
+      }));
+      Toast.show(`⌛ ${vencidas.length} licitação(ões) com abertura já passada marcada(s) como Expirada (nada foi excluído — marque "Mostrar encerradas" para vê-las).`, 7000);
+      if (typeof App !== 'undefined') App.updateNotifBadge();
+      render();
+    }, 50);
+  }
+
+  function toggleEncerradas(v) { _mostrarEncerradas = !!v; render(); }
 
   /* ── PNCP Monitor ─────────────────────────────────────────────────────── */
 
@@ -450,7 +481,7 @@ const Licitacoes = (() => {
      Pipeline quando o usuário clica "Lançar agora" numa licitação que
      realmente está sendo disputada. ────────────────────────────────────── */
 
-  const _TERMINAL = ['ganhou', 'perdeu', 'deserta', 'cancelada'];
+  const _TERMINAL = Utils.LIC_ENCERRADAS;
 
   function _criarLeadNoPipeline(lic) {
     // Calcular próxima ação: 3 dias antes da abertura (ou amanhã se < 3 dias)
@@ -532,7 +563,12 @@ const Licitacoes = (() => {
               ${MODALIDADES.map(m => `<option value="${m}" ${_filter.modalidade===m?'selected':''}>${m}</option>`).join('')}
             </select>
           </div>
-          <span class="text-sm text-muted">${list.length} licitação(ões)</span>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label class="text-xs text-muted" style="display:flex;align-items:center;gap:5px;cursor:pointer" title="Expiradas, perdidas, desertas e canceladas ficam ocultas por padrão">
+              <input type="checkbox" ${_mostrarEncerradas ? 'checked' : ''} onchange="Licitacoes.toggleEncerradas(this.checked)"> Mostrar encerradas (${allLics.filter(l => Utils.licEncerrada(l.status)).length})
+            </label>
+            <span class="text-sm text-muted">${list.length} licitação(ões)</span>
+          </div>
         </div>
         <div class="table-wrap">
           ${list.length === 0 ? emptyState() : `
@@ -602,7 +638,8 @@ const Licitacoes = (() => {
       'identificada','em_analise','habilitacao','proposta_preparando',
       'proposta_enviada','sessao_realizada','recurso',
     ];
-    const won = ['ganhou','perdeu','deserta','cancelada'];
+    const encerradasNaoGanhas = lics.filter(l => Utils.licEncerrada(l.status) && l.status !== 'ganhou');
+    const expiradas = encerradasNaoGanhas.filter(l => l.status === 'expirada');
 
     return `
       <div style="overflow-x:auto;padding-bottom:8px">
@@ -641,14 +678,14 @@ const Licitacoes = (() => {
           </div>
           <div style="width:200px;flex-shrink:0">
             <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid #ef4444;margin-bottom:8px;transition:box-shadow .15s">
-              <div style="font-size:12px;font-weight:700;color:#ef4444">❌ Perdidas / Canceladas</div>
-              <div style="font-size:11px;color:var(--text-muted)">${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).length}</div>
-              <div style="display:flex;gap:4px;margin-top:6px">
+              <div style="font-size:12px;font-weight:700;color:#ef4444">❌ Encerradas</div>
+              <div style="font-size:11px;color:var(--text-muted)">${encerradasNaoGanhas.length} · ${expiradas.length} expirada(s)</div>
+              <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
                 <button class="btn btn-xs btn-secondary" style="flex:1;font-size:10px" onclick="Licitacoes.filtrarKanban('perdeu')">🔍 Ver lista</button>
-                ${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).length > 0 ? `<button class="btn btn-xs btn-danger" style="flex:1;font-size:10px" onclick="Licitacoes.limparEncerradas()">🗑 Limpar tudo</button>` : ''}
+                <button class="btn btn-xs btn-secondary" style="flex:1;font-size:10px" onclick="Licitacoes.toggleEncerradas(${_mostrarEncerradas ? 'false' : 'true'})">${_mostrarEncerradas ? '🙈 Ocultar' : '👁 Mostrar'}</button>
               </div>
             </div>
-            ${lics.filter(l=>['perdeu','deserta','cancelada'].includes(l.status)).map(l => renderKanbanCard(l)).join('')}
+            ${_mostrarEncerradas ? encerradasNaoGanhas.map(l => renderKanbanCard(l)).join('') : `<div class="text-xs text-muted" style="padding:8px 4px">${encerradasNaoGanhas.length} card(s) oculto(s)</div>`}
           </div>
         </div>
       </div>`;
@@ -658,7 +695,7 @@ const Licitacoes = (() => {
     const s = STATUS[l.status] || { label: l.status, badge: 'badge-gray', color: '#94a3b8' };
     const dias = Utils.daysUntil(l.dataAbertura);
     const alertStyle = dias != null && dias >= 0 && dias <= 7 ? 'border-left:3px solid #ef4444' : '';
-    const isEncerrada = ['descartada','cancelada','perdeu','deserta'].includes(l.status);
+    const isEncerrada = Utils.licEncerrada(l.status) && l.status !== 'ganhou';
     return `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;${isEncerrada?'opacity:.8;':'cursor:pointer;'}${alertStyle}" ${!isEncerrada ? `onclick="Licitacoes.view('${l.id}')"` : ''}>
         <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:3px">${Utils.escHtml(l.numero||'—')}</div>
@@ -1293,7 +1330,7 @@ const Licitacoes = (() => {
 
   /* ── Limpar licitações encerradas permanentemente ─────────────────────── */
   function limparEncerradas() {
-    const encerradas = DB.getAll('licitacoes').filter(l => ['perdeu','deserta','cancelada'].includes(l.status));
+    const encerradas = DB.getAll('licitacoes').filter(l => ['perdeu','deserta','cancelada','expirada'].includes(l.status));
     if (!encerradas.length) { Toast.success('Nenhuma licitação encerrada para excluir.'); return; }
     if (!confirm(`Excluir permanentemente ${encerradas.length} licitação(ões) encerrada(s) (perdida, deserta ou cancelada)?\n\nEsta ação não pode ser desfeita.`)) return;
     encerradas.forEach(l => DB.remove('licitacoes', l.id));
@@ -1306,6 +1343,6 @@ const Licitacoes = (() => {
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,
     filtrarKanban, recarregarPncp, moverKanbanPncp, importarPncp,
-    limparEncerradas, limparDescartadasPncp,
+    limparEncerradas, limparDescartadasPncp, toggleEncerradas,
   };
 })();

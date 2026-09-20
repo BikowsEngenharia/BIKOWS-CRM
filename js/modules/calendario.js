@@ -159,7 +159,7 @@ const Calendario = (() => {
 
     // ── Licitações — data de abertura ─────────────────────────────────────
     DB.getAll('licitacoes')
-      .filter(l => l.dataAbertura && !['ganhou','perdeu','deserta','cancelada'].includes(l.status))
+      .filter(l => l.dataAbertura && !Utils.licEncerrada(l.status))
       .forEach(l => {
         addEvent(l.dataAbertura, {
           type: 'licitacao',

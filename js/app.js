@@ -781,7 +781,7 @@ const App = (() => {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const clientOpts = clientes.map(c => `<option value="${c.id}">${Utils.escHtml(c.nome)}</option>`).join('');
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}">${Utils.escHtml(r)}</option>`).join('');
     const hoje = Utils.todayStr();
 
     Modal.open({
@@ -813,7 +813,7 @@ const App = (() => {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const clientOpts = '<option value="">— Cliente —</option>' + clientes.map(c => `<option value="${c.id}">${Utils.escHtml(c.nome)}</option>`).join('');
-    const respOpts = '<option value="">— Responsável —</option>' + cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const respOpts = '<option value="">— Responsável —</option>' + cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}">${Utils.escHtml(r)}</option>`).join('');
     const hoje = Utils.todayStr();
     const el = document.getElementById('qcFormArea');
     if (!el) return;

@@ -342,7 +342,7 @@ const Relatorios = (() => {
               <thead><tr><th>Estado</th><th>Clientes</th><th>%</th></tr></thead>
               <tbody>
                 ${Object.entries(byEstado).sort((a,b)=>b[1].length-a[1].length).slice(0,10).map(([estado, list]) =>
-                  `<tr><td class="font-bold">${estado}</td><td>${list.length}</td><td><div class="progress"><div class="progress-fill" style="width:${(list.length/clientes.length*100).toFixed(0)}%"></div></div></td></tr>`
+                  `<tr><td class="font-bold">${Utils.escHtml(estado)}</td><td>${list.length}</td><td><div class="progress"><div class="progress-fill" style="width:${(list.length/clientes.length*100).toFixed(0)}%"></div></div></td></tr>`
                 ).join('')}
               </tbody>
             </table>
@@ -364,7 +364,7 @@ const Relatorios = (() => {
               }).sort((a,b)=>b.receita-a.receita).slice(0,10).map(({c,receita,leads:lc,proj}) =>
                 `<tr>
                   <td class="font-bold">${Utils.escHtml(c.nome)}</td>
-                  <td>${c.segmento?`<span class="badge badge-blue">${c.segmento}</span>`:'—'}</td>
+                  <td>${c.segmento?`<span class="badge badge-blue">${Utils.escHtml(c.segmento)}</span>`:'—'}</td>
                   <td>${lc}</td>
                   <td>${proj}</td>
                   <td class="font-bold text-success">${receita > 0 ? Utils.formatCurrency(receita) : '—'}</td>

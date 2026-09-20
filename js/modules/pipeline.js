@@ -177,7 +177,7 @@ const Pipeline = (() => {
   function _origemBadge(o) {
     if (!o || !_ORIGENS_MAP[o]) return '';
     const m = _ORIGENS_MAP[o];
-    return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:${m.color};background:${m.bg};padding:2px 8px;border-radius:99px;border:1px solid ${m.color}33">${m.icon} ${o}</span>`;
+    return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:${m.color};background:${m.bg};padding:2px 8px;border-radius:99px;border:1px solid ${m.color}33">${m.icon} ${Utils.escHtml(o)}</span>`;
   }
   function _previewOrigem(sel) {
     const el = document.getElementById('fOrigemPreview');
@@ -555,7 +555,7 @@ const Pipeline = (() => {
           ${lead.dataProximaAcao ? '📅 ' + Utils.formatDate(lead.dataProximaAcao) : ''}
           ${alert}
         </span>
-        <span class="text-xs text-muted">${lead.responsavel || ''}</span>
+        <span class="text-xs text-muted">${Utils.escHtml(lead.responsavel || '')}</span>
       </div>
       <div class="kc-actions">
         <span class="kanban-move-btns">
@@ -818,7 +818,7 @@ const Pipeline = (() => {
             <div style="height:6px;background:var(--border);border-radius:99px;margin-bottom:8px">
               <div style="width:${score}%;height:100%;background:${scoreCor};border-radius:99px"></div>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:4px">${detalhes.map(d => `<span style="font-size:10px;background:var(--surface-2);padding:2px 6px;border-radius:99px;color:var(--text-muted)">${d}</span>`).join('')}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">${detalhes.map(d => `<span style="font-size:10px;background:var(--surface-2);padding:2px 6px;border-radius:99px;color:var(--text-muted)">${Utils.escHtml(d)}</span>`).join('')}</div>
           </div>`;
         })()}
 
@@ -1066,7 +1066,7 @@ const Pipeline = (() => {
     const cfg = DB.getConfig();
     const seq = String(DB.getAll('projetos').length + 1).padStart(3, '0');
     const codigo = `BIK-${new Date().getFullYear()}-PRJ-${seq}`;
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${lead.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${lead.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     Modal.open({
       title: '📋 Criar Projeto a partir do Lead',
       size: 'modal-lg',
@@ -1199,7 +1199,7 @@ const Pipeline = (() => {
 
     const clientOptions = clientes.map(c => `<option value="${c.id}" ${lead?.clienteId === c.id ? 'selected' : ''}>${Utils.escHtml(c.nome)}</option>`).join('');
     const stageOptions = STAGES.map(s => `<option value="${s.key}" ${st === s.key ? 'selected' : ''}>${s.label} (${s.prob}%)</option>`).join('');
-    const respOptions = cfg.responsaveis.map(r => `<option value="${r}" ${lead?.responsavel === r ? 'selected' : ''}>${r}</option>`).join('');
+    const respOptions = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${lead?.responsavel === r ? 'selected' : ''}>${Utils.escHtml(r)}</option>`).join('');
     const servicosOptions = cfg.servicos.map(s => {
       const sel = (lead?.servicoInteresse || []).includes(s) ? 'selected' : '';
       return `<option value="${s}" ${sel}>${s}</option>`;
@@ -1233,7 +1233,7 @@ const Pipeline = (() => {
           <div class="form-group">
             <label class="form-label">Segmento</label>
             <select class="form-control" id="fSegmento">
-              ${cfg.segmentos.map(s => `<option value="${s}" ${lead?.segmento === s ? 'selected' : ''}>${s}</option>`).join('')}
+              ${cfg.segmentos.map(s => `<option value="${Utils.escHtml(s)}" ${lead?.segmento === s ? 'selected' : ''}>${Utils.escHtml(s)}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -1322,7 +1322,7 @@ const Pipeline = (() => {
             <select class="form-control" id="fCampanhaId">
               <option value="">— Selecionar campanha —</option>
               ${DB.getAll('trafego_campanhas').filter(c => c.status !== 'encerrada').map(c =>
-                `<option value="${c.id}" ${lead?.campanhaId===c.id?'selected':''}>${Utils.escHtml(c.nome)} · ${c.plataforma || 'Google Ads'}</option>`
+                `<option value="${c.id}" ${lead?.campanhaId===c.id?'selected':''}>${Utils.escHtml(c.nome)} · ${Utils.escHtml(c.plataforma || 'Google Ads')}</option>`
               ).join('')}
             </select>
             <span class="form-hint">Vincule este lead a uma campanha para acompanhar o ROI</span>

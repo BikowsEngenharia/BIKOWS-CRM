@@ -96,7 +96,7 @@ const Atividades = (() => {
             </select>
             <select class="filter-select" onchange="Atividades.setFilter('responsavel',this.value)">
               <option value="">Todos os responsáveis</option>
-              ${config.responsaveis.map(r => `<option value="${r}" ${_filter.responsavel===r?'selected':''}>${r}</option>`).join('')}
+              ${config.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${_filter.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('')}
             </select>
           </div>
           <span class="text-sm text-muted">${list.length} atividade(s)</span>
@@ -170,7 +170,7 @@ const Atividades = (() => {
     const clientOpts = clientes.map(c => `<option value="${c.id}" ${a?.clienteId===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
     const leadOpts   = leads.map(l => `<option value="${l.id}" ${a?.leadId===l.id?'selected':''}>${Utils.escHtml(l.titulo)}</option>`).join('');
     const tipoOpts   = Object.entries(Utils.ATIV_TIPO).map(([k,v]) => `<option value="${k}" ${a?.tipo===k?'selected':''}>${v.icon} ${v.label}</option>`).join('');
-    const respOpts   = cfg.responsaveis.map(r => `<option value="${r}" ${a?.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts   = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${a?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const statusOpts = Object.entries(Utils.ATIV_STATUS).map(([k,v]) => `<option value="${k}" ${(a?.status||'pendente')===k?'selected':''}>${v.label}</option>`).join('');
 
     Modal.open({

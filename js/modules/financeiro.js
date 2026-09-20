@@ -292,7 +292,7 @@ const Financeiro = (() => {
             <div class="dre-row"><div class="dre-label">Serviços e Receitas</div><div class="dre-value pos">+ ${Utils.formatCurrency(v.r)}</div></div>
             <div class="dre-row dre-subtotal"><div class="dre-label">Receita Bruta</div><div class="dre-value">${Utils.formatCurrency(v.r)}</div></div>
             <div class="dre-row dre-section"><div class="dre-label">(-) DEDUÇÕES</div></div>
-            <div class="dre-row"><div class="dre-label">Impostos sobre receita (${(DB.getConfig().regimeTributario||'Simples')} · ${((DB.getConfig().aliquotaImpostos||6)).toFixed(1)}%)</div><div class="dre-value neg">- ${Utils.formatCurrency(imp)}</div></div>
+            <div class="dre-row"><div class="dre-label">Impostos sobre receita (${Utils.escHtml(DB.getConfig().regimeTributario||'Simples')} · ${((DB.getConfig().aliquotaImpostos||6)).toFixed(1)}%)</div><div class="dre-value neg">- ${Utils.formatCurrency(imp)}</div></div>
             <div class="dre-row dre-total"><div class="dre-label">= RECEITA LÍQUIDA</div><div class="dre-value">${Utils.formatCurrency(rl)}</div></div>
             <div class="dre-row dre-section"><div class="dre-label">(-) CUSTO DOS SERVIÇOS (CSP)</div></div>
             <div class="dre-row"><div class="dre-label">Materiais e Insumos</div><div class="dre-value neg">- ${Utils.formatCurrency(v.mat)}</div></div>

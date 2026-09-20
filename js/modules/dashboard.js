@@ -242,7 +242,7 @@ const Dashboard = (() => {
         <!-- Canal principal de leads -->
         <div class="kpi-card" style="--kpi-color:#6366f1">
           <div class="kpi-label">Principal Canal</div>
-          <div class="kpi-value" style="font-size:16px">${canalPrincipal}</div>
+          <div class="kpi-value" style="font-size:16px">${Utils.escHtml(canalPrincipal)}</div>
           <div class="kpi-sub">${canalPrincipalQtd} leads · ${canalPrincipalPct}% do total</div>
           <div class="kpi-icon">📡</div>
         </div>
@@ -866,7 +866,7 @@ const Dashboard = (() => {
           <div class="activity-title">${Utils.escHtml(a.titulo)}</div>
           <div class="activity-sub">${Utils.escHtml(client)} · ${Utils.formatDate(a.data)} ${a.hora || ''} ${alert}</div>
         </div>
-        <div class="activity-time text-xs text-muted">${a.responsavel || ''}</div>
+        <div class="activity-time text-xs text-muted">${Utils.escHtml(a.responsavel || '')}</div>
       </div>`;
     }).join('');
   }

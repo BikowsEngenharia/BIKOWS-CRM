@@ -894,7 +894,7 @@ const Metas = (() => {
 
         <div class="form-group mt-3">
           <label class="form-label">📝 Estratégia / Observações</label>
-          <textarea class="form-control" id="mObs" rows="3" placeholder="Foco principal, estratégias, pontos de atenção...">${meta.observacoes||''}</textarea>
+          <textarea class="form-control" id="mObs" rows="3" placeholder="Foco principal, estratégias, pontos de atenção...">${Utils.escHtml(meta.observacoes||'')}</textarea>
         </div>`,
       saveCb: () => saveMeta(ano, qi, meta.id),
     });

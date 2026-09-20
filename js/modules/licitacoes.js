@@ -711,7 +711,7 @@ const Licitacoes = (() => {
             <div style="flex:1">
               <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${Utils.escHtml(l.modalidade||'')} · ${Utils.escHtml(l.portal||'')}</div>
               <div style="font-size:16px;font-weight:700;color:var(--text);line-height:1.4">${Utils.escHtml(l.objeto||'—')}</div>
-              <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">🏛 ${Utils.escHtml(l.orgao||'—')}${l.uasg ? ` <span class="text-muted" style="font-size:11px">UASG: ${l.uasg}</span>` : ''}</div>
+              <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">🏛 ${Utils.escHtml(l.orgao||'—')}${l.uasg ? ` <span class="text-muted" style="font-size:11px">UASG: ${Utils.escHtml(l.uasg)}</span>` : ''}</div>
             </div>
             <div style="text-align:right">
               <span class="badge ${lic_status.badge}" style="font-size:12px;padding:4px 10px">${lic_status.label}</span>
@@ -892,7 +892,7 @@ const Licitacoes = (() => {
     const cfg = DB.getConfig();
     const l = id ? DB.get('licitacoes', id) : null;
 
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${l?.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${l?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const modalOpts = MODALIDADES.map(m => `<option value="${m}" ${l?.modalidade===m?'selected':''}>${m}</option>`).join('');
     const portalOpts = PORTAIS.map(p => `<option value="${p}" ${l?.portal===p?'selected':''}>${p}</option>`).join('');
     const statusOpts = Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${(l?.status||'identificada')===k?'selected':''}>${v.label}</option>`).join('');
@@ -1098,7 +1098,7 @@ const Licitacoes = (() => {
     const cfg = DB.getConfig();
     const seq = String(DB.getAll('projetos').length + 1).padStart(3, '0');
     const codigo = `BIK-${new Date().getFullYear()}-PRJ-${seq}`;
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${l.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${l.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
 
     Modal.open({
       title: '📋 Criar Projeto — ' + l.numero,

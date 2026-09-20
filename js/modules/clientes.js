@@ -79,7 +79,7 @@ const Clientes = (() => {
               value="${Utils.escHtml(_filter.search)}" oninput="Clientes.setFilter('search',this.value)">
             <select class="filter-select" onchange="Clientes.setFilter('segmento',this.value)">
               <option value="">Todos os segmentos</option>
-              ${config.segmentos.map(s => `<option value="${s}" ${_filter.segmento===s?'selected':''}>${s}</option>`).join('')}
+              ${config.segmentos.map(s => `<option value="${Utils.escHtml(s)}" ${_filter.segmento===s?'selected':''}>${Utils.escHtml(s)}</option>`).join('')}
             </select>
             <select class="filter-select" onchange="Clientes.setFilter('porte',this.value)">
               <option value="">Todos os portes</option>
@@ -174,7 +174,7 @@ const Clientes = (() => {
               <div style="font-size:19px;font-weight:700">${Utils.escHtml(c.nome)}</div>
               ${c.codigoCliente ? `<span style="font-size:11px;background:var(--primary);color:#fff;padding:2px 8px;border-radius:99px;font-weight:700">${Utils.escHtml(c.codigoCliente)}</span>` : ''}
             </div>
-            <div class="text-sm text-muted">${c.segmento?`<span class="badge badge-blue">${c.segmento}</span> · `:''} ${Utils.escHtml(c.porte||'')} ${c.cidade?'· '+c.cidade+'/'+c.estado:''}${c.nps ? ` · ${'⭐'.repeat(c.nps)}` : ''}</div>
+            <div class="text-sm text-muted">${c.segmento?`<span class="badge badge-blue">${Utils.escHtml(c.segmento)}</span> · `:''} ${Utils.escHtml(c.porte||'')} ${c.cidade?'· '+Utils.escHtml(c.cidade)+'/'+Utils.escHtml(c.estado||''):''}${c.nps ? ` · ${'⭐'.repeat(c.nps)}` : ''}</div>
             <div class="text-xs text-muted mt-1">CNPJ: ${Utils.escHtml(c.cnpj||'—')} · ${Utils.escHtml(c.email||'—')} · ${Utils.escHtml(c.telefone||'—')}${c.engResponsavel?` · Resp: ${Utils.escHtml(c.engResponsavel)}`:''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -440,7 +440,7 @@ const Clientes = (() => {
           <div class="form-group">
             <label class="form-label">Segmento</label>
             <select class="form-control" id="fSegmento">
-              ${config.segmentos.map(s => `<option value="${s}" ${c?.segmento===s?'selected':''}>${s}</option>`).join('')}
+              ${config.segmentos.map(s => `<option value="${Utils.escHtml(s)}" ${c?.segmento===s?'selected':''}>${Utils.escHtml(s)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">

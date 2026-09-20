@@ -120,7 +120,7 @@ const Projetos = (() => {
             </select>
             <select class="filter-select" onchange="Projetos.setFilter('responsavel',this.value)">
               <option value="">Todos os responsáveis</option>
-              ${config.responsaveis.map(r => `<option value="${r}" ${_filter.responsavel===r?'selected':''}>${r}</option>`).join('')}
+              ${config.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${_filter.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('')}
             </select>
           </div>
           <span class="text-sm text-muted">${list.length} projeto(s)</span>
@@ -535,7 +535,7 @@ const Projetos = (() => {
   function abrirFormART(projetoId, artId = null) {
     const art = artId ? DB.get('arts', artId) : null;
     const cfg = DB.getConfig();
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${art?.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${art?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
 
     Modal.open({
       title: artId ? 'Editar ART' : 'Nova ART',
@@ -856,7 +856,7 @@ const Projetos = (() => {
     const etapas = p?.etapas || [{ nome: '', inicio: '', fim: '', pct: 0, status: 'pendente' }];
 
     const clientOpts = clientes.map(c => `<option value="${c.id}" ${p?.clienteId===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${p?.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${p?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const statusOpts = Object.entries(Utils.PROJ_STATUS).map(([k,v]) => `<option value="${k}" ${p?.status===k?'selected':''}>${v.label}</option>`).join('');
 
     const etapasHtml = etapas.map((e, i) => renderEtapaRow(e, i)).join('');

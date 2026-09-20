@@ -99,7 +99,7 @@ const Charts = (() => {
         bars += `<text x="${x + barW/2}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">${label}</text>`;
       }
       const lbl = (d.label || '').length > 6 ? d.label.slice(0,6)+'…' : (d.label || '');
-      bars += `<text x="${x + barW/2}" y="${pad.t + ih + 14}" text-anchor="middle" font-size="10" fill="#64748b">${lbl}</text>`;
+      bars += `<text x="${x + barW/2}" y="${pad.t + ih + 14}" text-anchor="middle" font-size="10" fill="#64748b">${Utils.escHtml(lbl)}</text>`;
     });
 
     el.innerHTML = `<svg viewBox="0 0 ${w} ${height}" width="100%" height="${height}" style="display:block">
@@ -205,7 +205,7 @@ const Charts = (() => {
     if (series[0].labels) {
       series[0].labels.forEach((lbl, i) => {
         const x = pad.l + (i / (n - 1 || 1)) * iw;
-        xLabels += `<text x="${x}" y="${pad.t+ih+18}" text-anchor="middle" font-size="10" fill="#64748b">${lbl}</text>`;
+        xLabels += `<text x="${x}" y="${pad.t+ih+18}" text-anchor="middle" font-size="10" fill="#64748b">${Utils.escHtml(lbl)}</text>`;
       });
     }
 

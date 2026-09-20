@@ -297,7 +297,7 @@ const Propostas = (() => {
                 <span style="font-size:11px;font-weight:700;color:${i===0?'var(--primary)':'var(--text-muted)'}">v${versoes.length - i}</span>
                 <div style="flex:1">
                   <div class="font-bold text-sm">${Utils.formatCurrency(v.valor)}</div>
-                  <div class="text-xs text-muted">${v.motivo || 'Revisão'}</div>
+                  <div class="text-xs text-muted">${Utils.escHtml(v.motivo || 'Revisão')}</div>
                 </div>
                 <div class="text-xs text-muted">${new Date(v.data).toLocaleDateString('pt-BR')}</div>
               </div>`).join('')}
@@ -368,7 +368,7 @@ const Propostas = (() => {
     _formItems = (p?.itens || []).map(it => _calcItem({ ...it }));
 
     const clientOpts = clientes.map(c => `<option value="${c.id}" ${p?.clienteId===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${p?.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${p?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const statusOpts = Object.entries(Utils.PROP_STATUS).map(([k,v]) => `<option value="${k}" ${(p?.status||'elaboracao')===k?'selected':''}>${v.label}</option>`).join('');
 
     const nextNum = id ? (p?.numero || _nextNumeroProposta()) : _nextNumeroProposta();
@@ -552,7 +552,7 @@ const Propostas = (() => {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes');
     const cli = clientes.find(c => c.id === prop.clienteId);
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}">${Utils.escHtml(r)}</option>`).join('');
     const projCount = String(DB.getAll('projetos').length + 1).padStart(3, '0');
     const codSuggest = `BIK-${new Date().getFullYear()}-PRJ-${projCount}`;
 
@@ -799,7 +799,7 @@ const Propostas = (() => {
     const container = document.getElementById('cEtapasContainer');
     if (!container) return;
     const cfg = DB.getConfig();
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}">${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}">${Utils.escHtml(r)}</option>`).join('');
     const condicao = document.getElementById('cCondicao')?.value || 'avista';
     const showPgto = condicao === 'medicoes';
     const valorTotal = Utils.parseMoney(document.getElementById('cValorFechado')?.value) || 0;
@@ -1104,9 +1104,9 @@ const Propostas = (() => {
           <th style="padding:8px;text-align:right;width:110px">Val. Unit.</th>
           <th style="padding:8px;text-align:right;width:110px">Total</th>
         </tr></thead>
-        <tbody>${p.itens.map((it,i)=>`<tr style="background:${i%2===0?'#f8fafc':'#fff'}"><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0">${it.desc||''}</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0">${it.qtd}</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;color:#64748b">${it.un||''}</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0">R$ ${(it.unit||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style="padding:7px 8px;text-align:right;font-weight:700;border-bottom:1px solid #e2e8f0">R$ ${(it.total||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td></tr>`).join('')}</tbody>
+        <tbody>${p.itens.map((it,i)=>`<tr style="background:${i%2===0?'#f8fafc':'#fff'}"><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0">${Utils.escHtml(it.desc||'')}</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0">${it.qtd}</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;color:#64748b">${it.un||''}</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0">R$ ${(it.unit||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td style="padding:7px 8px;text-align:right;font-weight:700;border-bottom:1px solid #e2e8f0">R$ ${(it.total||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td></tr>`).join('')}</tbody>
       </table>` : '';
-    w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Proposta ${p.numero||''}</title>
+    w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Proposta ${Utils.escHtml(p.numero||'')}</title>
       <style>
         body{font-family:Arial,sans-serif;color:#1e293b;margin:0;padding:32px;font-size:14px;line-height:1.5}
         .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1e40af}
@@ -1123,24 +1123,24 @@ const Propostas = (() => {
         @media print { @page { margin: 15mm; } body { padding: 0; } }
       </style></head><body>
       <div class="header">
-        <div><div class="empresa-nome">${cfg.empresa||'Bikows Engenharia'}</div>
-          <div class="empresa-info">${cfg.cnpj?'CNPJ: '+cfg.cnpj+' · ':''} ${cfg.cidade||''}${cfg.estado?' / '+cfg.estado:''}</div>
+        <div><div class="empresa-nome">${Utils.escHtml(cfg.empresa||'Bikows Engenharia')}</div>
+          <div class="empresa-info">${cfg.cnpj?'CNPJ: '+Utils.escHtml(cfg.cnpj)+' · ':''} ${Utils.escHtml(cfg.cidade||'')}${cfg.estado?' / '+Utils.escHtml(cfg.estado):''}</div>
         </div>
-        <div class="prop-info"><div class="prop-num">${p.numero||'—'}</div><div>Data: ${new Date().toLocaleDateString('pt-BR')}</div></div>
+        <div class="prop-info"><div class="prop-num">${Utils.escHtml(p.numero||'—')}</div><div>Data: ${new Date().toLocaleDateString('pt-BR')}</div></div>
       </div>
       <div class="section">
         <h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Cliente</h3>
         <div class="grid2">
-          <div class="field"><label>Empresa</label><p><strong>${cliente?.nome||p.clienteNome||'—'}</strong></p></div>
-          <div class="field"><label>CNPJ</label><p>${cliente?.cnpj||'—'}</p></div>
-          <div class="field"><label>Cidade / UF</label><p>${[cliente?.cidade,cliente?.estado].filter(Boolean).join(' / ')||'—'}</p></div>
-          <div class="field"><label>Responsável</label><p>${p.responsavel||'—'}</p></div>
+          <div class="field"><label>Empresa</label><p><strong>${Utils.escHtml(cliente?.nome||p.clienteNome||'—')}</strong></p></div>
+          <div class="field"><label>CNPJ</label><p>${Utils.escHtml(cliente?.cnpj||'—')}</p></div>
+          <div class="field"><label>Cidade / UF</label><p>${Utils.escHtml([cliente?.cidade,cliente?.estado].filter(Boolean).join(' / ')||'—')}</p></div>
+          <div class="field"><label>Responsável</label><p>${Utils.escHtml(p.responsavel||'—')}</p></div>
         </div>
       </div>
       <div class="section">
         <h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Objeto da Proposta</h3>
-        <p><strong>${p.titulo}</strong></p>
-        ${p.descricao?`<p style="color:#475569;font-size:13px">${p.descricao}</p>`:''}
+        <p><strong>${Utils.escHtml(p.titulo)}</strong></p>
+        ${p.descricao?`<p style="color:#475569;font-size:13px">${Utils.escHtml(p.descricao).replace(/\n/g,'<br>')}</p>`:''}
       </div>
       ${itensHtml}
       <div class="valor-box">
@@ -1151,14 +1151,14 @@ const Propostas = (() => {
         <h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Condições Comerciais</h3>
         <div class="grid2">
           <div class="field"><label>Validade da Proposta</label><p>${p.validade?new Date(p.validade+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</p></div>
-          ${p.formaPagamento?`<div class="field"><label>Forma de Pagamento</label><p>${p.formaPagamento}</p></div>`:''}
-          ${p.prazoEntrega?`<div class="field"><label>Prazo de Execução</label><p>${p.prazoEntrega}</p></div>`:''}
-          <div class="field"><label>Responsável Técnico</label><p>${p.responsavel||'—'}</p></div>
+          ${p.formaPagamento?`<div class="field"><label>Forma de Pagamento</label><p>${Utils.escHtml(p.formaPagamento)}</p></div>`:''}
+          ${p.prazoEntrega?`<div class="field"><label>Prazo de Execução</label><p>${Utils.escHtml(p.prazoEntrega)}</p></div>`:''}
+          <div class="field"><label>Responsável Técnico</label><p>${Utils.escHtml(p.responsavel||'—')}</p></div>
         </div>
       </div>
-      ${p.observacoes?`<div class="section"><h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Observações</h3><div class="obs">${p.observacoes}</div></div>`:''}
+      ${p.observacoes?`<div class="section"><h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:6px">Observações</h3><div class="obs">${Utils.escHtml(p.observacoes).replace(/\n/g,'<br>')}</div></div>`:''}
       <div class="footer">
-        <strong>${cfg.empresa||'Bikows Engenharia'}</strong>${cfg.cnpj?' · CNPJ: '+cfg.cnpj:''}<br>
+        <strong>${Utils.escHtml(cfg.empresa||'Bikows Engenharia')}</strong>${cfg.cnpj?' · CNPJ: '+Utils.escHtml(cfg.cnpj):''}<br>
         Documento gerado pelo CRM Bikows em ${new Date().toLocaleString('pt-BR')}
       </div>
     </body></html>`);

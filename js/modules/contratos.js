@@ -432,7 +432,7 @@ const Contratos = (() => {
     const c = id ? DB.get('contratos', id) : null;
 
     const clientOpts = clientes.map(cl => `<option value="${cl.id}" ${c?.clienteId===cl.id?'selected':''}>${Utils.escHtml(cl.nome)}</option>`).join('');
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${c?.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${c?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const statusOpts = Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${(c?.status||'ativo')===k?'selected':''}>${v.label}</option>`).join('');
 
     Modal.open({
@@ -471,7 +471,7 @@ const Contratos = (() => {
             <label class="form-label">Tipo de Serviço</label>
             <select class="form-control" id="fcServico">
               <option value="">—</option>
-              ${cfg.servicos.map(s => `<option value="${s}" ${c?.tipoServico===s?'selected':''}>${s}</option>`).join('')}
+              ${cfg.servicos.map(s => `<option value="${Utils.escHtml(s)}" ${c?.tipoServico===s?'selected':''}>${Utils.escHtml(s)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
@@ -725,7 +725,7 @@ const Contratos = (() => {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const clientOpts = clientes.map(cl => `<option value="${cl.id}" ${p.clienteId===cl.id?'selected':''}>${Utils.escHtml(cl.nome)}</option>`).join('');
-    const respOpts = cfg.responsaveis.map(r => `<option value="${r}" ${p.responsavel===r?'selected':''}>${r}</option>`).join('');
+    const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${p.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const statusOpts = Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${k==='ativo'?'selected':''}>${v.label}</option>`).join('');
     const hoje = Utils.todayStr();
 
@@ -765,7 +765,7 @@ const Contratos = (() => {
             <label class="form-label">Tipo de Serviço</label>
             <select class="form-control" id="fcServico">
               <option value="">—</option>
-              ${cfg.servicos.map(s => `<option value="${s}">${s}</option>`).join('')}
+              ${cfg.servicos.map(s => `<option value="${Utils.escHtml(s)}">${Utils.escHtml(s)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">

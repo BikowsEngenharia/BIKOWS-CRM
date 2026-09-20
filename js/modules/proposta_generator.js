@@ -576,7 +576,7 @@ enerlab</textarea>
     // Calcular data de validade real
     let validadeISO = null;
     if (data.data) {
-      const d = new Date(data.data);
+      const d = Utils.parseDate(data.data);
       d.setDate(d.getDate() + (parseInt(data.validade) || 15));
       validadeISO = Utils.localDateStr(d);
     }

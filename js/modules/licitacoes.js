@@ -487,7 +487,7 @@ const Licitacoes = (() => {
     // Calcular próxima ação: 3 dias antes da abertura (ou amanhã se < 3 dias)
     let dataAcao = lic.dataAbertura;
     if (dataAcao) {
-      const d = new Date(dataAcao);
+      const d = Utils.parseDate(dataAcao);
       d.setDate(d.getDate() - 3);
       const hoje = new Date(); hoje.setHours(0,0,0,0);
       if (d < hoje) d.setDate(hoje.getDate() + 1);

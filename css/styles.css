@@ -1977,6 +1977,47 @@ body.dark-mode .bottom-nav {
 }
 
 /* ==========================================
+   MENU "⋯ MAIS" — ações secundárias do cabeçalho em telas pequenas
+   (montado por Utils.collapseActions)
+   ========================================== */
+.sec-actions { position: relative; }
+.sec-more-btn { flex: 0 0 auto !important; }
+.sec-more-menu {
+  display: none;
+  position: absolute; right: 0; top: calc(100% + 6px);
+  z-index: 60;
+  min-width: 220px; max-width: calc(100vw - 24px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  flex-direction: column;
+  gap: 2px;
+}
+.sec-more-menu.open { display: flex; }
+.sec-more-menu > .btn,
+.sec-more-menu > label.btn {
+  width: 100%;
+  justify-content: flex-start;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--text);
+  font-weight: 500;
+  padding: 10px 12px;
+  min-height: 42px;
+  flex: none !important;
+  min-width: 0 !important;
+}
+.sec-more-menu > .btn:hover, .sec-more-menu > label.btn:hover { background: var(--bg); }
+@media (max-width: 640px) {
+  .sec-actions { position: static; }
+  .sec-more-menu { left: 10px; right: 10px; top: calc(100% - 6px); }
+  .sec-header { position: relative; }
+}
+
+/* ==========================================
    FOCUS VISIBLE — acessibilidade
    ========================================== */
 :focus-visible {

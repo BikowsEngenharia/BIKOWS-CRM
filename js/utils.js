@@ -92,6 +92,17 @@ const Utils = (() => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  // 'YYYY-MM-DD' → Date à meia-noite LOCAL. new Date('2026-09-01') interpreta
+  // como UTC e no Brasil vira 31/08 21:00 — qualquer conta de dias/meses
+  // feita em cima disso sai um dia atrasada.
+  function parseDate(str) {
+    if (!str) return null;
+    if (str instanceof Date) return new Date(str);
+    const s = String(str);
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T00:00:00') : new Date(s);
+    return isNaN(d) ? null : d;
+  }
+
   function todayStr() {
     return localDateStr(new Date());
   }
@@ -327,6 +338,40 @@ const Utils = (() => {
     });
   }
 
+  // Cabeçalhos de página com muitos botões (Pipeline tem 7) ocupavam a tela
+  // inteira do celular antes de qualquer conteúdo. Em telas ≤900px, os botões
+  // secundários são movidos para um menu "⋯ Mais"; o seletor de período, as
+  // abas e o botão primário continuam visíveis. Os nós são MOVIDOS (não
+  // recriados), então os onclick continuam funcionando.
+  function collapseActions(root) {
+    if (window.innerWidth > 900) return;
+    const scope = root || document;
+    scope.querySelectorAll('.sec-header .sec-actions').forEach(sa => {
+      if (sa.dataset.collapsed === '1') return;
+      const kids = [...sa.children];
+      const isPeriodo = el => el.tagName === 'DIV' && el.querySelector('[onclick*="setPeriodo"], [onclick*="Periodo"]');
+      const isPrimary = el => el.classList.contains('btn-primary') || el.classList.contains('btn-danger') || el.classList.contains('btn-success');
+      const isTab = el => el.id && /^btnTab/i.test(el.id) || el.classList.contains('tabs');
+      const others = kids.filter(el => !isPeriodo(el) && !isPrimary(el) && !isTab(el) && (el.tagName === 'BUTTON' || el.tagName === 'LABEL' || el.tagName === 'A'));
+      sa.dataset.collapsed = '1';
+      if (others.length < 2) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary sec-more-btn';
+      btn.textContent = '⋯ Mais (' + others.length + ')';
+      const menu = document.createElement('div');
+      menu.className = 'sec-more-menu';
+      others.forEach(el => menu.appendChild(el));
+      btn.onclick = (e) => { e.stopPropagation(); menu.classList.toggle('open'); };
+      menu.addEventListener('click', () => setTimeout(() => menu.classList.remove('open'), 50));
+      document.addEventListener('click', (e) => { if (!menu.contains(e.target) && e.target !== btn) menu.classList.remove('open'); });
+      // fica logo antes do botão primário principal (o último — "+ Novo ...")
+      const primary = kids.filter(el => isPrimary(el) && !isTab(el)).pop();
+      if (primary) { sa.insertBefore(btn, primary); } else sa.appendChild(btn);
+      sa.appendChild(menu);
+    });
+  }
+
   function waBtn(phone, cls = '') {
     if (!phone) return '';
     return `<button class="btn btn-xs btn-success ${cls}" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${escJs(phone)}')" title="Abrir WhatsApp">💬</button>`;
@@ -334,12 +379,12 @@ const Utils = (() => {
 
   return {
     formatCurrency, formatDate, formatDateTime, formatCNPJ, formatPhone,
-    timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, truncate, escHtml, escJs,
+    timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, parseDate, truncate, escHtml, escJs,
     parseMoney, moneyToInput,
     LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS, LIC_ENCERRADAS, licEncerrada,
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,
-    validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn, labelTables,
+    validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn, labelTables, collapseActions,
   };
 })();
 

@@ -386,8 +386,8 @@ const Contratos = (() => {
     // Calcular nova data fim baseada na duração do contrato atual
     let novoFim = '';
     if (c.dataInicio && c.dataFim) {
-      const duracao = new Date(c.dataFim) - new Date(c.dataInicio);
-      const novaFimDate = new Date(new Date(novoInicio).getTime() + duracao);
+      const duracao = Utils.parseDate(c.dataFim) - Utils.parseDate(c.dataInicio);
+      const novaFimDate = new Date(Utils.parseDate(novoInicio).getTime() + duracao);
       novoFim = Utils.localDateStr(novaFimDate);
     }
     Modal.open({
@@ -875,7 +875,8 @@ const Contratos = (() => {
     const inicio = document.getElementById('fcInicio')?.value;
     const meses = Number(document.getElementById('fcPrazoMeses')?.value);
     if (!inicio || !meses) return;
-    const d = new Date(inicio);
+    const d = Utils.parseDate(inicio);
+    if (!d) return;
     d.setMonth(d.getMonth() + meses);
     const fimEl = document.getElementById('fcFim');
     if (fimEl) fimEl.value = Utils.localDateStr(d);

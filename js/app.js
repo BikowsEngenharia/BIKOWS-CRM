@@ -159,7 +159,11 @@ const App = (() => {
       // oculta e as tabelas apareceriam sem rótulo ao voltar para o CRM.
       _labelPending.t = setTimeout(() => {
         _labelPending.t = 0;
-        try { Utils.labelTables(document.getElementById('pageContent')); Utils.labelTables(document.getElementById('modalBody')); } catch (e) { /* silencioso */ }
+        try {
+          Utils.labelTables(document.getElementById('pageContent'));
+          Utils.labelTables(document.getElementById('modalBody'));
+          Utils.collapseActions(document.getElementById('pageContent'));
+        } catch (e) { /* silencioso */ }
       });
     };
     ['pageContent', 'modalBody'].forEach(id => {
@@ -776,21 +780,28 @@ const App = (() => {
     }
   }
 
-  function toggleDark() {
-    const isDark = document.body.classList.toggle('dark-mode');
-    localStorage.setItem('crm_dark', isDark ? '1' : '0');
+  /* Modo escuro — um único estado para os dois botões (barra superior e
+     menu lateral). Antes cada botão tinha seu próprio mecanismo e chave no
+     localStorage (body.dark-mode / data-theme), e era possível ficar com
+     um ligado e o outro desligado, ícones fora de sincronia. */
+  function _setTheme(theme) {
+    const dark = theme === 'dark';
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.body.classList.toggle('dark-mode', dark);
+    localStorage.setItem('crm_theme', dark ? 'dark' : 'light');
+    localStorage.removeItem('crm_dark');
     const btn = document.getElementById('darkToggle');
-    if (btn) btn.textContent = isDark ? '☀️' : '🌙';
-  }
-
-  function toggleDarkMode() {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const newTheme = isDark ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('crm_theme', newTheme);
+    if (btn) btn.textContent = dark ? '☀️' : '🌙';
     const icon = document.getElementById('darkModeIcon');
-    if (icon) icon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    if (icon) icon.textContent = dark ? '☀️' : '🌙';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#071120' : '#0B1B33');
   }
+  function toggleTheme() {
+    _setTheme(document.body.classList.contains('dark-mode') ? 'light' : 'dark');
+  }
+  const toggleDark = toggleTheme;      // compat: botão da barra superior
+  const toggleDarkMode = toggleTheme;  // compat: botão do menu lateral
 
   /* ================================================
      CAPTURA RÁPIDA — adicionar item em 2 cliques
@@ -944,19 +955,9 @@ const App = (() => {
   }
 
   function _applyDark() {
-    const isDark = localStorage.getItem('crm_dark') === '1';
-    if (isDark) {
-      document.body.classList.add('dark-mode');
-      const btn = document.getElementById('darkToggle');
-      if (btn) btn.textContent = '☀️';
-    }
-    // Restore data-theme dark mode (sidebar toggle)
-    const savedTheme = localStorage.getItem('crm_theme');
-    if (savedTheme) {
-      document.documentElement.setAttribute('data-theme', savedTheme);
-      const icon = document.getElementById('darkModeIcon');
-      if (icon) icon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-    }
+    // Aceita as duas chaves antigas para quem já tinha o modo escuro ligado
+    const saved = localStorage.getItem('crm_theme') || (localStorage.getItem('crm_dark') === '1' ? 'dark' : 'light');
+    _setTheme(saved === 'dark' ? 'dark' : 'light');
   }
 
   /* ================================================
@@ -1001,7 +1002,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

@@ -367,6 +367,9 @@ const Dashboard = (() => {
       <!-- Alertas de Contratos e Laudos Vencendo -->
       ${_renderAlertasContratos()}
 
+      <!-- Inspeções de equipamentos vencendo (recorrência NR-13 / NR-12) -->
+      ${_renderAlertasInspecoes()}
+
       ${_renderTrafegoWidget()}
 
       <!-- Alertas Follow-up -->
@@ -463,6 +466,41 @@ const Dashboard = (() => {
         </div>
       </div>`;
     } catch(e) { return ''; }
+  }
+
+  // Equipamentos com inspeção vencida ou vencendo em 60 dias — cada um é uma
+  // renovação de contrato (receita recorrente). Só aparece se houver algum.
+  function _renderAlertasInspecoes() {
+    try {
+      if (typeof Equipamentos === 'undefined' || !Equipamentos.getVencendo) return '';
+      const lista = Equipamentos.getVencendo(60);
+      if (!lista.length) return '';
+      const vencidas = lista.filter(e => Utils.daysUntil(e.proximaInspecao) < 0).length;
+      const valor = lista.reduce((s, e) => s + (Number(e.valorInspecao) || 0), 0);
+      return `<div class="card mb-4" style="border-left:4px solid var(--danger)">
+        <div class="card-header">
+          <div class="card-title" style="color:var(--danger)">⚙️ Inspeções a vencer (60 dias) · ${lista.length}${vencidas ? ' · ' + vencidas + ' vencida(s)' : ''}</div>
+          <div class="flex gap-2">
+            ${valor ? `<span class="text-xs text-muted" style="align-self:center">${Utils.formatCurrency(valor)} em renovações</span>` : ''}
+            <button class="btn btn-xs btn-secondary" onclick="App.navigate('equipamentos')">Ver equipamentos →</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:8px 16px 12px">
+          ${lista.slice(0, 6).map(e => {
+            const d = Utils.daysUntil(e.proximaInspecao);
+            const lead = e.leadRenovacaoId ? DB.get('leads', e.leadRenovacaoId) : null;
+            const noPipeline = lead && !['fechado_ganho', 'executado', 'fechado_perdido'].includes(lead.status);
+            return `<div class="followup-item ${d < 0 ? 'urgent' : ''} mb-2" style="gap:8px;flex-wrap:wrap">
+              <div style="flex:1;min-width:160px"><div class="font-bold text-sm">${Utils.escHtml(e.tag || '—')} <span class="badge badge-blue">${Utils.escHtml(e.norma || '')}</span></div>
+              <div class="text-xs text-muted">${Utils.escHtml(Utils.getClientName(e.clienteId))} · próxima ${Utils.formatDate(e.proximaInspecao)}</div></div>
+              <span class="badge ${d < 0 ? 'badge-red' : d <= 30 ? 'badge-orange' : 'badge-yellow'}">${d < 0 ? Math.abs(d) + 'd vencida' : d === 0 ? 'Hoje' : 'em ' + d + 'd'}</span>
+              ${noPipeline ? '<span class="badge badge-teal">↗ no pipeline</span>' : `<button class="btn btn-xs btn-secondary" onclick="Equipamentos.gerarOportunidade('${e.id}');Dashboard.render()">↗ Gerar renovação</button>`}
+            </div>`;
+          }).join('')}
+          ${lista.length > 6 ? `<div class="text-xs text-muted">… e mais ${lista.length - 6}</div>` : ''}
+        </div>
+      </div>`;
+    } catch (e) { return ''; }
   }
 
   let _alertaContratosDias = 90;

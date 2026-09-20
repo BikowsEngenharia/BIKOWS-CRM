@@ -434,7 +434,8 @@ h1, h2, h3 {
   border-radius: 2px;
   margin-top: 5px;
 }
-.sec-actions { display: flex; gap: 8px; }
+.sec-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.sec-header { flex-wrap: wrap; gap: 10px; }
 
 /* ==========================================
    GRIDS
@@ -470,7 +471,7 @@ h1, h2, h3 {
    KPI CARDS
    ========================================== */
 .kpi-grid {
-  display: grid; grid-template-columns: repeat(4,1fr);
+  display: grid; grid-template-columns: repeat(var(--kpi-cols, 4), 1fr); /* --kpi-cols:5 em Licitações */
   gap: 14px; margin-bottom: 20px;
 }
 .kpi-card {
@@ -1230,6 +1231,8 @@ select.form-control { cursor: pointer; }
   .card-header { padding: 11px 14px; flex-wrap: wrap; gap: 8px; }
   .card-header .filters { width: 100%; }
   .card-header .filter-select { flex: 1 1 45%; min-width: 0; max-width: 100%; }
+  .card-header .flex { flex-wrap: wrap; max-width: 100%; min-width: 0; }
+  .card-header .flex > .form-control { flex: 1 1 160px; width: auto !important; }
   /* Grupos de ação em cabeçalhos internos (ex.: Contas a Pagar) */
   .fin-tab-content .sec-actions, .fin-tab-content .flex.justify-between { flex-wrap: wrap; gap: 8px; }
   /* Selects largos (ex.: seletor de funcionário no holerite) */

@@ -1184,9 +1184,17 @@ select.form-control { cursor: pointer; }
   /* Parcelas de recebíveis: permitir quebra de linha no celular */
   .parcela-row { flex-wrap: wrap; gap: 6px; }
 
-  /* Cards */
+  /* Cards — cabeçalho com filtros quebra em várias linhas em vez de estourar */
   .card-body { padding: 12px; }
-  .card-header { padding: 11px 14px; }
+  .card-header { padding: 11px 14px; flex-wrap: wrap; gap: 8px; }
+  .card-header .filters { width: 100%; }
+  .card-header .filter-select { flex: 1 1 45%; min-width: 0; max-width: 100%; }
+  /* Grupos de ação em cabeçalhos internos (ex.: Contas a Pagar) */
+  .fin-tab-content .sec-actions, .fin-tab-content .flex.justify-between { flex-wrap: wrap; gap: 8px; }
+  /* Selects largos (ex.: seletor de funcionário no holerite) */
+  .page-content select.form-control { max-width: 100%; }
+  /* Célula de checkbox (seleção em massa) não vira título do card */
+  .tbl td.td-check { flex-direction: row; justify-content: flex-start; padding: 4px 0; font-weight: 400; }
 
   /* Stats row */
   .stats-row { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
@@ -1896,8 +1904,9 @@ body.dark-mode .bottom-nav {
   .table-wrap { overflow-x: visible; }
   .tbl { min-width: 0; border-collapse: separate; border-spacing: 0; }
   .tbl thead { display: none; }
-  .tbl, .tbl tbody, .tbl tr { display: block; width: 100%; }
+  .tbl, .tbl tbody { display: block; width: 100%; }
   .tbl tr {
+    display: flex; flex-direction: column; width: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -1940,14 +1949,19 @@ body.dark-mode .bottom-nav {
     padding-top: 10px;
   }
   .tbl td:has(.tbl-actions):before { margin-bottom: 4px; }
+  /* Linha de ações: só os botões, sem o rótulo "Ações" ocupando uma linha */
+  .tbl td[data-label="Ações"]:before { display: none; }
+  .tbl td[data-label="Ações"] { padding-top: 6px; }
   .tbl-actions {
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 6px;
   }
-  /* Primeira célula sem data-label fica como título do card */
-  .tbl td:first-child:not([data-label]):before { display: none; }
-  .tbl td:first-child:not([data-label]) {
+  /* Célula-título do card (marcada por Utils.labelTables) — vai para o topo */
+  .tbl td:first-child:not([data-label]):before,
+  .tbl td.td-title:before { display: none; }
+  .tbl td:first-child:not([data-label]),
+  .tbl td.td-title {
     flex-direction: column;
     align-items: flex-start;
     text-align: left;
@@ -1955,6 +1969,11 @@ body.dark-mode .bottom-nav {
     font-weight: 600;
     color: var(--text);
   }
+  .tbl td.td-title { order: -1; font-size: 13.5px; }
+  .tbl td.td-check { order: -2; }
+  /* Conteúdo longo: rótulo em cima, valor embaixo, alinhado à esquerda */
+  .tbl td.td-block { flex-direction: column; align-items: flex-start; text-align: left; gap: 3px; }
+  .tbl td.td-block:before { margin-bottom: 0; }
 }
 
 /* ==========================================

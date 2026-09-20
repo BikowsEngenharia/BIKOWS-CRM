@@ -295,6 +295,38 @@ const Utils = (() => {
     window.open(url, '_blank');
   }
 
+  // Em telas ≤640px o CSS transforma cada linha de tabela em um card e cada
+  // célula numa linha "RÓTULO  valor" usando o atributo data-label. Nenhum
+  // módulo escreve esse atributo à mão, então esta função copia o texto do
+  // <th> correspondente para cada <td> (a 1ª coluna de conteúdo vira o título
+  // do card e fica sem rótulo; a coluna de ações recebe "Ações").
+  function labelTables(root) {
+    const scope = root || document;
+    scope.querySelectorAll('table.tbl').forEach(table => {
+      if (table.dataset.labeled === '1') return;
+      const ths = [...(table.tHead ? table.tHead.querySelectorAll('th') : [])];
+      if (!ths.length) return;
+      const labels = ths.map(th => (th.getAttribute('data-label') || th.getAttribute('title') || th.textContent || '').replace(/\s+/g, ' ').trim());
+      // Coluna-título do card: a 1ª cujo cabeçalho parece "nome da coisa"
+      // (Atividade, Objeto, Cliente, Processo...); senão a 1ª que não é checkbox.
+      const TITULO = /atividade|t[ií]tulo|nome|objeto|descri|processo|^n[ºo°]?$|cliente|fornecedor|empresa|proposta|contrato|projeto|meta|campanha|documento|funcion|lead|oportunidade|conta|categoria|item/i;
+      let titleIdx = labels.findIndex((l, i) => l && TITULO.test(l) && !ths[i].querySelector('input[type=checkbox]'));
+      if (titleIdx < 0) titleIdx = labels.findIndex((_, i) => !ths[i].querySelector('input[type=checkbox]'));
+      table.querySelectorAll('tbody > tr').forEach(tr => {
+        [...tr.children].forEach((td, i) => {
+          if (td.tagName !== 'TD' || td.hasAttribute('data-label')) return;
+          if (td.querySelector('input[type=checkbox]') && !td.textContent.trim()) { td.classList.add('td-check'); return; }
+          if (i === titleIdx) { td.classList.add('td-title'); return; }
+          if (td.querySelector('.tbl-actions') || /^(ações|acoes|acao|ação)$/i.test(labels[i] || '')) { td.setAttribute('data-label', 'Ações'); return; }
+          if (labels[i]) td.setAttribute('data-label', labels[i]);
+          // Conteúdo longo ou composto: rótulo em cima, valor embaixo (largura total)
+          if (td.textContent.trim().length > 42 || td.children.length > 1) td.classList.add('td-block');
+        });
+      });
+      table.dataset.labeled = '1';
+    });
+  }
+
   function waBtn(phone, cls = '') {
     if (!phone) return '';
     return `<button class="btn btn-xs btn-success ${cls}" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${escJs(phone)}')" title="Abrir WhatsApp">💬</button>`;
@@ -307,7 +339,7 @@ const Utils = (() => {
     LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS, LIC_ENCERRADAS, licEncerrada,
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,
-    validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn,
+    validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn, labelTables,
   };
 })();
 

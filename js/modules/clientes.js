@@ -387,9 +387,15 @@ const Clientes = (() => {
     reader.readAsDataURL(file);
   }
 
+  // Próximo código livre: maior sufixo numérico existente + 1. Usar
+  // "quantidade + 1" gerava colisão (ex.: CLI-0010 já em uso) sempre que
+  // algum cliente era excluído ou tinha código digitado à mão.
   function _nextCodigoCliente() {
-    const total = DB.getAll('clientes').length + 1;
-    return 'CLI-' + String(total).padStart(4, '0');
+    const maior = DB.getAll('clientes').reduce((max, c) => {
+      const m = String(c.codigoCliente || '').match(/(\d+)\s*$/);
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 0);
+    return 'CLI-' + String(maior + 1).padStart(4, '0');
   }
 
   function openForm(id = null) {

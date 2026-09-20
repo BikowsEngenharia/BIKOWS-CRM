@@ -150,6 +150,24 @@ const App = (() => {
       if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); quickCapture(); return; }
     });
 
+    // Tabelas → cards no celular: rotula as células sempre que uma página
+    // ou modal é (re)renderizada, sem cada módulo precisar saber disso.
+    const _labelPending = { t: 0 };
+    const _labelSoon = () => {
+      if (_labelPending.t) return;
+      // setTimeout (não requestAnimationFrame): rAF fica congelado em aba
+      // oculta e as tabelas apareceriam sem rótulo ao voltar para o CRM.
+      _labelPending.t = setTimeout(() => {
+        _labelPending.t = 0;
+        try { Utils.labelTables(document.getElementById('pageContent')); Utils.labelTables(document.getElementById('modalBody')); } catch (e) { /* silencioso */ }
+      });
+    };
+    ['pageContent', 'modalBody'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) new MutationObserver(_labelSoon).observe(el, { childList: true, subtree: true });
+    });
+    _labelSoon();
+
     // Clique fora fecha search
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.search-box') && !e.target.closest('#searchPanel')) closeSearch();

@@ -318,7 +318,7 @@ const Folha = (() => {
         <div class="card-header" style="gap:16px;flex-wrap:wrap">
           <div class="flex items-center gap-2">
             <label class="form-label mb-0">Funcionário:</label>
-            <select class="form-control" style="width:280px" onchange="Folha.setHoleirteFunc(this.value)">${funcOpts}</select>
+            <select class="form-control" style="width:280px;max-width:100%;flex:1 1 200px" onchange="Folha.setHoleirteFunc(this.value)">${funcOpts}</select>
           </div>
           <div class="flex items-center gap-2">
             <label class="form-label mb-0">Competência:</label>

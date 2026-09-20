@@ -159,6 +159,7 @@ const Documentos = (() => {
           DB.create('documentos', data);
           Toast.success('Documento cadastrado!');
         }
+        Modal.close();
 
         // Re-renderizar a lista onde estava
         const containerId = filtro.projetoId ? 'docsProjeto' : filtro.clienteId ? 'docsCliente' : 'docsGlobal';

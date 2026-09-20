@@ -1,16 +1,38 @@
-// Edge Function: crm-prospeccao
-// Deploy: supabase functions deploy crm-prospeccao
-// Secret necessário: GOOGLE_PLACES_API_KEY
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// Edge Function: crm-prospeccao (v6 — Places API NEW + autorização)
+// Migrada da API legada (maps.googleapis.com/maps/api/place/*) para a
+// Places API (New) em places.googleapis.com/v1. A legada foi descontinuada
+// para novos projetos em mar/2025 e nao pode mais ser habilitada — era a
+// causa do erro REQUEST_DENIED mesmo com chave valida.
+// v6: exige usuário logado no CRM (JWT de sessão). Antes bastava a chave
+//     anon (pública) para consumir a cota paga do Google Places.
+// Secret necessario: GOOGLE_PLACES_API_KEY
+// No Google Cloud Console habilite: "Places API (New)"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+const JSON_H = { ...CORS_HEADERS, "Content-Type": "application/json" };
 
-// Mapeamento de tipos Google → categorias em PT-BR
+// ---- Autorização (cópia de _shared/auth.ts) ----
+const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+async function authorize(req: Request): Promise<{ ok: boolean; via: string }> {
+  const cronSecret = req.headers.get("x-cron-secret");
+  if (cronSecret) {
+    const { data } = await admin.from("crm_config").select("value").eq("key", "cron_secret").maybeSingle();
+    const esperado = (data?.value as any)?.secret;
+    return esperado && esperado === cronSecret ? { ok: true, via: "cron" } : { ok: false, via: "cron-secret-invalido" };
+  }
+  const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!token) return { ok: false, via: "sem-token" };
+  const { data, error } = await admin.auth.getUser(token);
+  if (error || !data?.user) return { ok: false, via: "token-invalido" };
+  return { ok: true, via: "user:" + (data.user.email || data.user.id) };
+}
+
+// Mapeamento de tipos Google -> categorias em PT-BR
 const TIPO_BR: Record<string, string> = {
   manufacturing: "Indústria / Manufatura",
   food_processing: "Indústria Alimentícia",
@@ -45,195 +67,141 @@ function mapCategoriasBR(tipos: string[]): string[] {
   const resultado: string[] = [];
   for (const t of tipos) {
     if (EXCLUIR_TIPOS.has(t)) continue;
-    // Verificar mapeamento direto
-    if (TIPO_BR[t]) {
-      resultado.push(TIPO_BR[t]);
-      continue;
-    }
-    // Verificar se contém palavra-chave
+    if (TIPO_BR[t]) { resultado.push(TIPO_BR[t]); continue; }
     for (const [key, val] of Object.entries(TIPO_BR)) {
-      if (t.includes(key)) {
-        resultado.push(val);
-        break;
-      }
+      if (t.includes(key)) { resultado.push(val); break; }
     }
   }
-  // Se não mapeou nada, usar o primeiro tipo relevante formatado
   if (resultado.length === 0) {
     const primeiro = tipos.find(t => !EXCLUIR_TIPOS.has(t));
-    if (primeiro) {
-      resultado.push(
-        primeiro.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-      );
-    } else {
-      resultado.push("Empresa");
-    }
+    resultado.push(primeiro
+      ? primeiro.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+      : "Empresa");
   }
-  return [...new Set(resultado)]; // remover duplicatas
+  return [...new Set(resultado)];
 }
 
-async function fetchPlaceDetails(
-  placeId: string,
-  apiKey: string
-): Promise<Record<string, unknown>> {
-  const fields = [
-    "name",
-    "formatted_address",
-    "formatted_phone_number",
-    "website",
-    "rating",
-    "user_ratings_total",
-    "types",
-    "business_status",
-  ].join(",");
-
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${apiKey}&language=pt-BR`;
-
-  const resp = await fetch(url);
-  const data = await resp.json();
-
-  if (data.status !== "OK") return {};
-  return data.result || {};
+// business_status da API nova vem como enum OPERATIONAL / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY
+function normalizarStatus(s: string | undefined): string {
+  return s || "OPERATIONAL";
 }
 
-serve(async (req: Request) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: CORS_HEADERS });
-  }
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "METHOD_NOT_ALLOWED", message: "Use POST" }),
-      { status: 405, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "METHOD_NOT_ALLOWED", message: "Use POST" }), { status: 405, headers: JSON_H });
   }
 
-  // Verificar API Key configurada
+  const auth = await authorize(req);
+  if (!auth.ok) {
+    console.warn("[prospeccao] recusado:", auth.via);
+    return new Response(JSON.stringify({ error: "NAO_AUTORIZADO", message: "Faça login no CRM para usar a prospecção.", via: auth.via }), { status: 401, headers: JSON_H });
+  }
+
   const apiKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({
-        error: "API_KEY_NOT_CONFIGURED",
-        message: "Configure GOOGLE_PLACES_API_KEY nos secrets do Supabase",
-      }),
-      { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({
+      error: "API_KEY_NOT_CONFIGURED",
+      message: "Configure GOOGLE_PLACES_API_KEY nos secrets do Supabase (Edge Functions).",
+    }), { status: 200, headers: JSON_H });
   }
 
   let body: { keyword?: string; estado?: string; cidade?: string; raio?: number };
+  try { body = await req.json(); }
+  catch {
+    return new Response(JSON.stringify({ error: "INVALID_JSON", message: "Corpo da requisição inválido" }), { status: 400, headers: JSON_H });
+  }
+
+  const { keyword, estado, cidade } = body;
+  if (!keyword || String(keyword).length > 120) {
+    return new Response(JSON.stringify({ error: "MISSING_KEYWORD", message: "Informe uma palavra-chave (até 120 caracteres)" }), { status: 400, headers: JSON_H });
+  }
+
+  const partes = [String(keyword)];
+  if (cidade) partes.push(String(cidade).slice(0, 80));
+  if (estado) partes.push(String(estado).slice(0, 40));
+  partes.push("Brasil");
+  const textQuery = partes.join(" ");
+
+  // Places API (New) — searchText: 1 chamada traz todos os campos, sem
+  // precisar de um details por resultado (mais barato e mais rapido).
+  const fieldMask = [
+    "places.id",
+    "places.displayName",
+    "places.formattedAddress",
+    "places.nationalPhoneNumber",
+    "places.internationalPhoneNumber",
+    "places.websiteUri",
+    "places.rating",
+    "places.userRatingCount",
+    "places.types",
+    "places.primaryType",
+    "places.businessStatus",
+  ].join(",");
+
+  let json: Record<string, unknown>;
   try {
-    body = await req.json();
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "INVALID_JSON", message: "Corpo da requisição inválido" }),
-      { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
-  }
-
-  const { keyword, estado, cidade, raio = 50000 } = body;
-
-  if (!keyword) {
-    return new Response(
-      JSON.stringify({ error: "MISSING_KEYWORD", message: "Informe uma palavra-chave" }),
-      { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
-  }
-
-  // Montar query de busca
-  const queryParts = [keyword];
-  if (cidade) queryParts.push(cidade);
-  if (estado) queryParts.push(estado);
-  queryParts.push("Brasil");
-
-  const query = encodeURIComponent(queryParts.join(" "));
-  const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${query}&radius=${raio}&key=${apiKey}&language=pt-BR`;
-
-  let searchData: { status: string; results?: Record<string, unknown>[]; error_message?: string };
-  try {
-    const searchResp = await fetch(textSearchUrl);
-    searchData = await searchResp.json();
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "FETCH_ERROR", message: `Erro ao chamar Google API: ${err}` }),
-      { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
-  }
-
-  if (searchData.status === "REQUEST_DENIED") {
-    return new Response(
-      JSON.stringify({
-        error: "API_KEY_INVALID",
-        message: "API Key inválida ou sem permissão para Places API. Verifique no Google Cloud Console.",
+    const resp = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": fieldMask,
+      },
+      body: JSON.stringify({
+        textQuery,
+        languageCode: "pt-BR",
+        regionCode: "BR",
+        maxResultCount: 20,
       }),
-      { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
-  }
-
-  if (searchData.status !== "OK" && searchData.status !== "ZERO_RESULTS") {
-    return new Response(
-      JSON.stringify({
-        error: "GOOGLE_API_ERROR",
-        message: searchData.error_message || `Status: ${searchData.status}`,
-      }),
-      { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
-  }
-
-  const places = (searchData.results || []).slice(0, 20);
-
-  // Buscar detalhes de cada lugar em paralelo (máx 10 simultâneos para evitar rate limit)
-  const BATCH_SIZE = 5;
-  const resultados: Record<string, unknown>[] = [];
-
-  for (let i = 0; i < places.length; i += BATCH_SIZE) {
-    const batch = places.slice(i, i + BATCH_SIZE);
-    const detailsPromises = batch.map(async (place) => {
-      const placeId = place.place_id as string;
-      if (!placeId) return null;
-
-      try {
-        const details = await fetchPlaceDetails(placeId, apiKey);
-
-        const tipos = (details.types || place.types || []) as string[];
-        return {
-          placeId,
-          nome: (details.name || place.name || "") as string,
-          endereco: (details.formatted_address || (place.formatted_address as string) || "") as string,
-          telefone: (details.formatted_phone_number || "") as string,
-          website: (details.website || "") as string,
-          rating: (details.rating || place.rating || null) as number | null,
-          totalAvaliacoes: (details.user_ratings_total || (place as Record<string, unknown>).user_ratings_total || 0) as number,
-          categoria: tipos.find((t: string) => !EXCLUIR_TIPOS.has(t)) || "Empresa",
-          categoriasBR: mapCategoriasBR(tipos),
-          tipos,
-          status: (details.business_status || (place as Record<string, unknown>).business_status || "OPERATIONAL") as string,
-        };
-      } catch {
-        // Se falhar detalhes, retornar dados básicos do text search
-        const tipos = (place.types || []) as string[];
-        return {
-          placeId,
-          nome: (place.name || "") as string,
-          endereco: (place.formatted_address || "") as string,
-          telefone: "",
-          website: "",
-          rating: (place.rating || null) as number | null,
-          totalAvaliacoes: ((place as Record<string, unknown>).user_ratings_total || 0) as number,
-          categoria: tipos.find((t: string) => !EXCLUIR_TIPOS.has(t)) || "Empresa",
-          categoriasBR: mapCategoriasBR(tipos),
-          tipos,
-          status: ((place as Record<string, unknown>).business_status || "OPERATIONAL") as string,
-        };
-      }
     });
 
-    const batchResults = await Promise.all(detailsPromises);
-    resultados.push(...batchResults.filter(Boolean) as Record<string, unknown>[]);
+    json = await resp.json();
+
+    if (!resp.ok) {
+      const err = (json?.error ?? {}) as Record<string, unknown>;
+      const status = String(err.status ?? "");
+      const msg = String(err.message ?? "Erro desconhecido");
+
+      if (status === "PERMISSION_DENIED" || /API key not valid|API_KEY_INVALID/i.test(msg)) {
+        return new Response(JSON.stringify({
+          error: "API_KEY_INVALID",
+          message: "Chave do Google inválida ou sem a 'Places API (New)' habilitada. No Google Cloud Console: APIs e serviços > Biblioteca > habilite 'Places API (New)' e confira as restrições da chave.",
+          detalhe: msg,
+        }), { status: 200, headers: JSON_H });
+      }
+      if (/billing/i.test(msg)) {
+        return new Response(JSON.stringify({
+          error: "BILLING_REQUIRED",
+          message: "A Places API exige faturamento ativo no projeto do Google Cloud.",
+          detalhe: msg,
+        }), { status: 200, headers: JSON_H });
+      }
+      return new Response(JSON.stringify({ error: "GOOGLE_API_ERROR", message: msg, status }), { status: 200, headers: JSON_H });
+    }
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "FETCH_ERROR", message: `Erro ao chamar Google API: ${err}` }), { status: 500, headers: JSON_H });
   }
 
-  return new Response(JSON.stringify(resultados), {
-    status: 200,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  const places = (json.places ?? []) as Record<string, any>[];
+
+  const resultados = places.map(p => {
+    const tipos: string[] = p.types || (p.primaryType ? [p.primaryType] : []);
+    return {
+      placeId: p.id || "",
+      nome: p.displayName?.text || "",
+      endereco: p.formattedAddress || "",
+      telefone: p.nationalPhoneNumber || p.internationalPhoneNumber || "",
+      website: p.websiteUri || "",
+      rating: typeof p.rating === "number" ? p.rating : null,
+      totalAvaliacoes: p.userRatingCount || 0,
+      categoria: tipos.find(t => !EXCLUIR_TIPOS.has(t)) || "Empresa",
+      categoriasBR: mapCategoriasBR(tipos),
+      tipos,
+      status: normalizarStatus(p.businessStatus),
+    };
   });
+
+  return new Response(JSON.stringify(resultados), { status: 200, headers: JSON_H });
 });

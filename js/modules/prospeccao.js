@@ -240,13 +240,18 @@ const Prospeccao = (() => {
     if (resultadosEl) resultadosEl.innerHTML = '';
 
     try {
+      // Token da sessão logada: a edge function exige usuário autenticado
+      // (a chave anon pública deixou de ser aceita para proteger a cota
+      // paga do Google Places).
+      const { data: { session } } = await _supabase.auth.getSession();
       const resp = await fetch(
         'https://mxvwccyopzfewhvscrzj.supabase.co/functions/v1/crm-prospeccao',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_ANON}`,
+            'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON}`,
+            'apikey': SUPABASE_ANON,
           },
           body: JSON.stringify({ keyword, estado, cidade, raio }),
         }

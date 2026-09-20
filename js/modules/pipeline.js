@@ -1471,14 +1471,13 @@ const Pipeline = (() => {
     App.updateNotifBadge();
   }
 
+  // Via SDK: envia o JWT da sessão logada (a edge function agora exige
+  // usuário autenticado — a chave anon pública deixou de ser aceita).
   async function _notificarEvento(evento, dados) {
     try {
-      await fetch('https://mxvwccyopzfewhvscrzj.supabase.co/functions/v1/crm-notificacoes-eventos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14dndjY3lvcHpmZXdodnNjcnpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MDI2OTYsImV4cCI6MjA5NDM3ODY5Nn0.zDPXwxt5UjY2NN1HMc1cVtPlKvAcOOlhh032Ls7MSMg' },
-        body: JSON.stringify({ evento, dados }),
-      });
-    } catch {}
+      const { error } = await _supabase.functions.invoke('crm-notificacoes-eventos', { body: { evento, dados } });
+      if (error) console.warn('[Pipeline] notificação de evento falhou:', error.message || error);
+    } catch (e) { console.warn('[Pipeline] notificação de evento falhou:', e); }
   }
 
   function deleteLead(id) {

@@ -337,6 +337,7 @@ const Documentos = (() => {
         };
         if (docId) { DB.update('documentos', docId, data); Toast.success('Documento atualizado!'); }
         else { DB.create('documentos', data); Toast.success('Documento cadastrado!'); }
+        Modal.close();
         render();
       },
     });

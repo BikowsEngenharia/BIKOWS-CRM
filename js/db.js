@@ -14,6 +14,7 @@ const DB = (() => {
     'timesheet','arts','socios','documentos',
     'despesas_fixas','dividas','ativos_empresa',
     'pessoal_lancamentos','plano_acoes','agenda_pessoal','pessoal_despesas_fixas',
+    'visitas','equipamentos',
   ];
 
   // Cache em memória — populado por loadAll()
@@ -613,6 +614,7 @@ const DB = (() => {
 
   return {
     getAll, get, create, update, remove, undoRemove, restoreDeleted, peekLastDeleted,
+    entities: () => [...ENTITIES],
     getConfig, saveConfig,
     loadAll, subscribeRealtime, initSampleData,
     getAuditLog, clearAuditLog,

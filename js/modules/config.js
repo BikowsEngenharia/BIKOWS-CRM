@@ -497,9 +497,9 @@ const Config = (() => {
       empresa: DB.getConfig()?.empresa || 'CRM',
       dados: {}
     };
-    const colecoes = ['leads','clientes','projetos','propostas','contratos','atividades',
-      'recebiveis','lancamentos','contaspagar','licitacoes','marketing_posts','metas',
-      'contatos','folha','config'];
+    // TODAS as entidades do banco (antes a lista era fixa e deixava de fora
+    // funcionários, despesas fixas, dívidas, marketing, tráfego, plano, agenda...)
+    const colecoes = (DB.entities ? DB.entities() : []).concat(['config']);
     colecoes.forEach(c => {
       try { backup.dados[c] = DB.getAll(c); } catch(e) {}
     });
@@ -655,8 +655,8 @@ const Config = (() => {
   // Páginas permitidas por perfil
   const ROLE_PAGES = {
     admin:      null, // null = tudo
-    comercial:  ['dashboard','pipeline','clientes','contatos','propostas','atividades','calendario','relatorios','metas','config'],
-    tecnico:    ['dashboard','projetos','atividades','clientes','contatos','calendario','relatorios','licitacoes','config'],
+    comercial:  ['dashboard','pipeline','clientes','contatos','propostas','atividades','calendario','relatorios','metas','config','equipamentos','visitas'],
+    tecnico:    ['dashboard','projetos','atividades','clientes','contatos','calendario','relatorios','licitacoes','config','visitas','equipamentos','documentos'],
     financeiro: ['dashboard','financeiro','relatorios','clientes','contatos','contratos','config'],
     viewer:     ['dashboard','relatorios'],
   };

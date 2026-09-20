@@ -978,6 +978,19 @@ select.form-control { cursor: pointer; }
   gap: 12px;
   margin-bottom: 20px;
 }
+/* Caixas de estatística (Contatos, Clientes, Atividades, Documentos,
+   Relatórios) — estavam sem estilo nenhum: só o número solto na página */
+.stat-box {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--stat-color, var(--primary));
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-xs);
+  min-width: 0;
+}
+.stat-val { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1.1; letter-spacing: -.4px; font-feature-settings: "tnum"; }
+.stat-lbl { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
 
 /* ==========================================
    MOBILE SIDEBAR OVERLAY

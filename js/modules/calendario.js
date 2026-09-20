@@ -93,6 +93,19 @@ const Calendario = (() => {
       }
     });
 
+    // ── Visitas técnicas agendadas ────────────────────────────────────────
+    DB.getAll('visitas').forEach(v => {
+      if (!v.data || v.status === 'cancelada') return;
+      // Se a visita gerou uma atividade, ela já aparece acima — não duplica
+      if (v.atividadeId && DB.get('atividades', v.atividadeId)) return;
+      const hora = v.horaInicio ? ' ' + v.horaInicio : '';
+      addEvent(v.data, {
+        type: 'visita', color: '#fff', bg: v.status === 'realizada' ? '#0f766e' : '#0891b2',
+        entityId: v.id, entityType: 'visitas', raw: v,
+        label: `🏭${hora} ${Utils.escHtml(v.numero || 'Visita')} · ${Utils.escHtml(Utils.truncate(Utils.getClientName(v.clienteId), 18))}`,
+      });
+    });
+
     // ── Leads — próxima ação (follow-up) ──────────────────────────────────
     DB.getAll('leads').forEach(l => {
       if (!l.dataProximaAcao) return;

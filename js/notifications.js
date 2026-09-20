@@ -105,6 +105,7 @@ const Notifications = (() => {
     items.push(..._checkParcelas(prefs));
     items.push(..._checkLicitacoes(prefs));
     items.push(..._checkContasPagar(prefs));
+    items.push(..._checkInspecoes(prefs));
     items.push(..._checkARTPendente(prefs));
     items.push(..._checkMarketing(prefs));
     items.push(..._checkCPLTrafico(prefs));
@@ -238,6 +239,20 @@ const Notifications = (() => {
           body: (l.numero || '—') + ' · ' + Utils.truncate(l.orgao || '', 40),
         };
       });
+  }
+
+  /* ---- Equipamentos: inspeção vencida / vencendo em 30 dias ---- */
+  function _checkInspecoes(prefs) {
+    if (typeof Equipamentos === 'undefined' || !Equipamentos.getVencendo) return [];
+    return Equipamentos.getVencendo(30).map(e => {
+      const d = _daysUntil(e.proximaInspecao);
+      const label = d < 0 ? `vencida há ${Math.abs(d)}d` : d === 0 ? 'vence hoje' : `vence em ${d}d`;
+      return {
+        tag: 'eqp_' + e.id,
+        title: '⚙️ Inspeção ' + (e.norma || '') + ' — ' + label,
+        body: (e.tag || '—') + ' · ' + Utils.truncate(Utils.getClientName(e.clienteId), 40),
+      };
+    });
   }
 
   /* ---- Contas a pagar ---- */

@@ -10,6 +10,8 @@ const App = (() => {
     contatos:   { title: 'Contatos',        module: Contatos,    addLabel: '+ Novo Contato' },
     projetos:   { title: 'Projetos',        module: Projetos,    addLabel: '+ Novo Projeto' },
     atividades: { title: 'Atividades',      module: Atividades,  addLabel: '+ Nova Atividade' },
+    visitas:    { title: 'Visitas Técnicas', module: Visitas,    addLabel: '+ Nova Visita' },
+    equipamentos: { title: 'Equipamentos & Inspeções', module: Equipamentos, addLabel: '+ Novo Equipamento' },
     propostas:  { title: 'Propostas',       module: Propostas,   addLabel: '+ Nova Proposta' },
     contratos:  { title: 'Contratos',       module: Contratos,   addLabel: '+ Novo Contrato' },
     financeiro: { title: 'Financeiro',      module: Financeiro,  addLabel: '+ Novo Recebível' },
@@ -46,6 +48,7 @@ const App = (() => {
     marketing_ideias: 'marketing', marketing_kpis: 'marketing',
     trafego_campanhas: 'trafego', trafego_metas: 'trafego',
     documentos: 'documentos',
+    visitas: 'visitas', equipamentos: 'equipamentos',
   };
 
   function refreshIfNeeded(entity) {
@@ -304,7 +307,7 @@ const App = (() => {
     const p = _pendenciasAtuais();
     const total = p.followups.length + p.atrasadas.length + p.parcelasVencidas.length + p.licitacoes.length +
       p.projetosAtrasados.length + p.projSemArt.length + p.contratosVencendoLista.length +
-      p.contasPagarVencendo.length + p.marketingProximos.length;
+      p.contasPagarVencendo.length + p.marketingProximos.length + p.inspecoesVencendo.length;
     const badge = document.getElementById('notifBadge');
     if (badge) {
       badge.textContent = total;
@@ -373,7 +376,12 @@ const App = (() => {
       return d != null && d <= 1 && d >= 0 && isLive('mkt_'+p.id);
     });
 
-    return { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos };
+    // Equipamentos com inspeção vencida ou vencendo em 30 dias (recorrência)
+    const inspecoesVencendo = (typeof Equipamentos !== 'undefined' && Equipamentos.getVencendo)
+      ? Equipamentos.getVencendo(30).filter(e => isLive('eqp_' + e.id))
+      : [];
+
+    return { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos, inspecoesVencendo };
   }
 
   function dismissAllNotifs() {
@@ -388,6 +396,7 @@ const App = (() => {
       ...p.contratosVencendoLista.map(c => 'contrato_'+c.id),
       ...p.contasPagarVencendo.map(c => 'cp_'+c.id),
       ...p.marketingProximos.map(m => 'mkt_'+m.id),
+      ...p.inspecoesVencendo.map(e => 'eqp_'+e.id),
     ];
     if (tags.length === 0) { Toast.success('Nenhuma pendência para excluir.'); return; }
     if (!confirm(`Excluir todas as ${tags.length} notificação(ões) pendente(s) do sino?\n\nOs registros originais (atividades, leads, contas, etc.) continuam intactos — só a notificação some.`)) return;
@@ -402,8 +411,8 @@ const App = (() => {
   }
 
   function showPendencias() {
-    const { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos } = _pendenciasAtuais();
-    const totalPendencias = followups.length + atrasadas.length + parcelasVencidas.length + licitacoes.length + projetosAtrasados.length + projSemArt.length + contratosVencendoLista.length + contasPagarVencendo.length + marketingProximos.length;
+    const { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos, inspecoesVencendo } = _pendenciasAtuais();
+    const totalPendencias = followups.length + atrasadas.length + parcelasVencidas.length + licitacoes.length + projetosAtrasados.length + projSemArt.length + contratosVencendoLista.length + contasPagarVencendo.length + marketingProximos.length + inspecoesVencendo.length;
 
     Modal.open({
       title: '⚠ Pendências',
@@ -539,9 +548,24 @@ const App = (() => {
           }).join('')}
         ` : ''}
 
+        ${inspecoesVencendo.length > 0 ? `
+          <div class="detail-label mb-2 mt-3">Inspeções de Equipamentos (${inspecoesVencendo.length})</div>
+          ${inspecoesVencendo.map(e => {
+            const dias = Utils.daysUntil(e.proximaInspecao);
+            const venceu = dias < 0;
+            return `<div class="followup-item urgent mb-2">
+              <div style="flex:1"><div class="font-bold text-sm">⚙️ ${Utils.escHtml(e.tag || e.descricao || '—')} · ${Utils.escHtml(e.norma || '')}</div>
+              <div class="text-xs">${Utils.escHtml(Utils.getClientName(e.clienteId))} · ${venceu ? 'Venceu' : 'Vence'}: ${Utils.formatDate(e.proximaInspecao)}</div></div>
+              <span class="badge ${venceu ? 'badge-red' : 'badge-yellow'}">${venceu ? 'Vencida há ' + Math.abs(dias) + 'd' : (dias === 0 ? 'Hoje' : dias + 'd')}</span>
+              <button class="btn btn-xs btn-secondary" onclick="App.navigate('equipamentos');Modal.close()">Ver</button>
+              ${_notifActions('eqp_' + e.id)}
+            </div>`;
+          }).join('')}
+        ` : ''}
+
         ${followups.length === 0 && atrasadas.length === 0 && parcelasVencidas.length === 0 && licitacoes.length === 0 &&
           projetosAtrasados.length === 0 && projSemArt.length === 0 && contratosVencendoLista.length === 0 &&
-          contasPagarVencendo.length === 0 && marketingProximos.length === 0 ?
+          contasPagarVencendo.length === 0 && marketingProximos.length === 0 && inspecoesVencendo.length === 0 ?
           '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Tudo em dia!</div><div class="empty-sub">Nenhuma pendência no momento.</div></div>' : ''}
       `,
     });
@@ -701,6 +725,33 @@ const App = (() => {
           title: c.nome,
           sub: (c.cargo || '') + (c.empresa ? ' · ' + c.empresa : ''),
           action: () => { App.navigate('contatos'); }
+        }))
+      });
+    }
+
+    // Equipamentos (max 3)
+    const equipamentos = DB.getAll('equipamentos').filter(e =>
+      e.tag?.toLowerCase().includes(t) || e.descricao?.toLowerCase().includes(t) || Utils.getClientName(e.clienteId)?.toLowerCase().includes(t)
+    ).slice(0, 3);
+    if (equipamentos.length) {
+      groups.push({
+        icon: '⚙️', category: 'Equipamentos', items: equipamentos.map(e => ({
+          title: (e.tag || '') + (e.descricao ? ' · ' + e.descricao : ''),
+          sub: Utils.getClientName(e.clienteId) + (e.proximaInspecao ? ' · próx. ' + Utils.formatDate(e.proximaInspecao) : ''),
+          action: () => { App.navigate('equipamentos'); setTimeout(() => Equipamentos.openForm(e.id), 300); }
+        }))
+      });
+    }
+    // Visitas técnicas (max 2)
+    const visitas = DB.getAll('visitas').filter(v =>
+      v.numero?.toLowerCase().includes(t) || v.objetivo?.toLowerCase().includes(t) || Utils.getClientName(v.clienteId)?.toLowerCase().includes(t)
+    ).slice(0, 2);
+    if (visitas.length) {
+      groups.push({
+        icon: '🏭', category: 'Visitas Técnicas', items: visitas.map(v => ({
+          title: (v.numero ? v.numero + ' · ' : '') + (v.objetivo || ''),
+          sub: Utils.getClientName(v.clienteId) + (v.data ? ' · ' + Utils.formatDate(v.data) : ''),
+          action: () => { App.navigate('visitas'); setTimeout(() => Visitas.view(v.id), 300); }
         }))
       });
     }

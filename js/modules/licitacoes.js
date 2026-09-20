@@ -222,7 +222,7 @@ const Licitacoes = (() => {
      proposta (ainda em identificada/análise/habilitação/preparando) viram
      "Expirada": saem do "Em disputa" e da lista padrão, mas NADA é apagado —
      o registro continua no histórico com o status anterior guardado. */
-  function _autoExpirarLicitacoesCrm() {
+  function _autoExpirarLicitacoesCrm(silencioso) {
     if (_autoExpirouSessao) return;
     _autoExpirouSessao = true;
     const PRE_PROPOSTA = ['identificada', 'em_analise', 'habilitacao', 'proposta_preparando'];
@@ -236,9 +236,9 @@ const Licitacoes = (() => {
         status: 'expirada', statusAnterior: l.status, expiradaEm: hoje,
         motivoPerda: l.motivoPerda || 'Abertura passou sem participação',
       }));
-      Toast.show(`⌛ ${vencidas.length} licitação(ões) com abertura já passada marcada(s) como Expirada (nada foi excluído — marque "Mostrar encerradas" para vê-las).`, 7000);
-      if (typeof App !== 'undefined') App.updateNotifBadge();
-      render();
+      Toast.show(`⌛ ${vencidas.length} licitação(ões) com abertura já passada marcada(s) como Expirada (nada foi excluído — em Licitações, marque "Mostrar encerradas" para vê-las).`, 7000);
+      if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('licitacoes'); }
+      if (!silencioso) render();
     }, 50);
   }
 
@@ -1344,5 +1344,6 @@ const Licitacoes = (() => {
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,
     filtrarKanban, recarregarPncp, moverKanbanPncp, importarPncp,
     limparEncerradas, limparDescartadasPncp, toggleEncerradas,
+    autoExpirar: () => _autoExpirarLicitacoesCrm(true),
   };
 })();

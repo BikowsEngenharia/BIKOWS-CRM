@@ -78,6 +78,10 @@ const App = (() => {
 
     navigate('dashboard');
     updateNotifBadge();
+    // Licitações com abertura passada viram 'Expirada' já na abertura do
+    // sistema (senão o Dashboard mostrava R$ 80 mi 'em disputa' até
+    // alguém abrir a aba Licitações)
+    if (typeof Licitacoes !== 'undefined' && Licitacoes.autoExpirar) setTimeout(() => { try { Licitacoes.autoExpirar(); } catch (e) { /* silencioso */ } }, 400);
     // Aplicar restrições de navegação após carregamento inicial
     setTimeout(() => aplicarPermissoesNavegacao(), 200);
 

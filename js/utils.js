@@ -344,16 +344,20 @@ const Utils = (() => {
   // abas e o botão primário continuam visíveis. Os nós são MOVIDOS (não
   // recriados), então os onclick continuam funcionando.
   function collapseActions(root) {
-    if (window.innerWidth > 900) return;
     const scope = root || document;
+    // Desktop: mantém os 2 primeiros secundários visíveis e recolhe o resto
+    // quando há 4+ (o Pipeline tinha 7 botões e o título quebrava linha).
+    // Celular/tablet: todos os secundários vão para o menu.
+    const keep = window.innerWidth > 900 ? 2 : 0;
     scope.querySelectorAll('.sec-header .sec-actions').forEach(sa => {
       if (sa.dataset.collapsed === '1') return;
       const kids = [...sa.children];
       const isPeriodo = el => el.tagName === 'DIV' && el.querySelector('[onclick*="setPeriodo"], [onclick*="Periodo"]');
       const isPrimary = el => el.classList.contains('btn-primary') || el.classList.contains('btn-danger') || el.classList.contains('btn-success');
       const isTab = el => el.id && /^btnTab/i.test(el.id) || el.classList.contains('tabs');
-      const others = kids.filter(el => !isPeriodo(el) && !isPrimary(el) && !isTab(el) && (el.tagName === 'BUTTON' || el.tagName === 'LABEL' || el.tagName === 'A'));
+      const all = kids.filter(el => !isPeriodo(el) && !isPrimary(el) && !isTab(el) && (el.tagName === 'BUTTON' || el.tagName === 'LABEL' || el.tagName === 'A'));
       sa.dataset.collapsed = '1';
+      const others = all.length >= keep + 2 ? all.slice(keep) : [];
       if (others.length < 2) return;
       const btn = document.createElement('button');
       btn.type = 'button';

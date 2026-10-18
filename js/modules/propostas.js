@@ -37,29 +37,13 @@ const Propostas = (() => {
      Busca o maior sequencial existente e incrementa,
      nunca depende do .length (quebra com exclusões)
   ------------------------------------------------ */
-  // Piso histórico — última proposta emitida antes do sistema
-  const _PISO_SEQUENCIA = 1100;
-
+  /* Numeração no padrão real da empresa: BIK-AAAA-CTR-NNN.
+     O gerador antigo sugeria PROP-AAAA-NNNNN, formato que não existe em
+     nenhum dos registros da base — o usuário apagava e digitava à mão, e
+     números digitados à mão colidiam. A série é compartilhada com os
+     contratos (ao fechar, o contrato herda o número da proposta). */
   function _nextNumeroProposta() {
-    const ano = new Date().getFullYear();
-    const prefix = `PROP-${ano}-`;
-    const todas = DB.getAll('propostas');
-    let max = _PISO_SEQUENCIA; // começa do piso, nunca abaixo
-    todas.forEach(p => {
-      if (p.numero && p.numero.startsWith(prefix)) {
-        const seq = parseInt(p.numero.replace(prefix, ''), 10);
-        if (!isNaN(seq) && seq > max) max = seq;
-      }
-    });
-    // Também considera números no formato legado BIK-YYYY-CTR-NNN
-    const prefixLegado = `BIK-${ano}-CTR-`;
-    todas.forEach(p => {
-      if (p.numero && p.numero.startsWith(prefixLegado)) {
-        const seq = parseInt(p.numero.replace(prefixLegado, ''), 10);
-        if (!isNaN(seq) && seq > max) max = seq;
-      }
-    });
-    return `${prefix}${String(max + 1).padStart(5, '0')}`;
+    return Utils.proximoNumero(Utils.SERIE_PROPOSTA(), Utils.FONTES_CTR, 3);
   }
 
   function _emptyItem() {
@@ -470,6 +454,15 @@ const Propostas = (() => {
   function saveProposta(id) {
     const titulo = document.getElementById('fpTitulo').value.trim();
     if (!titulo) { Toast.error('Título obrigatório'); return; }
+    const numeroInformado = document.getElementById('fpNum').value.trim();
+    const emUso = Utils.numeroEmUso(numeroInformado, Utils.FONTES_CTR, id);
+    if (emUso) {
+      const jaEraAssim = id && (DB.get('propostas', id)?.numero || '').trim() === numeroInformado;
+      const onde = emUso.entidade === 'contratos' ? 'por um contrato' : 'por outra proposta';
+      const alvo = Utils.truncate(emUso.registro.titulo || emUso.registro.objeto || '', 40);
+      if (!jaEraAssim) { Toast.error(`O número ${numeroInformado} já está em uso ${onde}: "${alvo}". Troque o número para salvar.`); return; }
+      Toast.warning(`Atenção: o número ${numeroInformado} está repetido ${onde} ("${alvo}"). Salvo mesmo assim — recomendo renumerar.`, 7000);
+    }
     // Use items total if items exist, else manual valor
     const autoValor = _formItems.length > 0 ? _sumItems() : 0;
     const manualValor = Utils.parseMoney(document.getElementById('fpValor').value);
@@ -552,8 +545,7 @@ const Propostas = (() => {
     const clientes = DB.getAll('clientes');
     const cli = clientes.find(c => c.id === prop.clienteId);
     const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}">${Utils.escHtml(r)}</option>`).join('');
-    const projCount = String(DB.getAll('projetos').length + 1).padStart(3, '0');
-    const codSuggest = `BIK-${new Date().getFullYear()}-PRJ-${projCount}`;
+    const codSuggest = Utils.proximoNumero(Utils.SERIE_PROJETO(), Utils.FONTES_PRJ, 3);
 
     Modal.open({
       title: `🤝 Fechar Contrato — ${Utils.escHtml(prop.titulo)}`,

@@ -84,6 +84,7 @@ const Projetos = (() => {
           <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
             ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Projetos.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
           </div>
+          ${_duplicados().length ? `<button class="btn btn-secondary" onclick="Projetos.renumerarDuplicados()" title="Há projetos com o mesmo código">⚠ Renumerar ${_duplicados().length} código(s) repetido(s)</button>` : ''}
           <button class="btn btn-secondary" onclick="Projetos.verRentabilidade()">📊 Rentabilidade</button>
           <button class="btn btn-primary" onclick="Projetos.openForm()">+ Novo Projeto</button>
         </div>
@@ -1078,7 +1079,66 @@ const Projetos = (() => {
     }).filter(e => e.nome.trim());
   }
 
+  /* Projetos que repetem o código de um projeto mais antigo. */
+  function _duplicados() {
+    const porCodigo = {};
+    DB.getAll('projetos').forEach(p => {
+      const c = (p.codigo || '').trim().toLowerCase();
+      if (!c) return;
+      (porCodigo[c] = porCodigo[c] || []).push(p);
+    });
+    const dups = [];
+    Object.values(porCodigo).forEach(grupo => {
+      if (grupo.length < 2) return;
+      // mantém o mais antigo, renumera os demais
+      grupo.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      dups.push(...grupo.slice(1));
+    });
+    return dups;
+  }
+
+  function renumerarDuplicados() {
+    const dups = _duplicados();
+    if (!dups.length) { Toast.success('Nenhum código repetido.'); return; }
+    const plano = dups.map(p => ({ p, novo: null }));
+    // calcula os códigos novos em sequência, sem colidir entre si
+    const usados = new Set(DB.getAll('projetos').map(p => (p.codigo || '').trim().toLowerCase()));
+    plano.forEach(item => {
+      let n = Utils.proximoNumero(Utils.SERIE_PROJETO(), Utils.FONTES_PRJ, 3);
+      while (usados.has(n.toLowerCase())) {
+        const m = n.match(/^(.*?)(\d+)$/);
+        n = m[1] + String(parseInt(m[2], 10) + 1).padStart(m[2].length, '0');
+      }
+      usados.add(n.toLowerCase());
+      item.novo = n;
+    });
+    const resumo = plano.map(i => `${i.p.codigo} → ${i.novo}  (${Utils.truncate(i.p.titulo || '', 34)})`).join(' · ');
+    Confirm.show(
+      'Renumerar códigos repetidos',
+      `${plano.length} projeto(s) com código repetido serão renumerados. O projeto mais antigo de cada par mantém o código. Nada é excluído e o código anterior fica no histórico do projeto. ${resumo}`,
+      () => {
+        plano.forEach(({ p, novo }) => {
+          DB.update('projetos', p.id, {
+            codigo: novo,
+            codigoAnterior: p.codigo,
+            observacoes: ((p.observacoes ? p.observacoes + '\n' : '') + `[${Utils.formatDate(Utils.todayStr())}] Código alterado de ${p.codigo} para ${novo} (duplicidade).`),
+          });
+        });
+        Toast.success(`${plano.length} projeto(s) renumerado(s).`);
+        render();
+      }
+    );
+  }
+
   function saveProjeto(id) {
+    const _codInformado = document.getElementById('fpCodigo')?.value.trim();
+    const _codEmUso = Utils.numeroEmUso(_codInformado, Utils.FONTES_PRJ, id);
+    if (_codEmUso) {
+      const _jaEraAssim = id && (DB.get('projetos', id)?.codigo || '').trim() === _codInformado;
+      const _alvo = Utils.truncate(_codEmUso.registro.titulo || '', 40);
+      if (!_jaEraAssim) { Toast.error(`O código ${_codInformado} já está em uso pelo projeto "${_alvo}". Troque o código para salvar.`); return; }
+      Toast.warning(`Atenção: o código ${_codInformado} está repetido com o projeto "${_alvo}". Salvo mesmo assim — use "Renumerar" para corrigir.`, 7000);
+    }
     const titulo = document.getElementById('fpTitulo').value.trim();
     if (!titulo) { Toast.error('Título obrigatório'); return; }
     // Coleta checklist do DOM
@@ -1351,8 +1411,7 @@ const Projetos = (() => {
 
   /* ---- OS auto-gerador ---- */
   function _nextOS() {
-    const total = DB.getAll('projetos').filter(p => p.ordemServico).length + 1;
-    return `OS-${new Date().getFullYear()}-${String(total).padStart(5,'0')}`;
+    return Utils.proximoNumero(`OS-${new Date().getFullYear()}-`, [['projetos', 'ordemServico']], 5);
   }
 
   function drillDown(tipo) {
@@ -1507,7 +1566,7 @@ const Projetos = (() => {
   return {
     render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew,
     verRentabilidade, addChecklistItem, toggleChecklistItem, aplicarTemplateChecklist,
-    _nextOS, setPeriodo, setTabProjetos, drillDown,
+    _nextOS, setPeriodo, setTabProjetos, drillDown, renumerarDuplicados,
     // Timesheet (Melhoria 2)
     salvarTimesheet, removerTimesheet,
     // ARTs (Melhoria 4)

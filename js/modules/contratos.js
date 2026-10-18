@@ -39,16 +39,11 @@ const Contratos = (() => {
 
   let _filter = { status: '', clienteId: '' };
 
+  /* Mesma série das propostas (BIK-AAAA-CTR-NNN): ao fechar uma proposta o
+     contrato herda o número, então as duas tabelas não podem gerar sequências
+     independentes — era assim que saíam dois BIK-2026-CTR-006. */
   function _nextNumeroContrato() {
-    const ano = new Date().getFullYear();
-    const todos = DB.getAll('contratos');
-    let max = 0;
-    todos.forEach(c => {
-      if (!c.numero) return;
-      const m = c.numero.match(/^CONTR-\d{4}-(\d+)/);
-      if (m) max = Math.max(max, parseInt(m[1], 10));
-    });
-    return `CONTR-${ano}-${String(max + 1).padStart(5, '0')}`;
+    return Utils.proximoNumero(Utils.SERIE_PROPOSTA(), Utils.FONTES_CTR, 3);
   }
 
   function _statusBadge(status) {
@@ -547,6 +542,15 @@ const Contratos = (() => {
   }
 
   function saveContrato(id) {
+    const _numInformado = document.getElementById('fContratoNumero')?.value.trim();
+    const _emUso = Utils.numeroEmUso(_numInformado, Utils.FONTES_CTR, id);
+    if (_emUso) {
+      const _jaEraAssim = id && (DB.get('contratos', id)?.numero || '').trim() === _numInformado;
+      const _onde = _emUso.entidade === 'propostas' ? 'por uma proposta' : 'por outro contrato';
+      const _alvo = Utils.truncate(_emUso.registro.objeto || _emUso.registro.titulo || '', 40);
+      if (!_jaEraAssim) { Toast.error(`O número ${_numInformado} já está em uso ${_onde}: "${_alvo}". Troque o número para salvar.`); return; }
+      Toast.warning(`Atenção: o número ${_numInformado} está repetido ${_onde} ("${_alvo}"). Salvo mesmo assim — recomendo renumerar.`, 7000);
+    }
     const objeto = document.getElementById('fcObjeto').value.trim();
     if (!objeto) { Toast.error('Objeto do contrato obrigatório'); return; }
     const valor = Utils.parseMoney(document.getElementById('fcValor').value);

@@ -376,6 +376,59 @@ const Utils = (() => {
     });
   }
 
+  /* Próximo número de uma série (ex.: "BIK-2026-PRJ-" → "BIK-2026-PRJ-012").
+     Varre TODAS as fontes informadas e usa o MAIOR sufixo existente + 1.
+     Antes cada módulo fazia `lista.length + 1`, que repete número sempre que
+     um registro é excluído ou numerado à mão — foi o que gerou 3 projetos e
+     1 proposta/contrato com número duplicado na base.
+       fontes: [['projetos','codigo'], ...]  */
+  function proximoNumero(prefixo, fontes, digitos = 3) {
+    let max = 0;
+    (fontes || []).forEach(([entidade, campo]) => {
+      (DB.getAll(entidade) || []).forEach(r => {
+        const v = String(r[campo] || '');
+        if (!v.startsWith(prefixo)) return;
+        const n = parseInt(v.slice(prefixo.length).replace(/\D.*$/, ''), 10);
+        if (!isNaN(n) && n > max) max = n;
+      });
+    });
+    return prefixo + String(max + 1).padStart(digitos, '0');
+  }
+
+  /* Já existe outro registro com este número?
+     Ignora o próprio registro e o par legítimo proposta↔contrato (o contrato
+     herda o número da proposta que o originou, via contrato.propostaId).
+       idAtual  — id do registro sendo salvo
+       parId    — id do registro irmão permitido (proposta ou contrato) */
+  function numeroEmUso(numero, fontes, idAtual, parId) {
+    const alvo = String(numero || '').trim().toLowerCase();
+    if (!alvo) return null;
+    for (const [entidade, campo] of (fontes || [])) {
+      const achado = (DB.getAll(entidade) || []).find(r => {
+        if (r.id === idAtual || (parId && r.id === parId)) return false;
+        if (String(r[campo] || '').trim().toLowerCase() !== alvo) return false;
+        // contrato gerado a partir desta proposta compartilha o número
+        if (entidade === 'contratos' && idAtual && r.propostaId === idAtual) return false;
+        // e o inverso: a proposta de origem do contrato sendo salvo
+        if (entidade === 'propostas' && idAtual) {
+          const ct = (DB.getAll('contratos') || []).find(c => c.id === idAtual);
+          if (ct && ct.propostaId === r.id) return false;
+        }
+        return true;
+      });
+      if (achado) return { entidade, registro: achado };
+    }
+    return null;
+  }
+
+  // Séries usadas pela empresa (formato real da base, não inventado)
+  const SERIE_PROPOSTA = () => `BIK-${new Date().getFullYear()}-CTR-`;
+  const SERIE_PROJETO  = () => `BIK-${new Date().getFullYear()}-PRJ-`;
+  // Proposta e contrato compartilham a mesma série: ao fechar, o contrato
+  // herda o número da proposta.
+  const FONTES_CTR = [['propostas', 'numero'], ['contratos', 'numero']];
+  const FONTES_PRJ = [['projetos', 'codigo']];
+
   function waBtn(phone, cls = '') {
     if (!phone) return '';
     return `<button class="btn btn-xs btn-success ${cls}" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${escJs(phone)}')" title="Abrir WhatsApp">💬</button>`;
@@ -389,6 +442,7 @@ const Utils = (() => {
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,
     validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn, labelTables, collapseActions,
+    proximoNumero, numeroEmUso, SERIE_PROPOSTA, SERIE_PROJETO, FONTES_CTR, FONTES_PRJ,
   };
 })();
 

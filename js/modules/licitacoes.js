@@ -1236,8 +1236,7 @@ const Licitacoes = (() => {
     const l = DB.get('licitacoes', id);
     if (!l) return;
     const cfg = DB.getConfig();
-    const seq = String(DB.getAll('projetos').length + 1).padStart(3, '0');
-    const codigo = `BIK-${new Date().getFullYear()}-PRJ-${seq}`;
+    const codigo = Utils.proximoNumero(Utils.SERIE_PROJETO(), Utils.FONTES_PRJ, 3);
     const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${l.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
 
     Modal.open({

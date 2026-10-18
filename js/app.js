@@ -284,8 +284,33 @@ const App = (() => {
     document.getElementById('sidebarRole').textContent = user.cargo || 'Admin';
   }
 
+  /* Mapa de notificações dispensadas. Uma entrada com status 'adiada' só
+     conta enquanto a data de retorno não chegou — é o "lembrar depois". */
   function _notifDismissed() {
-    return DB.getConfig().notificacoesStatus || {};
+    const map = DB.getConfig().notificacoesStatus || {};
+    const hoje = Utils.todayStr();
+    const efetivo = {};
+    Object.entries(map).forEach(([tag, info]) => {
+      if (info && info.status === 'adiada') {
+        if ((info.ate || '') > hoje) efetivo[tag] = info; // ainda adiada
+        return;                                           // venceu: volta a aparecer
+      }
+      efetivo[tag] = info;
+    });
+    return efetivo;
+  }
+
+  /* Adia a pendência por N dias (ou até uma data). */
+  function adiarNotif(tag, dias) {
+    const cfg = DB.getConfig();
+    const map = { ...(cfg.notificacoesStatus || {}) };
+    const d = new Date(); d.setDate(d.getDate() + (Number(dias) || 1));
+    const ate = Utils.localDateStr(d);
+    map[tag] = { status: 'adiada', data: Utils.todayStr(), ate };
+    DB.saveConfig({ ...cfg, notificacoesStatus: map });
+    updateNotifBadge();
+    Toast.success(`Lembrete adiado para ${Utils.formatDate(ate)}`);
+    if (document.getElementById('modalBackdrop')?.classList.contains('open')) showPendencias();
   }
 
   function dismissNotif(tag, status) {
@@ -316,7 +341,9 @@ const App = (() => {
   }
 
   function _notifActions(tag) {
-    return `<button class="btn btn-xs btn-ghost" onclick="App.dismissNotif('${tag}','lida')" title="Marcar como lida">✓ Lida</button>
+    return `<button class="btn btn-xs btn-ghost" onclick="App.adiarNotif('${tag}',1)" title="Lembrar amanhã">⏰ 1d</button>
+      <button class="btn btn-xs btn-ghost" onclick="App.adiarNotif('${tag}',7)" title="Lembrar daqui a 7 dias">⏰ 7d</button>
+      <button class="btn btn-xs btn-ghost" onclick="App.dismissNotif('${tag}','lida')" title="Marcar como lida">✓ Lida</button>
       <button class="btn btn-xs btn-ghost" onclick="App.dismissNotif('${tag}','excluida')" title="Excluir notificação">🗑</button>`;
   }
 
@@ -384,6 +411,30 @@ const App = (() => {
     return { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos, inspecoesVencendo };
   }
 
+  /* Adia TODAS as pendências visíveis de uma vez. Útil quando o acúmulo é
+     grande e o usuário quer revisar numa data específica em vez de excluir. */
+  function adiarTodasNotifs(dias) {
+    const p = _pendenciasAtuais();
+    const tags = [
+      ...p.followups.map(l => 'lead_'+l.id), ...p.atrasadas.map(a => 'atv_'+a.id),
+      ...p.parcelasVencidas.map(pc => 'parc_'+pc.id), ...p.licitacoes.map(l => 'lic_'+l.id),
+      ...p.projetosAtrasados.map(pr => 'proj_'+pr.id), ...p.projSemArt.map(pr => 'art_'+pr.id),
+      ...p.contratosVencendoLista.map(c => 'contrato_'+c.id), ...p.contasPagarVencendo.map(c => 'cp_'+c.id),
+      ...p.marketingProximos.map(m => 'mkt_'+m.id), ...p.inspecoesVencendo.map(e => 'eqp_'+e.id),
+    ];
+    if (!tags.length) { Toast.success('Nenhuma pendência para adiar.'); return; }
+    const d = new Date(); d.setDate(d.getDate() + (Number(dias) || 7));
+    const ate = Utils.localDateStr(d);
+    const cfg = DB.getConfig();
+    const map = { ...(cfg.notificacoesStatus || {}) };
+    const hoje = Utils.todayStr();
+    tags.forEach(t => { map[t] = { status: 'adiada', data: hoje, ate }; });
+    DB.saveConfig({ ...cfg, notificacoesStatus: map });
+    updateNotifBadge();
+    Toast.success(`${tags.length} lembrete(s) adiado(s) para ${Utils.formatDate(ate)}.`);
+    showPendencias();
+  }
+
   function dismissAllNotifs() {
     const p = _pendenciasAtuais();
     const tags = [
@@ -414,11 +465,35 @@ const App = (() => {
     const { followups, atrasadas, parcelasVencidas, licitacoes, projetosAtrasados, projSemArt, contratosVencendoLista, contasPagarVencendo, marketingProximos, inspecoesVencendo } = _pendenciasAtuais();
     const totalPendencias = followups.length + atrasadas.length + parcelasVencidas.length + licitacoes.length + projetosAtrasados.length + projSemArt.length + contratosVencendoLista.length + contasPagarVencendo.length + marketingProximos.length + inspecoesVencendo.length;
 
+    // Resumo no topo: com 50+ pendências a lista crua não dizia o que é
+    // urgente. Agora mostra o placar por gravidade antes do detalhamento.
+    const _venc = (d) => d != null && d < 0;
+    const criticas = parcelasVencidas.length + inspecoesVencendo.filter(e => _venc(Utils.daysUntil(e.proximaInspecao))).length
+      + contratosVencendoLista.filter(c => _venc(Utils.daysUntil(c.dataFim))).length
+      + contasPagarVencendo.filter(c => _venc(Utils.daysUntil(c.vencimento))).length;
+    const atrasos = followups.length + atrasadas.length + projetosAtrasados.length;
+    const avisos = totalPendencias - criticas - atrasos;
+    const _resumoChip = (cor, icone, n, label) => n > 0
+      ? `<div style="flex:1;min-width:92px;background:var(--${cor}-light);border:1px solid var(--${cor}-border, var(--border));border-radius:var(--radius);padding:8px 10px;text-align:center">
+          <div style="font-size:18px;font-weight:800;color:var(--${cor})">${icone} ${n}</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted)">${label}</div>
+        </div>` : '';
+
     Modal.open({
       title: '⚠ Pendências',
       size: 'modal-lg',
       body: `
-        ${totalPendencias > 0 ? `<div class="mb-3" style="text-align:right"><button class="btn btn-xs btn-danger" onclick="App.dismissAllNotifs()">🗑 Excluir Todas (${totalPendencias})</button></div>` : ''}
+        ${totalPendencias > 0 ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            ${_resumoChip('danger', '💸', criticas, 'Dinheiro / vencido')}
+            ${_resumoChip('warning', '⏰', atrasos, 'Em atraso')}
+            ${_resumoChip('info', 'ℹ️', avisos, 'A vencer')}
+          </div>
+          <div class="mb-3" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            <span class="text-xs text-muted" style="margin-right:auto;align-self:center">⏰ adia o lembrete · ✓ marca como lida · 🗑 remove do sino (o registro continua intacto)</span>
+            <button class="btn btn-xs btn-secondary" onclick="App.adiarTodasNotifs(7)" title="Adiar todas por 7 dias">⏰ Adiar todas (7d)</button>
+            <button class="btn btn-xs btn-danger" onclick="App.dismissAllNotifs()">🗑 Excluir Todas (${totalPendencias})</button>
+          </div>` : ''}
         ${followups.length > 0 ? `
           <div class="detail-label mb-2">Follow-ups Vencidos (${followups.length})</div>
           ${followups.map(l => {
@@ -1057,7 +1132,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, adiarNotif, adiarTodasNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

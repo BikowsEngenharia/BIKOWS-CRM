@@ -13,6 +13,14 @@ const Notifications = (() => {
       email:    false,
       emailDest: '',
       horaChecagem: '08:00',
+      // Fora desta janela o CRM não dispara notificação do navegador (ainda
+      // conta no sino). Antes, abrir o CRM às 23h disparava tudo.
+      silencioDe:  '20:00',
+      silencioAte: '07:00',
+      // Uma notificação do navegador por vez, agrupada. Antes era UMA POR
+      // ITEM: com 26 follow-ups + 17 atividades atrasadas o sistema abria
+      // dezenas de notificações de uma vez ao abrir o CRM.
+      agruparBrowser: true,
       antecedencia: {
         atividades:  1,
         reunioes:    1,
@@ -47,20 +55,11 @@ const Notifications = (() => {
     if ('Notification' in window && Notification.permission === 'default') {
       setTimeout(function() { Notification.requestPermission(); }, 3000);
     }
-    // Contratos vencendo em 7 dias
-    setTimeout(function() {
-      if (typeof Contratos !== 'undefined' && Contratos.getContratosVencendo) {
-        var venc7 = Contratos.getContratosVencendo(7);
-        if (venc7.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
-          try {
-            new Notification('⚠️ Contratos Vencendo', {
-              body: venc7.length + ' contrato(s) vencem nos próximos 7 dias',
-              icon: '/img/logo-bikows.png',
-            });
-          } catch(e) { /* silencioso */ }
-        }
-      }
-    }, 5000);
+    // Faxina do histórico de dispensas (ver limparDispensasAntigas)
+    setTimeout(function() { limparDispensasAntigas(true); }, 2500);
+    // (Removida aqui a notificação fixa de "Contratos Vencendo": ela ignorava
+    //  as preferências e as dispensas do usuário, e reaparecia em toda sessão.
+    //  Contratos vencendo já entram pelo sino e pelo _checkAll.)
   }
 
   /* ---- Service Worker ---- */
@@ -131,9 +130,18 @@ const Notifications = (() => {
 
     if (novos.length === 0) return;
 
-    novos.forEach(item => {
-      if (prefs.browser) _notifyBrowser(item);
-    });
+    if (prefs.browser && !_emSilencio(prefs)) {
+      if (prefs.agruparBrowser !== false && novos.length > 1) {
+        // Uma notificação só, resumindo por categoria
+        const porTipo = {};
+        novos.forEach(i => { const k = (i.tag || '').split('_')[0]; porTipo[k] = (porTipo[k] || 0) + 1; });
+        const NOMES = { atv: 'atividade(s)', lead: 'follow-up(s)', parc: 'parcela(s)', lic: 'licitação(ões)', cp: 'conta(s) a pagar', eqp: 'inspeção(ões)', art: 'projeto(s) sem ART', mkt: 'post(s) agendado(s)', cpl: 'alerta(s) de tráfego' };
+        const resumo = Object.entries(porTipo).map(([k, n]) => `${n} ${NOMES[k] || 'pendência(s)'}`).join(' · ');
+        _notifyBrowser({ tag: 'resumo_' + Utils.todayStr(), title: `🔔 ${novos.length} pendências no CRM`, body: resumo });
+      } else {
+        novos.forEach(item => _notifyBrowser(item));
+      }
+    }
 
     // In-app: mostra toast resumido
     if (prefs.inApp && novos.length > 0) {
@@ -150,6 +158,53 @@ const Notifications = (() => {
 
     // Email (se configurado)
     if (prefs.email && prefs.emailDest) _sendEmailDigest(novos, prefs);
+  }
+
+  /* Janela de silêncio (ex.: 20:00 → 07:00, atravessando a meia-noite). */
+  function _emSilencio(prefs) {
+    const de = prefs.silencioDe, ate = prefs.silencioAte;
+    if (!de || !ate) return false;
+    const agora = new Date();
+    const hhmm = String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
+    return de <= ate ? (hhmm >= de && hhmm < ate) : (hhmm >= de || hhmm < ate);
+  }
+
+  /* Limpa o histórico de notificações dispensadas.
+     Problema que isto resolve: 'notificacoesStatus' só crescia — chegou a 165
+     entradas / 11 KB dos 12 KB do registro de configuração, reenviado inteiro a
+     cada clique em "lida". Além disso, uma pendência dispensada nunca mais
+     alertava, mesmo depois de ganhar data nova.
+     Regras: some a entrada cujo registro não existe mais, e a marcada como
+     "lida" há mais de 30 dias (a "excluída" é decisão explícita e fica). */
+  function limparDispensasAntigas(silencioso) {
+    try {
+      const cfg = DB.getConfig();
+      const map = cfg.notificacoesStatus || {};
+      const tags = Object.keys(map);
+      if (!tags.length) return 0;
+      const ENT = { atv: 'atividades', lead: 'leads', lic: 'licitacoes', proj: 'projetos', art: 'projetos', contrato: 'contratos', cp: 'contaspagar', mkt: 'marketing_posts', eqp: 'equipamentos' };
+      const limite = new Date(Date.now() - 30 * 86400000);
+      const novo = {};
+      let removidas = 0;
+      tags.forEach(t => {
+        const info = map[t] || {};
+        const idx = t.indexOf('_');
+        const prefixo = idx > 0 ? t.slice(0, idx) : '';
+        const id = idx > 0 ? t.slice(idx + 1) : '';
+        // registro sumiu? a dispensa não serve mais para nada
+        const ent = ENT[prefixo];
+        if (ent && id && !DB.get(ent, id) && prefixo !== 'parc') { removidas++; return; }
+        // "lida" vencida volta a poder alertar
+        if (info.status === 'lida' && info.data && new Date(info.data) < limite) { removidas++; return; }
+        novo[t] = info;
+      });
+      if (removidas > 0) {
+        DB.saveConfig({ ...cfg, notificacoesStatus: novo });
+        if (!silencioso) Toast.success(`${removidas} notificação(ões) antiga(s) removida(s) do histórico.`);
+        if (typeof App !== 'undefined') App.updateNotifBadge();
+      }
+      return removidas;
+    } catch (e) { console.warn('[Notif] limparDispensasAntigas:', e); return 0; }
   }
 
   function _daysUntil(dateStr) {
@@ -492,5 +547,6 @@ const Notifications = (() => {
     savePrefs,
     checkAll: _checkAll,
     sendTestEmail,
+    limparDispensasAntigas,
   };
 })();

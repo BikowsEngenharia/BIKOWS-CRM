@@ -913,7 +913,7 @@ const Relatorios = (() => {
         <!-- TOP CLIENTES -->
         ${topClientes.length ? `<div style="margin-bottom:24px">
           <h2 style="font-size:15px;font-weight:700;color:#1d4ed8;margin:0 0 12px;border-left:4px solid #1d4ed8;padding-left:8px">🏆 Top Clientes</h2>
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <table class="tbl" style="width:100%;border-collapse:collapse;font-size:12px">
             <thead><tr style="background:#f8fafc">
               <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Cliente</th>
               <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Receita Fechada</th>
@@ -943,7 +943,7 @@ const Relatorios = (() => {
         <!-- PROJETOS -->
         <div>
           <h2 style="font-size:15px;font-weight:700;color:#1d4ed8;margin:0 0 12px;border-left:4px solid #1d4ed8;padding-left:8px">🔧 Projetos em Andamento</h2>
-          ${projetosAtivos.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px">
+          ${projetosAtivos.length ? `<table class="tbl" style="width:100%;border-collapse:collapse;font-size:12px">
             <thead><tr style="background:#f8fafc">
               <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Projeto</th>
               <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Cliente</th>

@@ -344,6 +344,7 @@ const Pipeline = (() => {
           </div>
           <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Ver somente licitações">🏛 Licitações</button>
           <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
+          ${_semProximaAcao().length ? `<button class="btn btn-secondary" onclick="Pipeline.drillDown('sem_proxima_acao')" title="Leads ativos sem próxima ação marcada — ninguém é lembrado deles">⚠ ${_semProximaAcao().length} sem ação</button>` : ''}
           <button class="btn btn-secondary" onclick="Pipeline.reativarLeadsPerdidos()" title="Reativar leads perdidos">♻️ Reativar</button>
           <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
           <button class="btn btn-secondary" onclick="Pipeline.downloadCSVTemplate()" title="Baixar modelo CSV de leads">📋 Modelo CSV</button>
@@ -1565,6 +1566,26 @@ const Pipeline = (() => {
   function addNew() { openForm(); }
 
   /* ---- Drill-down dos KPI cards ---- */
+  /* Ativos sem data de próxima ação: não aparecem em lugar nenhum hoje. */
+  function _semProximaAcao() {
+    return DB.getAll('leads').filter(l =>
+      !['fechado_ganho', 'executado', 'fechado_perdido'].includes(l.status) && !l.dataProximaAcao);
+  }
+
+  /* Marca a próxima ação de um lead em N dias, direto da lista. */
+  function definirProximaAcao(leadId, dias) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    const d = new Date(); d.setDate(d.getDate() + (Number(dias) || 3));
+    DB.update('leads', leadId, {
+      dataProximaAcao: Utils.localDateStr(d),
+      proximaAcao: lead.proximaAcao || 'Retomar contato',
+    });
+    Toast.success(`Próxima ação de "${Utils.truncate(lead.titulo || '', 30)}" marcada para ${Utils.formatDate(Utils.localDateStr(d))}`);
+    if (typeof App !== 'undefined') App.updateNotifBadge();
+    drillDown('sem_proxima_acao');
+  }
+
   function drillDown(tipo) {
     const hoje = Utils.localDateStr(new Date());
     let title = '', items = [], cols = [], rowFn = () => [];
@@ -1572,7 +1593,25 @@ const Pipeline = (() => {
     const allLeads = DB.getAll('leads');
     const leadsAtivos = allLeads.filter(l => !['fechado_ganho','executado','fechado_perdido'].includes(l.status));
 
-    if (tipo === 'pipeline_total') {
+    if (tipo === 'sem_proxima_acao') {
+      title = '⚠ Leads ativos sem próxima ação';
+      items = _semProximaAcao().sort((a, b) => (b.valorEstimado || 0) - (a.valorEstimado || 0));
+      cols = ['Lead', 'Etapa', 'Valor', 'Marcar ação para'];
+      rowFn = l => {
+        const stage = STAGES.find(s => s.key === l.status);
+        return [
+          Utils.escHtml(l.titulo || ''),
+          `<span style="font-size:11px;color:${stage?.color || '#64748b'}">${stage?.label || l.status}</span>`,
+          Utils.formatCurrency(l.valorEstimado),
+          `<div class="tbl-actions">
+            <button class="btn btn-xs btn-secondary" onclick="Pipeline.definirProximaAcao('${l.id}',1)" title="Amanhã">1d</button>
+            <button class="btn btn-xs btn-secondary" onclick="Pipeline.definirProximaAcao('${l.id}',3)" title="Em 3 dias">3d</button>
+            <button class="btn btn-xs btn-secondary" onclick="Pipeline.definirProximaAcao('${l.id}',7)" title="Em 7 dias">7d</button>
+            <button class="btn btn-xs btn-primary" onclick="Modal.close();Pipeline.viewLead('${l.id}')" title="Abrir o lead">Abrir</button>
+          </div>`,
+        ];
+      };
+    } else if (tipo === 'pipeline_total') {
       title = 'Total em Pipeline';
       items = leadsAtivos;
       cols = ['Lead', 'Etapa', 'Valor', 'Responsável'];
@@ -1637,7 +1676,7 @@ const Pipeline = (() => {
     Modal.open({
       title: `${title} — ${items.length} registro(s)`,
       body: `<div style="max-height:55vh;overflow-y:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <table class="tbl" style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
             ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
           </tr></thead>
@@ -1859,7 +1898,7 @@ const Pipeline = (() => {
   }
 
   return {
-    render, openForm, saveLead, deleteLead, viewLead, addNew,
+    render, openForm, saveLead, deleteLead, viewLead, addNew, definirProximaAcao,
     dragStart, dragEnd, dragOver, dragLeave, drop, moverEtapa,
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,

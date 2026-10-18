@@ -700,7 +700,7 @@ const Contratos = (() => {
       title: `${title} — ${items.length} registro(s)`,
       body: `
         <div style="max-height:55vh;overflow-y:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <table class="tbl" style="width:100%;border-collapse:collapse;font-size:13px">
             <thead><tr style="background:var(--surface-2,#f8fafc);position:sticky;top:0">
               ${cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border)">${c}</th>`).join('')}
             </tr></thead>

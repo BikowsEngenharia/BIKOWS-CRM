@@ -115,6 +115,11 @@ const Licitacoes = (() => {
   let _autoExpirouSessao = false;  // roda 1x por sessão
   let _tab = 'lista'; // 'lista' | 'kanban' | 'pncp'
   let _pncpData = [];   // cache dos dados PNCP
+  // Filtros da aba PNCP. Sem isso, a coluna "Novas" chegou a 454 cards de uma
+  // vez (o monitor acrescenta ~16/dia) e a aba ficava impossível de usar.
+  let _pncpFiltro = { relevancia: 0, uf: '', busca: '', somentePrazoAberto: true };
+  let _pncpLimite = 20;        // cards mostrados por coluna (botão "ver mais")
+  const _PNCP_IDADE_MAX = 45;  // dias: sem prazo e antiga = descartada automaticamente
   let _pncpLoading = false;
 
   /* ── Render principal ─────────────────────────────────────────────────── */
@@ -255,21 +260,43 @@ const Licitacoes = (() => {
   async function _autoExpirarVencidasPncp() {
     try {
       const { data, error } = await _supabase
-        .from('crm_licitacoes').select('id,data')
+        .from('crm_licitacoes').select('id,data,created_at')
         .eq('data->>kanban', 'nova');
       if (error || !data) return;
       const hoje = new Date();
-      const vencidas = data.filter(l => {
-        const enc = l.data?.dataEncerramento ? new Date(l.data.dataEncerramento) : null;
-        return enc && !isNaN(enc) && enc < hoje;
-      });
-      if (vencidas.length === 0) return;
-      for (const l of vencidas) {
-        await _supabase.from('crm_licitacoes').update({
-          data: { ...l.data, kanban: 'descartada', descartadoMotivo: 'Prazo de proposta expirado sem análise', descartadoEm: Utils.todayStr() }
-        }).eq('id', l.id);
+      const limiteIdade = new Date(hoje.getTime() - _PNCP_IDADE_MAX * 86400000);
+      const vencidas = [];
+      for (const l of data) {
+        const encRaw = l.data?.dataEncerramento;
+        const enc = encRaw ? new Date(encRaw) : null;
+        if (enc && !isNaN(enc)) {
+          if (enc < hoje) vencidas.push({ l, motivo: 'Prazo de proposta expirado sem análise' });
+          continue;
+        }
+        // Sem data de encerramento: o PNCP nem sempre informa. Antes, essas
+        // ficavam na coluna "Novas" para sempre (eram 88). Agora saem de cena
+        // depois de _PNCP_IDADE_MAX dias da publicação/captura.
+        const refRaw = l.data?.dataPublicacao || l.created_at;
+        if (!refRaw) continue; // sem referência de data: não dá para julgar, mantém
+        const ref = new Date(refRaw);
+        if (!isNaN(ref) && ref < limiteIdade) {
+          vencidas.push({ l, motivo: `Sem prazo informado e publicada há mais de ${_PNCP_IDADE_MAX} dias` });
+        }
       }
-      Toast.show(`🗑 ${vencidas.length} licitação(ões) com prazo vencido movida(s) automaticamente para Descartada.`, 6000);
+      if (vencidas.length === 0) return;
+      // Upsert em LOTE: antes era um UPDATE sequencial por registro — com 200+
+      // licitações isso virava 200 requisições em fila e normalmente não
+      // terminava, deixando o backlog crescer.
+      const hojeStr = Utils.todayStr();
+      const payload = vencidas.map(({ l, motivo }) => ({
+        id: l.id,
+        data: { ...l.data, kanban: 'descartada', descartadoMotivo: motivo, descartadoEm: hojeStr },
+      }));
+      for (let i = 0; i < payload.length; i += 200) {
+        const { error: upErr } = await _supabase.from('crm_licitacoes').upsert(payload.slice(i, i + 200));
+        if (upErr) { console.warn('[Licitacoes] expirar PNCP em lote:', upErr.message); return; }
+      }
+      Toast.show(`🗑 ${vencidas.length} licitação(ões) do PNCP com prazo vencido movida(s) para Descartada (nada foi excluído).`, 7000);
       _loadPncpBadge();
       if (_tab === 'pncp') recarregarPncp();
     } catch (e) { console.warn('[Licitacoes] autoExpirarVencidasPncp:', e); }
@@ -305,9 +332,12 @@ const Licitacoes = (() => {
     } catch {}
   }
 
+  let _pncpVisiveis = 0;
+
   function renderPNCPTab() {
     // Dispara carga assíncrona e retorna skeleton
     if (!_pncpLoading) { _pncpLoading = true; _fetchPncp(); }
+    _pncpVisiveis = _filtrarPncp(_pncpData.filter(l => (l.data?.kanban || 'nova') !== 'descartada'), 'nova').length;
 
     const kanbanCols = [
       { key: 'nova',       label: '🔍 Novas',           color: '#3b82f6' },
@@ -331,29 +361,98 @@ const Licitacoes = (() => {
     return `
       <div class="card mb-3">
         <div style="padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <div style="flex:1">
+          <div style="flex:1;min-width:220px">
             <div class="font-bold">🔍 PNCP Monitor — Licitações Descobertas Automaticamente</div>
-            <div class="text-xs text-muted">${_pncpData.length} licitação(ões) capturadas · Arraste entre colunas ou clique para gerenciar</div>
+            <div class="text-xs text-muted">${_pncpData.length} capturadas · ${_pncpVisiveis} no filtro atual · o monitor acrescenta cerca de 16/dia</div>
           </div>
+          <button class="btn btn-sm btn-secondary" onclick="Licitacoes.expirarPncpAgora()" title="Move para Descartada tudo que já venceu ou está parado há muito tempo (nada é excluído)">🧹 Limpar vencidas</button>
           <button class="btn btn-sm btn-secondary" onclick="Licitacoes.recarregarPncp()">🔄 Atualizar</button>
+        </div>
+        <div style="padding:0 18px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input class="form-control" style="flex:2;min-width:180px" placeholder="Buscar objeto, órgão ou município..." value="${Utils.escHtml(_pncpFiltro.busca)}" oninput="Licitacoes.setPncpFiltro('busca', this.value)">
+          <select class="filter-select" onchange="Licitacoes.setPncpFiltro('relevancia', this.value)">
+            <option value="0" ${_pncpFiltro.relevancia == 0 ? 'selected' : ''}>Toda relevância</option>
+            <option value="3" ${_pncpFiltro.relevancia == 3 ? 'selected' : ''}>⭐ Relevância 3+ (mais aderentes)</option>
+            <option value="2" ${_pncpFiltro.relevancia == 2 ? 'selected' : ''}>Relevância 2+</option>
+          </select>
+          <select class="filter-select" onchange="Licitacoes.setPncpFiltro('uf', this.value)">
+            <option value="">Todas as UFs</option>
+            ${[...new Set(_pncpData.map(l => l.data?.uf).filter(Boolean))].sort().map(uf => `<option value="${Utils.escHtml(uf)}" ${_pncpFiltro.uf === uf ? 'selected' : ''}>${Utils.escHtml(uf)}</option>`).join('')}
+          </select>
+          <label class="text-xs text-muted" style="display:flex;align-items:center;gap:5px;cursor:pointer" title="Esconde as que já passaram do prazo de proposta">
+            <input type="checkbox" ${_pncpFiltro.somentePrazoAberto ? 'checked' : ''} onchange="Licitacoes.setPncpFiltro('somentePrazoAberto', this.checked)"> Só com prazo aberto
+          </label>
         </div>
       </div>
       <div style="overflow-x:auto;padding-bottom:8px">
         <div style="display:flex;gap:12px;min-width:${kanbanCols.length * 220}px;align-items:flex-start">
           ${kanbanCols.map(col => {
-            const cards = _pncpData.filter(l => (l.data?.kanban || 'nova') === col.key);
+            const todas = _pncpData.filter(l => (l.data?.kanban || 'nova') === col.key);
+            const cards = _filtrarPncp(todas, col.key);
+            // Prazo mais próximo primeiro (as sem prazo vão para o fim)
+            cards.sort((a, b) => (a.data?.dataEncerramento || '9999').localeCompare(b.data?.dataEncerramento || '9999'));
+            const visiveis = cards.slice(0, _pncpLimite);
             return `
-              <div style="width:220px;flex-shrink:0">
+              <div style="width:230px;flex-shrink:0">
                 <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid ${col.color};margin-bottom:8px">
                   <div style="font-size:12px;font-weight:700;color:${col.color}">${col.label}</div>
-                  <div style="font-size:11px;color:var(--text-muted)">${cards.length} licitação(ões)</div>
-                  ${col.key === 'descartada' && cards.length > 0 ? `<button class="btn btn-xs btn-danger" style="margin-top:6px;width:100%;font-size:10px" onclick="Licitacoes.limparDescartadasPncp()">🗑 Limpar Descartadas</button>` : ''}
+                  <div style="font-size:11px;color:var(--text-muted)">${cards.length}${cards.length !== todas.length ? ' de ' + todas.length : ''} licitação(ões)</div>
+                  ${col.key === 'descartada' && todas.length > 0 ? `<button class="btn btn-xs btn-danger" style="margin-top:6px;width:100%;font-size:10px" onclick="Licitacoes.limparDescartadasPncp()">🗑 Excluir descartadas (${todas.length})</button>` : ''}
                 </div>
-                ${cards.map(l => _renderPncpCard(l, kanbanCols)).join('')}
+                ${visiveis.map(l => _renderPncpCard(l, kanbanCols)).join('')}
+                ${cards.length > visiveis.length ? `<button class="btn btn-xs btn-secondary" style="width:100%;font-size:10px" onclick="Licitacoes.verMaisPncp()">▼ Ver mais (${cards.length - visiveis.length} restantes)</button>` : ''}
+                ${cards.length === 0 && todas.length > 0 ? `<div class="text-xs text-muted" style="padding:8px 4px">${todas.length} oculta(s) pelo filtro</div>` : ''}
               </div>`;
           }).join('')}
         </div>
       </div>`;
+  }
+
+  /* Aplica os filtros da aba. A coluna "Descartada" ignora o filtro de prazo
+     (senão o histórico some, já que por definição está tudo vencido). */
+  function _filtrarPncp(lista, colKey) {
+    const f = _pncpFiltro;
+    const hoje = Utils.todayStr();
+    const termo = (f.busca || '').trim().toLowerCase();
+    return lista.filter(l => {
+      const d = l.data || {};
+      if (f.relevancia && Number(d.relevancia || 0) < Number(f.relevancia)) return false;
+      if (f.uf && d.uf !== f.uf) return false;
+      if (f.somentePrazoAberto && colKey !== 'descartada') {
+        const enc = (d.dataEncerramento || '').slice(0, 10);
+        if (enc && enc < hoje) return false;
+      }
+      if (termo) {
+        const alvo = [d.titulo, d.orgao, d.municipio, d.numero, d.numeroControlePNCP].join(' ').toLowerCase();
+        if (!alvo.includes(termo)) return false;
+      }
+      return true;
+    });
+  }
+
+  function setPncpFiltro(k, v) {
+    _pncpFiltro[k] = (k === 'relevancia') ? Number(v) : v;
+    _pncpLimite = 20;
+    const el = document.getElementById('licTabContent');
+    if (el) {
+      el.innerHTML = renderPNCPTab();
+      // devolve o foco ao campo de busca sem perder o que foi digitado
+      if (k === 'busca') {
+        const inp = el.querySelector('input[oninput*="busca"]');
+        if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+      }
+    }
+  }
+  function verMaisPncp() {
+    _pncpLimite += 20;
+    const el = document.getElementById('licTabContent');
+    if (el) el.innerHTML = renderPNCPTab();
+  }
+  /* Botão "Limpar vencidas": roda a expiração na hora, mesmo que já tenha
+     rodado nesta sessão. */
+  function expirarPncpAgora() {
+    Toast.show('🧹 Verificando licitações vencidas...', 3000);
+    _autoExpirarVencidasPncp();
   }
 
   function _renderPncpCard(l, kanbanCols) {
@@ -365,7 +464,7 @@ const Licitacoes = (() => {
 
     return `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;${encAlert ? 'border-left:3px solid #ef4444' : ''}">
-        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:3px">${Utils.escHtml(d.numero||d.numeroControlePNCP||'—')} · ${Utils.escHtml(d.uf||'')} · ${Utils.escHtml(d.municipio||'')}</div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:3px">${Number(d.relevancia) >= 3 ? '⭐ ' : ''}${Utils.escHtml(d.numero||d.numeroControlePNCP||'—')} · ${Utils.escHtml(d.uf||'')} · ${Utils.escHtml(d.municipio||'')}</div>
         <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:6px">${Utils.escHtml(Utils.truncate(d.titulo||'',80))}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">🏛 ${Utils.escHtml(Utils.truncate(d.orgao||'',35))}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
@@ -375,8 +474,9 @@ const Licitacoes = (() => {
         </div>
         ${d.analiseIA ? `<div style="font-size:10px;color:var(--text-muted);margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)">🤖 <b>${Utils.escHtml(d.analiseIA.aderencia||'')}</b>${d.analiseIA.servicoSugerido?' · '+Utils.escHtml(d.analiseIA.servicoSugerido):''}<br>${Utils.escHtml(Utils.truncate(d.analiseIA.justificativa||'',90))}</div>` : ''}
         ${!d.analiseIA && d.descartadoMotivo ? `<div style="font-size:10px;color:#94a3b8;margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)">ℹ ${Utils.escHtml(d.descartadoMotivo)}</div>` : ''}
+        ${(d.palavrasChave || []).length ? `<div style="font-size:9.5px;color:var(--text-muted);margin-top:5px">🔑 ${Utils.escHtml((d.palavrasChave || []).slice(0, 3).join(', '))}</div>` : ''}
         <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
-          ${d.linkPNCP ? `<a href="${Utils.escHtml(d.linkPNCP)}" target="_blank" class="btn btn-xs btn-secondary" style="font-size:10px">🔗 Edital</a>` : ''}
+          ${d.linkPNCP ? `<a href="${Utils.escHtml(d.linkPNCP)}" target="_blank" rel="noopener" class="btn btn-xs btn-secondary" style="font-size:10px">🔗 Edital</a>` : ''}
           <button class="btn btn-xs btn-primary" style="font-size:10px" onclick="Licitacoes.importarPncp('${l.id}')">↗ Criar Licitação</button>
           <select class="form-control" style="font-size:10px;padding:2px 4px;height:auto;flex:1;min-width:80px" onchange="Licitacoes.moverKanbanPncp('${l.id}',this.value)">
             ${kanbanCols.map(c => `<option value="${c.key}" ${(d.kanban||'nova')===c.key?'selected':''}>${c.label}</option>`).join('')}
@@ -387,10 +487,13 @@ const Licitacoes = (() => {
 
   async function _fetchPncp() {
     try {
+      // Limite explícito: a tabela passou de 450 registros e o PostgREST
+      // devolvia tudo a cada abertura da aba.
       const { data, error } = await _supabase
         .from('crm_licitacoes')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(600);
       if (!error && data) {
         _pncpData = data;
         // Re-render aba se estiver ativa
@@ -1344,6 +1447,7 @@ const Licitacoes = (() => {
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,
     filtrarKanban, recarregarPncp, moverKanbanPncp, importarPncp,
     limparEncerradas, limparDescartadasPncp, toggleEncerradas,
+    setPncpFiltro, verMaisPncp, expirarPncpAgora,
     autoExpirar: () => _autoExpirarLicitacoesCrm(true),
   };
 })();

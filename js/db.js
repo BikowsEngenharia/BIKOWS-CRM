@@ -14,7 +14,7 @@ const DB = (() => {
     'timesheet','arts','socios','documentos',
     'despesas_fixas','dividas','ativos_empresa',
     'pessoal_lancamentos','plano_acoes','agenda_pessoal','pessoal_despesas_fixas',
-    'visitas','equipamentos',
+    'visitas','equipamentos','catalogo_servicos',
   ];
 
   // Cache em memória — populado por loadAll()

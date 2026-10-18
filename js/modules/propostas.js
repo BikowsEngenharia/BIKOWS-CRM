@@ -125,7 +125,7 @@ const Propostas = (() => {
           <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
             ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Propostas.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
           </div>
-          <button class="btn btn-secondary" onclick="Propostas.propostaRapida(null)" title="Criar proposta a partir de template de serviço">⚡ Rápida</button>
+          <button class="btn btn-secondary" onclick="App.navigate('orcamento')" title="Montar a proposta a partir do catálogo de serviços, com preço, escopo e cronograma prontos">⚡ Orçamento Rápido</button>
           <button class="btn btn-primary" onclick="Propostas.openForm()">+ Nova Proposta</button>
         </div>
       </div>
@@ -1526,6 +1526,7 @@ const Propostas = (() => {
     nextNumeroProposta: _nextNumeroProposta,
     setPeriodo, drillDown, duplicar, imprimirProposta, _aplicarTemplate,
     propostaRapida, _selecionarTemplate, _gerarPropostaRapida,
+    TEMPLATES_SERVICOS,   // importados para o catálogo do Orçamento Rápido
     enviarWhatsApp, enviarEmail,
   };
 

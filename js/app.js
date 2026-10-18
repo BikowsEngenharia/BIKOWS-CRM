@@ -12,6 +12,7 @@ const App = (() => {
     atividades: { title: 'Atividades',      module: Atividades,  addLabel: '+ Nova Atividade' },
     visitas:    { title: 'Visitas Técnicas', module: Visitas,    addLabel: '+ Nova Visita' },
     equipamentos: { title: 'Equipamentos & Inspeções', module: Equipamentos, addLabel: '+ Novo Equipamento' },
+    orcamento:  { title: 'Orçamento Rápido', module: Orcamento,  addLabel: '+ Novo Serviço' },
     propostas:  { title: 'Propostas',       module: Propostas,   addLabel: '+ Nova Proposta' },
     contratos:  { title: 'Contratos',       module: Contratos,   addLabel: '+ Novo Contrato' },
     financeiro: { title: 'Financeiro',      module: Financeiro,  addLabel: '+ Novo Recebível' },
@@ -48,7 +49,7 @@ const App = (() => {
     marketing_ideias: 'marketing', marketing_kpis: 'marketing',
     trafego_campanhas: 'trafego', trafego_metas: 'trafego',
     documentos: 'documentos',
-    visitas: 'visitas', equipamentos: 'equipamentos',
+    visitas: 'visitas', equipamentos: 'equipamentos', catalogo_servicos: 'orcamento',
   };
 
   function refreshIfNeeded(entity) {

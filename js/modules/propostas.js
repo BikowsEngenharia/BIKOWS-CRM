@@ -172,7 +172,8 @@ const Propostas = (() => {
                   <td>
                     <div class="tbl-actions">
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.view('${p.id}')">Ver</button>
-                      <button class="btn btn-xs btn-success" onclick="PropostaGenerator.open('${p.id}')" title="Gerar proposta PDF">🖨 PDF</button>
+                      <button class="btn btn-xs btn-success" onclick="PropostaDoc.abrir('${p.id}')" title="Abrir o documento pronto para imprimir ou salvar em PDF">📄 Documento</button>
+                      <button class="btn btn-xs btn-secondary" onclick="PropostaGenerator.open('${p.id}')" title="Ajustar objetivo, escopo e cronograma antes de imprimir">✏️ Ajustar</button>
                       <button class="btn btn-xs" style="background:#25D366;color:#fff;border-color:#25D366" onclick="Propostas.enviarWhatsApp('${p.id}')" title="Enviar via WhatsApp">💬</button>
                       <button class="btn btn-xs" style="background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="Propostas.enviarEmail('${p.id}')" title="Enviar por e-mail">📧</button>
                       <button class="btn btn-xs btn-secondary" onclick="Propostas.duplicar('${p.id}')" title="Duplicar">📋</button>
@@ -300,7 +301,9 @@ const Propostas = (() => {
         </div>
 
         <div class="mt-4 flex gap-2" style="flex-wrap:wrap">
-          <button class="btn btn-success btn-sm" onclick="Modal.close();PropostaGenerator.open('${id}')">🖨 Gerar PDF</button>
+          <button class="btn btn-success btn-sm" onclick="Modal.close();PropostaDoc.abrir('${id}')">📄 Abrir documento</button>
+          <button class="btn btn-secondary btn-sm" onclick="PropostaDoc.baixar('${id}')" title="Baixa o documento como arquivo único, para anexar em e-mail">⬇️ Baixar arquivo</button>
+          <button class="btn btn-secondary btn-sm" onclick="Modal.close();PropostaGenerator.open('${id}')">✏️ Ajustar texto</button>
           <button class="btn btn-sm" style="background:#25D366;color:#fff;border-color:#25D366" onclick="Propostas.enviarWhatsApp('${id}')">💬 WhatsApp</button>
           <button class="btn btn-sm" style="background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="Propostas.enviarEmail('${id}')">📧 E-mail</button>
           ${p.canvaLink ? `<a href="${Utils.escHtml(p.canvaLink)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">🎨 Canva</a>` : ''}

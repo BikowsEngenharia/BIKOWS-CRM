@@ -138,7 +138,7 @@ const Orcamento = (() => {
   };
 
   /* ---- Estado do orçamento em montagem ---- */
-  let _tab = 'novo';              // 'novo' | 'catalogo'
+  let _tab = 'novo';              // 'novo' | 'catalogo' | 'documento'
   let _itens = [];                // [{servicoId, nome, unidade, qtd, valorUnit, escopo, cronograma, inclui, prazoDias, formaPagamento}]
   let _clienteId = '';
   let _leadId = '';
@@ -194,9 +194,10 @@ const Orcamento = (() => {
         <div class="sec-actions">
           <button class="btn ${_tab === 'novo' ? 'btn-primary' : 'btn-secondary'}" onclick="Orcamento.setTab('novo')">⚡ Novo Orçamento</button>
           <button class="btn ${_tab === 'catalogo' ? 'btn-primary' : 'btn-secondary'}" onclick="Orcamento.setTab('catalogo')">📚 Catálogo (${servicos.length})</button>
+          <button class="btn ${_tab === 'documento' ? 'btn-primary' : 'btn-secondary'}" onclick="Orcamento.setTab('documento')" title="Textos fixos, capa e modelo do documento da proposta">📐 Modelo do documento</button>
         </div>
       </div>
-      <div id="orcConteudo">${_tab === 'catalogo' ? _renderCatalogo() : _renderNovo(servicos)}</div>
+      <div id="orcConteudo">${_tab === 'catalogo' ? _renderCatalogo() : _tab === 'documento' ? _renderDocumento() : _renderNovo(servicos)}</div>
     `;
   }
 
@@ -237,7 +238,7 @@ const Orcamento = (() => {
                   <span class="font-bold" style="font-size:12.5px">${Utils.escHtml(s.nome || '')}</span>
                   <span class="text-xs text-muted">${Utils.escHtml(s.categoria || '')} · por ${Utils.escHtml(s.unidade || 'verba')}${s.prazoDias ? ' · ' + s.prazoDias + ' dias' : ''}</span>
                 </span>
-                <span class="font-bold text-primary" style="flex-shrink:0">${s.precoBase ? Utils.formatCurrency(s.precoBase) : 'a definir'}</span>
+                <span class="font-bold text-primary" style="flex-shrink:0;white-space:nowrap">${s.precoBase ? Utils.formatCurrency(s.precoBase) : 'a definir'}</span>
               </button>`).join('')}
           </div>
         </div>
@@ -312,7 +313,8 @@ const Orcamento = (() => {
               </div>
 
               <div class="flex gap-2" style="flex-wrap:wrap">
-                <button class="btn btn-primary" onclick="Orcamento.gerar(true)">📄 Gerar proposta e abrir PDF</button>
+                <button class="btn btn-primary" onclick="Orcamento.gerar('documento')">📄 Gerar e abrir o documento</button>
+                <button class="btn btn-secondary" onclick="Orcamento.gerar('formulario')" title="Abre o formulário completo para ajustar objetivo, escopo e cronograma antes de imprimir">✏️ Gerar e ajustar antes</button>
                 <button class="btn btn-secondary" onclick="Orcamento.gerar(false)">💾 Só salvar a proposta</button>
               </div>`}
           </div>
@@ -321,10 +323,10 @@ const Orcamento = (() => {
   }
 
   function _tituloSugerido() {
-    if (!_itens.length) return 'Ex.: Adequação NR-12 — Linha de prensas';
-    const cli = _clienteId ? Utils.getClientName(_clienteId) : '';
-    const base = _itens.length === 1 ? _itens[0].nome : `${_itens[0].nome} + ${_itens.length - 1} serviço(s)`;
-    return cli ? `${base} — ${cli}` : base;
+    if (!_itens.length) return 'Ex.: Adequação NR-12 de linha de prensas';
+    if (_itens.length === 1) return _itens[0].nome;
+    const extras = _itens.length - 1;
+    return `${_itens[0].nome} e mais ${extras} serviço${extras > 1 ? 's' : ''}`;
   }
 
   /* ---- Aba: catálogo ---- */
@@ -490,8 +492,10 @@ const Orcamento = (() => {
     limpar();
     if (typeof App !== 'undefined') App.updateNotifBadge();
 
-    if (abrirPdf && typeof PropostaGenerator !== 'undefined') {
+    if (abrirPdf === 'formulario' && typeof PropostaGenerator !== 'undefined') {
       setTimeout(() => PropostaGenerator.open(proposta.id), 300);
+    } else if (abrirPdf && typeof PropostaDoc !== 'undefined') {
+      setTimeout(() => PropostaDoc.abrir(proposta.id), 300);
     } else if (typeof App !== 'undefined') {
       App.navigate('propostas');
     }
@@ -685,6 +689,189 @@ const Orcamento = (() => {
     });
   }
 
+  /* ====================================================
+     ABA: MODELO DO DOCUMENTO
+     Textos e blocos fixos que valem para toda proposta gerada.
+     Ficam em config.documento; a proposta só carrega o que é dela.
+     ==================================================== */
+  function _renderDocumento() {
+    const d = (DB.getConfig() || {}).documento || {};
+    const padrao = (typeof PropostaDoc !== 'undefined' && PropostaDoc.PADROES) || { empresa: {}, engenheiro: {} };
+    const emp = Object.assign({}, padrao.empresa, d.empresa || {});
+    const eng = Object.assign({}, padrao.engenheiro, d.engenheiro || {});
+    const bl = Object.assign({ apresentacao: true, diferenciais: true, aceite: true }, d.blocos || {});
+    const linhas = a => (a || []).join('\n');
+    const nums = (d.numeros || []).map(x => `${x.n} | ${x.l}`).join('\n');
+    const difs = (d.diferenciais || []).map(x => `${x.titulo} | ${x.texto}`).join('\n');
+
+    return `
+      <div class="grid-2" style="align-items:start">
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">📄 Documento gerado</div></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Modelo padrão</label>
+                <select class="form-control" id="docModelo">
+                  <option value="completa" ${(d.modelo || 'completa') === 'completa' ? 'selected' : ''}>Completa (capa + institucional + escopo)</option>
+                  <option value="tecnica" ${d.modelo === 'tecnica' ? 'selected' : ''}>Técnica (capa + escopo, sem institucional)</option>
+                  <option value="enxuta" ${d.modelo === 'enxuta' ? 'selected' : ''}>Enxuta (orçamento de 1 página)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Validade padrão (dias)</label>
+                <input class="form-control" id="docValidade" type="number" min="1" max="180" value="${Number(d.validadeDias) || 15}">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Foto de capa (endereço da imagem)</label>
+              <input class="form-control" id="docCapa" value="${Utils.escHtml(d.capaFoto || '')}" placeholder="https://... (deixe em branco para capa gráfica)">
+              <div class="form-hint">Foto própria de campo funciona melhor que banco de imagem. Sem foto, a capa usa o fundo marinho com malha isométrica.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Blocos opcionais</label>
+              <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="docBlApres" ${bl.apresentacao !== false ? 'checked' : ''}> Página institucional (quem executa, números, clientes)</label>
+              <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="docBlDif" ${bl.diferenciais !== false ? 'checked' : ''}> Página de diferenciais técnicos</label>
+              <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="docBlAceite" ${bl.aceite !== false ? 'checked' : ''}> Campo de aceite assinado pelo cliente</label>
+            </div>
+            <div class="flex gap-2" style="flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="Orcamento.salvarDocumento()">💾 Salvar modelo</button>
+              <button class="btn btn-secondary" onclick="Orcamento.verModelo()">👁 Pré-visualizar modelo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">🏢 Dados que aparecem no documento</div></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group" style="flex:2">
+                <label class="form-label">Razão social</label>
+                <input class="form-control" id="docRazao" value="${Utils.escHtml(emp.razao || '')}" placeholder="BIKOWS EMPREENDIMENTOS LTDA">
+              </div>
+              <div class="form-group">
+                <label class="form-label">CNPJ</label>
+                <input class="form-control" id="docCnpj" value="${Utils.escHtml(emp.cnpj || '')}">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Endereço</label>
+              <input class="form-control" id="docEndereco" value="${Utils.escHtml(emp.endereco || '')}">
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Cidade</label><input class="form-control" id="docCidade" value="${Utils.escHtml(emp.cidade || '')}"></div>
+              <div class="form-group" style="max-width:80px"><label class="form-label">UF</label><input class="form-control" id="docUf" value="${Utils.escHtml(emp.uf || '')}"></div>
+              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" id="docCep" value="${Utils.escHtml(emp.cep || '')}"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" id="docTel" value="${Utils.escHtml(emp.telefone || '')}"></div>
+              <div class="form-group"><label class="form-label">E-mail</label><input class="form-control" id="docEmail" value="${Utils.escHtml(emp.email || '')}"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Site</label><input class="form-control" id="docSite" value="${Utils.escHtml(emp.site || '')}"></div>
+              <div class="form-group"><label class="form-label">Registro CREA da empresa</label><input class="form-control" id="docCrea" value="${Utils.escHtml(emp.crea || '')}"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Frase de assinatura</label>
+              <input class="form-control" id="docTagline" value="${Utils.escHtml(emp.tagline || '')}" placeholder="Soluções em Engenharia Industrial NR-12 e NR-13">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">✍️ Responsável técnico</div></div>
+          <div class="card-body">
+            <div class="form-group"><label class="form-label">Nome</label><input class="form-control" id="docEngNome" value="${Utils.escHtml(eng.nome || '')}" placeholder="MARCOS DA SILVA ISRAEL"></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Título 1</label><input class="form-control" id="docEngT1" value="${Utils.escHtml(eng.titulo1 || '')}" placeholder="ENGENHEIRO MECÂNICO"></div>
+              <div class="form-group"><label class="form-label">Título 2</label><input class="form-control" id="docEngT2" value="${Utils.escHtml(eng.titulo2 || '')}"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Título 3</label><input class="form-control" id="docEngT3" value="${Utils.escHtml(eng.titulo3 || '')}"></div>
+              <div class="form-group"><label class="form-label">CREA</label><input class="form-control" id="docEngCrea" value="${Utils.escHtml(eng.crea || '')}" placeholder="CREA PR-206397/D"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Números da empresa (um por linha: valor | rótulo)</label>
+              <textarea class="form-control" id="docNumeros" rows="4" placeholder="+1.000 | Máquinas adequadas à NR-12">${Utils.escHtml(nums)}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">📝 Textos fixos da proposta</div></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Quem executa (página institucional)</label>
+              <textarea class="form-control" id="docSobre" rows="4" placeholder="Deixe em branco para usar o texto padrão.">${Utils.escHtml(d.sobre || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Empresas atendidas (uma por linha)</label>
+              <textarea class="form-control" id="docClientes" rows="3">${Utils.escHtml(linhas(d.clientesRef))}</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Diferenciais (um por linha: título | texto)</label>
+              <textarea class="form-control" id="docDif" rows="5" placeholder="Responsabilidade técnica formal | Todo serviço sai com ART registrada...">${Utils.escHtml(difs)}</textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">O valor contempla (um por linha)</label>
+                <textarea class="form-control" id="docInclui" rows="4">${Utils.escHtml(linhas(d.incluiPadrao))}</textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Não contempla (um por linha)</label>
+                <textarea class="form-control" id="docNaoInclui" rows="4">${Utils.escHtml(linhas(d.naoIncluso))}</textarea>
+              </div>
+            </div>
+            <div class="form-hint">Estes textos entram em toda proposta gerada. O que é específico de um orçamento continua na aba "Novo Orçamento".</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function salvarDocumento() {
+    const val = id => (document.getElementById(id)?.value || '').trim();
+    const lista = id => val(id).split('\n').map(s => s.trim()).filter(Boolean);
+    const pares = (id, k1, k2) => lista(id).map(l => {
+      const i = l.indexOf('|');
+      return i < 0 ? { [k1]: l.trim(), [k2]: '' } : { [k1]: l.slice(0, i).trim(), [k2]: l.slice(i + 1).trim() };
+    }).filter(x => x[k1]);
+
+    const documento = {
+      modelo: val('docModelo') || 'completa',
+      validadeDias: parseInt(val('docValidade'), 10) || 15,
+      capaFoto: val('docCapa'),
+      blocos: {
+        apresentacao: !!document.getElementById('docBlApres')?.checked,
+        diferenciais: !!document.getElementById('docBlDif')?.checked,
+        aceite: !!document.getElementById('docBlAceite')?.checked,
+      },
+      empresa: {
+        razao: val('docRazao'), cnpj: val('docCnpj'), endereco: val('docEndereco'),
+        cidade: val('docCidade'), uf: val('docUf'), cep: val('docCep'),
+        telefone: val('docTel'), email: val('docEmail'), site: val('docSite'),
+        crea: val('docCrea'), tagline: val('docTagline'),
+      },
+      engenheiro: {
+        nome: val('docEngNome'), titulo1: val('docEngT1'), titulo2: val('docEngT2'),
+        titulo3: val('docEngT3'), crea: val('docEngCrea'),
+      },
+      numeros: pares('docNumeros', 'n', 'l'),
+      sobre: val('docSobre'),
+      clientesRef: lista('docClientes'),
+      diferenciais: pares('docDif', 'titulo', 'texto'),
+      incluiPadrao: lista('docInclui'),
+      naoIncluso: lista('docNaoInclui'),
+    };
+    DB.saveConfig({ documento });
+    Toast.success('Modelo do documento salvo. Vale para as próximas propostas.');
+  }
+
+  function verModelo() {
+    if (typeof PropostaDoc === 'undefined') { Toast.error('Documento indisponível'); return; }
+    PropostaDoc.abrirModelo(document.getElementById('docModelo')?.value || '');
+  }
+
   function addNew() {
     if (_tab === 'catalogo') openFormServico();
     else { _tab = 'catalogo'; render(); openFormServico(); }
@@ -695,6 +882,7 @@ const Orcamento = (() => {
     adicionar, remover, limpar, gerar,
     setCliente, setLead, setTitulo, setObs, setDesconto, setQtd, setValor, setBusca,
     popularModelos, openFormServico, salvarServico, duplicarServico, deleteServico,
+    salvarDocumento, verModelo,
     MODELOS,
   };
 })();

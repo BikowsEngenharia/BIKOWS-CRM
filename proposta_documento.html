@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposta Comercial · Bikows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DOCUMENTO DE PROPOSTA · BIKOWS
+   Identidade oficial (Manual de Marca v1.0 / 2026)
+   Marinho 35% · Base 40% · Azul 15% · Apoio 7% · Vermelho 3%
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --marinho: #0B1B33;
+  --marinho-2: #112a4d;
+  --azul:    #1D4F8C;
+  --vermelho:#C42B2B;
+  --bordo:   #8B2222;
+  --apoio:   #DCE6F2;
+  --base:    #F4F5F7;
+  --tinta:   #1A2433;
+  --texto:   #4B5563;
+  --borda:   #D8DADE;
+  --tit: 'Archivo', 'Arial Black', Arial, sans-serif;
+  --txt: 'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
+  --mono:'IBM Plex Mono', 'Consolas', monospace;
+}
+
+body {
+  font-family: var(--txt);
+  font-size: 9.6pt;
+  line-height: 1.5;
+  color: var(--tinta);
+  background: #9aa3ae;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ---------- Barra de ferramentas (só na tela) ---------- */
+.bar {
+  position: fixed; inset: 0 0 auto 0; z-index: 999;
+  background: var(--marinho); color: #fff;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  font-family: var(--txt);
+}
+.bar-title { flex: 1; font-size: 12.5px; font-weight: 600; letter-spacing: .2px; }
+.bar-title b { font-family: var(--mono); font-weight: 600; }
+.bar label { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; opacity: .75; }
+.bar select {
+  font-family: var(--txt); font-size: 12px; padding: 6px 8px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1); color: #fff;
+}
+.bar select option { color: #111; }
+.bar button {
+  padding: 7px 16px; border: none; border-radius: 4px; cursor: pointer;
+  font-family: var(--txt); font-size: 12px; font-weight: 600;
+}
+.b-print { background: var(--vermelho); color: #fff; }
+.b-ghost { background: rgba(255,255,255,.14); color: #fff; }
+.bar-space { height: 46px; }
+.aviso {
+  max-width: 210mm; margin: 0 auto 10mm; padding: 10mm;
+  background: #fff; border-left: 4px solid var(--vermelho);
+  font-size: 11pt;
+}
+
+/* ---------- Página A4 ---------- */
+.pg {
+  width: 210mm; min-height: 297mm;
+  background: #fff;
+  margin: 0 auto 10mm;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+.pg-body { flex: 1; padding: 7mm 14mm 4mm; }
+.pg-body.tight { padding-top: 5mm; }
+
+/* ---------- Cabeçalho ---------- */
+.hd {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 8mm; padding: 9mm 14mm 3mm;
+}
+.hd-logo img { height: 13mm; display: block; }
+.hd-logo .fb { font-family: var(--tit); font-weight: 900; font-size: 16pt; color: var(--marinho); letter-spacing: -.5px; }
+.hd-meta { text-align: right; font-family: var(--mono); font-size: 7pt; color: var(--texto); line-height: 1.7; }
+.hd-meta b { color: var(--marinho); font-weight: 600; }
+.hd-rule { height: 2px; background: var(--marinho); margin: 0 14mm; position: relative; }
+.hd-rule::after { content: ''; position: absolute; left: 0; top: 0; width: 18mm; height: 2px; background: var(--azul); }
+
+/* ---------- Rodapé ---------- */
+.ft {
+  margin-top: auto; padding: 3mm 14mm 6mm;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 6mm;
+  border-top: 1px solid var(--borda);
+  font-size: 6.8pt; color: var(--texto); line-height: 1.6;
+}
+.ft-l b { color: var(--marinho); font-weight: 600; }
+.ft-c { font-family: var(--mono); font-size: 7pt; color: var(--marinho); white-space: nowrap; }
+.ft-r { text-align: right; font-family: var(--mono); font-size: 6.8pt; }
+
+/* ---------- Títulos e divisores ---------- */
+.eyebrow {
+  font-family: var(--mono); font-size: 7.6pt; font-weight: 600;
+  letter-spacing: 1.6px; text-transform: uppercase; color: var(--azul);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 2mm;
+}
+.eyebrow::before { content: ''; width: 7px; height: 7px; background: var(--bordo); flex: 0 0 auto; }
+h1.doc {
+  font-family: var(--tit); font-weight: 900; font-size: 23pt; line-height: 1.05;
+  color: var(--marinho); text-transform: uppercase; letter-spacing: -.4px;
+}
+h2.sec {
+  font-family: var(--tit); font-weight: 700; font-size: 14pt;
+  color: var(--marinho); letter-spacing: -.2px; margin-bottom: 1mm;
+}
+.cota { position: relative; height: 1px; background: var(--borda); margin: 2.5mm 0 4mm; }
+.cota::before, .cota::after {
+  content: ''; position: absolute; top: -2px; width: 1px; height: 5px; background: var(--azul);
+}
+.cota::before { left: 0; } .cota::after { right: 0; }
+.lead { font-size: 10pt; color: var(--texto); line-height: 1.6; }
+.lead p + p { margin-top: 2.5mm; }
+
+/* ---------- Malha isométrica ---------- */
+.mesh {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    repeating-linear-gradient(60deg,  rgba(255,255,255,.09) 0 1px, transparent 1px 9mm),
+    repeating-linear-gradient(-60deg, rgba(255,255,255,.09) 0 1px, transparent 1px 9mm),
+    repeating-linear-gradient(0deg,   rgba(255,255,255,.05) 0 1px, transparent 1px 9mm);
+}
+
+/* ---------- Capa ---------- */
+.cover {
+  width: 210mm; min-height: 297mm; margin: 0 auto 10mm;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: var(--marinho); color: #fff;
+}
+.cover-photo { position: absolute; inset: 0; background-size: cover; background-position: center; filter: saturate(.88); }
+.cover-veil {
+  position: absolute; inset: 0;
+  background: linear-gradient(170deg, rgba(11,27,51,.93) 0%, rgba(11,27,51,.72) 45%, rgba(11,27,51,.97) 100%);
+}
+.cover-in { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; padding: 14mm 16mm 0; }
+.plaque {
+  background: #fff; padding: 4mm 5mm; border-radius: 1.5mm;
+  display: inline-flex; align-self: flex-start; box-shadow: 0 2mm 6mm rgba(0,0,0,.25);
+}
+.plaque img { height: 15mm; display: block; }
+.plaque .fb { font-family: var(--tit); font-weight: 900; font-size: 20pt; color: var(--marinho); }
+.cover-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8mm; }
+.cover-code { text-align: right; font-family: var(--mono); font-size: 8pt; letter-spacing: 1px; line-height: 1.9; color: rgba(255,255,255,.78); }
+.cover-code b { display: block; font-size: 12pt; color: #fff; font-weight: 600; letter-spacing: .5px; }
+.cover-mid { margin-top: auto; padding-bottom: 6mm; }
+.cover-eyebrow {
+  font-family: var(--mono); font-size: 8.5pt; font-weight: 500;
+  letter-spacing: 2.4px; text-transform: uppercase; color: #9cc0ea;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 5mm;
+}
+.cover-eyebrow::before { content: ''; width: 9px; height: 9px; background: var(--vermelho); flex: 0 0 auto; }
+.cover-h1 {
+  font-family: var(--tit); font-weight: 900; font-size: 36pt; line-height: 1.02;
+  text-transform: uppercase; letter-spacing: -1.2px;
+}
+.cover-h1.sm { font-size: 27pt; }
+.cover-h1.xs { font-size: 21pt; line-height: 1.12; }
+.cover-para { margin-top: 5mm; font-size: 11pt; color: rgba(255,255,255,.82); max-width: 150mm; }
+.cover-cota { height: 1px; background: rgba(255,255,255,.35); margin: 8mm 0 5mm; position: relative; }
+.cover-cota::before, .cover-cota::after { content: ''; position: absolute; top: -3px; width: 1px; height: 7px; background: #9cc0ea; }
+.cover-cota::before { left: 0; } .cover-cota::after { right: 0; }
+.cover-grid { display: flex; gap: 6mm; flex-wrap: wrap; }
+.cover-cell { min-width: 34mm; }
+.cover-cell .k { font-family: var(--mono); font-size: 7pt; letter-spacing: 1.4px; text-transform: uppercase; color: #9cc0ea; }
+.cover-cell .v { font-family: var(--txt); font-size: 10.5pt; font-weight: 600; margin-top: 1mm; }
+.cover-para-cli { display: flex; align-items: center; gap: 4mm; margin-top: 2mm; }
+.cover-cli-logo { background: #fff; padding: 2.5mm 3mm; border-radius: 1mm; }
+.cover-cli-logo img { max-height: 11mm; max-width: 40mm; display: block; }
+.cover-foot {
+  position: relative; z-index: 2;
+  background: rgba(0,0,0,.28); border-top: 1px solid rgba(255,255,255,.14);
+  padding: 5mm 16mm; display: flex; justify-content: space-between; gap: 6mm;
+  font-family: var(--mono); font-size: 7.4pt; letter-spacing: .6px; color: rgba(255,255,255,.82);
+}
+
+/* ---------- Faixa de topo (modelo enxuto) ---------- */
+.band {
+  background: var(--marinho); color: #fff; position: relative; overflow: hidden;
+  padding: 8mm 14mm 7mm;
+}
+.band-in { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 8mm; }
+.band .plaque { box-shadow: none; }
+.band .plaque img { height: 12mm; }
+.band-r { text-align: right; }
+.band-r .k { font-family: var(--mono); font-size: 7.4pt; letter-spacing: 1.6px; text-transform: uppercase; color: #9cc0ea; }
+.band-r .v { font-family: var(--tit); font-weight: 900; font-size: 15pt; letter-spacing: -.3px; }
+.band-title { position: relative; z-index: 2; margin-top: 6mm; font-family: var(--tit); font-weight: 900; font-size: 19pt; text-transform: uppercase; line-height: 1.08; letter-spacing: -.5px; }
+
+/* ---------- Blocos de dados ---------- */
+.dual { display: flex; gap: 5mm; }
+.dual > * { flex: 1 1 0; min-width: 0; }
+.box {
+  background: var(--base); border: 1px solid var(--borda); border-left: 3px solid var(--azul);
+  padding: 4mm 5mm;
+}
+.box.marinho { background: var(--marinho); border-color: var(--marinho); border-left-color: var(--vermelho); color: #fff; }
+.box h3 {
+  font-family: var(--mono); font-size: 7.4pt; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--azul); margin-bottom: 2.5mm;
+}
+.box.marinho h3 { color: #9cc0ea; }
+.kv { display: flex; gap: 3mm; font-size: 8.8pt; padding: .9mm 0; }
+.kv dt { flex: 0 0 26mm; color: var(--texto); }
+.kv dd { flex: 1; font-weight: 600; min-width: 0; word-wrap: break-word; }
+.box.marinho .kv dt { color: #9cc0ea; }
+.chips { display: flex; flex-wrap: wrap; gap: 2mm; margin-top: 1mm; }
+.chip {
+  font-family: var(--mono); font-size: 7.2pt; font-weight: 500; letter-spacing: .8px;
+  background: var(--apoio); color: var(--marinho); padding: 1.2mm 2.4mm; border-radius: 1mm;
+}
+.chip.ouro { background: var(--marinho); color: #fff; }
+
+/* ---------- Escopo ---------- */
+.scope { margin-bottom: 4.5mm; break-inside: avoid; }
+.scope-h {
+  display: flex; align-items: baseline; gap: 3mm;
+  border-bottom: 1px solid var(--apoio); padding-bottom: 1.5mm; margin-bottom: 2mm;
+}
+.scope-n { font-family: var(--mono); font-size: 8.5pt; font-weight: 600; color: var(--azul); }
+.scope-t { font-family: var(--tit); font-weight: 700; font-size: 10.5pt; color: var(--marinho); text-transform: uppercase; letter-spacing: .2px; }
+.scope ul { list-style: none; }
+.scope li { position: relative; padding-left: 5mm; font-size: 9.2pt; color: var(--texto); margin-bottom: 1.2mm; }
+.scope li::before { content: ''; position: absolute; left: 0; top: 1.5mm; width: 2.2mm; height: 2.2mm; background: var(--bordo); }
+
+/* ---------- Índice de etapas ---------- */
+.etapas { display: flex; flex-direction: column; gap: 1.5mm; }
+.etapa {
+  display: flex; align-items: baseline; gap: 3mm;
+  background: var(--base); border-left: 2px solid var(--azul); padding: 2mm 3mm;
+}
+.etapa-n { font-family: var(--mono); font-size: 8pt; font-weight: 600; color: var(--azul); }
+.etapa-t { flex: 1; font-family: var(--tit); font-weight: 600; font-size: 9.6pt; color: var(--marinho); }
+.etapa-q { font-family: var(--mono); font-size: 7pt; color: var(--texto); }
+
+/* ---------- Tabelas ---------- */
+table.t { width: 100%; border-collapse: collapse; font-size: 8.8pt; }
+table.t thead th {
+  background: var(--marinho); color: #fff; text-align: left;
+  font-family: var(--mono); font-size: 7.2pt; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase;
+  padding: 2.4mm 3mm;
+}
+table.t tbody td { padding: 2.4mm 3mm; border-bottom: 1px solid var(--borda); vertical-align: top; }
+table.t tbody tr:nth-child(even) td { background: #fafbfc; }
+table.t .num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+table.t .ctr { font-family: var(--mono); text-align: center; color: var(--azul); font-weight: 600; }
+table.t .it-desc { font-weight: 600; color: var(--marinho); }
+table.t .it-sub { font-size: 7.8pt; color: var(--texto); font-weight: 400; }
+table.t tfoot td {
+  padding: 2.2mm 3mm; font-size: 9pt; border-bottom: 1px solid var(--borda);
+  background: var(--base);
+}
+table.t tfoot .lbl { text-align: right; color: var(--texto); }
+table.t tfoot .num { font-weight: 600; color: var(--marinho); }
+
+/* ---------- Investimento ---------- */
+.total {
+  margin-top: 5mm; background: var(--marinho); color: #fff;
+  border-left: 4mm solid var(--vermelho); padding: 5mm 6mm;
+  display: flex; align-items: center; justify-content: space-between; gap: 6mm;
+}
+.total .k { font-family: var(--mono); font-size: 7.6pt; letter-spacing: 1.8px; text-transform: uppercase; color: #9cc0ea; }
+.total .v { font-family: var(--tit); font-weight: 900; font-size: 25pt; line-height: 1.1; letter-spacing: -.8px; }
+.total .ext { font-size: 8.4pt; color: rgba(255,255,255,.8); font-style: italic; margin-top: .5mm; }
+.total .val { text-align: right; font-family: var(--mono); font-size: 7.6pt; letter-spacing: 1.2px; color: #fff; line-height: 1.8; }
+.total .val b { display: block; font-size: 11pt; font-weight: 600; }
+.incl { display: flex; gap: 5mm; margin-top: 5mm; }
+.incl > div { flex: 1 1 0; min-width: 0; }
+.incl ul { list-style: none; }
+.incl li { position: relative; padding-left: 5mm; font-size: 8.6pt; color: var(--texto); margin-bottom: 1.1mm; }
+.incl li::before { content: ''; position: absolute; left: 0; top: 1.4mm; width: 2.2mm; height: 2.2mm; background: var(--bordo); }
+.incl .nao li::before { background: var(--borda); }
+
+/* ---------- Condições / aceite ---------- */
+.cond { display: flex; gap: 5mm; margin-bottom: 5mm; }
+.cond > div { flex: 1 1 0; }
+.cond .v { font-size: 10pt; font-weight: 600; color: var(--marinho); white-space: pre-line; }
+.stamp-val {
+  display: inline-block; font-family: var(--mono); font-size: 8.6pt; font-weight: 600;
+  letter-spacing: 1.4px; text-transform: uppercase;
+  border: 1.5px solid var(--bordo); color: var(--bordo); padding: 2mm 4mm; border-radius: 1mm;
+}
+.sign { display: flex; gap: 10mm; margin-top: 10mm; }
+.sign > div { flex: 1 1 0; text-align: center; }
+.sign-line { border-top: 1.2px solid var(--marinho); padding-top: 2mm; }
+.sign-name { font-family: var(--tit); font-weight: 700; font-size: 10pt; color: var(--marinho); text-transform: uppercase; }
+.sign-role { font-family: var(--mono); font-size: 7.2pt; color: var(--texto); line-height: 1.7; letter-spacing: .4px; margin-top: 1mm; }
+.aceite { margin-top: 8mm; background: var(--apoio); padding: 5mm; border-left: 3px solid var(--bordo); }
+.aceite h3 { font-family: var(--tit); font-weight: 700; font-size: 10.5pt; color: var(--marinho); text-transform: uppercase; margin-bottom: 1.5mm; }
+.aceite p { font-size: 8.6pt; color: var(--texto); }
+.aceite-fields { display: flex; gap: 6mm; margin-top: 7mm; }
+.aceite-fields > div { flex: 1 1 0; border-top: 1px solid var(--marinho); padding-top: 1.5mm; font-family: var(--mono); font-size: 7pt; letter-spacing: 1px; text-transform: uppercase; color: var(--texto); }
+
+/* ---------- Apresentação ---------- */
+.nums { display: flex; gap: 3mm; margin: 4mm 0 6mm; }
+.nums > div { flex: 1 1 0; background: var(--marinho); color: #fff; padding: 4mm 3mm; text-align: center; }
+.nums .n { font-family: var(--tit); font-weight: 900; font-size: 17pt; line-height: 1; }
+.nums .l { font-family: var(--mono); font-size: 6.6pt; letter-spacing: 1px; text-transform: uppercase; color: #9cc0ea; margin-top: 1.5mm; line-height: 1.5; }
+.logos { display: flex; flex-wrap: wrap; gap: 2.5mm; }
+.logos > div {
+  flex: 1 1 28%; min-width: 32mm; background: var(--base); border: 1px solid var(--borda);
+  height: 15mm; display: flex; align-items: center; justify-content: center; padding: 2mm;
+  font-family: var(--tit); font-weight: 700; font-size: 9pt; color: var(--marinho); text-align: center;
+}
+.logos img { max-height: 11mm; max-width: 100%; object-fit: contain; }
+.dif { break-inside: avoid; margin-bottom: 3.4mm; padding-left: 5mm; position: relative; }
+.dif::before { content: ''; position: absolute; left: 0; top: 1.6mm; width: 2.4mm; height: 2.4mm; background: var(--bordo); }
+.dif b { font-family: var(--tit); font-weight: 700; font-size: 9.6pt; color: var(--marinho); }
+.dif span { font-size: 9pt; color: var(--texto); }
+.quote {
+  margin-top: 5mm; padding: 4mm 5mm; background: var(--base); border-left: 3px solid var(--azul);
+  font-family: var(--tit); font-weight: 600; font-size: 11pt; color: var(--marinho); font-style: italic;
+}
+.uf { font-family: var(--mono); font-size: 7.4pt; letter-spacing: 1.4px; color: var(--texto); margin-top: 3mm; text-transform: uppercase; }
+
+/* ---------- Impressão ---------- */
+@page { size: A4; margin: 0; }
+@media print {
+  body { background: #fff; }
+  .bar, .bar-space { display: none !important; }
+  .pg, .cover { margin: 0 !important; box-shadow: none !important; page-break-after: always; break-after: page; }
+  .pg:last-child, .cover:last-child { page-break-after: auto; break-after: auto; }
+}
+@media screen {
+  .pg, .cover { box-shadow: 0 3mm 10mm rgba(0,0,0,.25); }
+}
+@media screen and (max-width: 214mm) {
+  .pg, .cover { width: 100%; min-height: 0; }
+
+  /* a barra deixa de flutuar: no celular ela cobriria o topo da capa */
+  .bar { position: static; flex-wrap: wrap; row-gap: 8px; }
+  .bar-title { flex: 1 1 100%; }
+  .bar-space { display: none; }
+
+  .hd, .ft, .pg-body { padding-left: 7mm; padding-right: 7mm; }
+  .pg-body { overflow-x: auto; }
+  .hd-rule { margin-left: 7mm; margin-right: 7mm; }
+
+  .cover-in { padding: 9mm 7mm 0; }
+  .cover-foot { padding: 4mm 7mm; flex-direction: column; gap: 1.5mm; }
+  .cover-h1 { font-size: 22pt; letter-spacing: -.4px; }
+  .cover-h1.sm { font-size: 19pt; }
+  .cover-h1.xs { font-size: 16pt; }
+  .cover-para { font-size: 10pt; }
+  .cover-grid { gap: 4mm; }
+
+  /* colunas lado a lado passam a empilhar */
+  .dual, .incl, .cond, .sign, .nums, .total, .aceite-fields { flex-direction: column; }
+  .dual, .incl, .cond, .sign, .nums { gap: 3mm; }
+  .total { align-items: flex-start; gap: 3mm; }
+  .total .val { text-align: left; }
+  .sign { margin-top: 8mm; gap: 8mm; }
+  .aceite-fields { gap: 7mm; }
+
+  .band-in { flex-direction: column; align-items: flex-start; gap: 4mm; }
+  .band-r { text-align: left; }
+
+  table.t { font-size: 8pt; table-layout: auto; }
+  table.t th, table.t td { width: auto !important; }
+  table.t thead th, table.t tbody td, table.t tfoot td { padding: 2mm; }
+  .kv { flex-wrap: wrap; }
+  .kv dt { flex: 0 0 24mm; }
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h3 class="bar-title" id="barTitle">Proposta Bikows</h3>
+  <label for="selModelo">Modelo</label>
+  <select id="selModelo" onchange="Doc.trocarModelo(this.value)">
+    <option value="completa">Completa (institucional)</option>
+    <option value="tecnica">Técnica (direta ao escopo)</option>
+    <option value="enxuta">Enxuta (orçamento de 1 página)</option>
+  </select>
+  <button class="b-ghost" onclick="Doc.togglePhoto()" id="btnFoto" title="Alternar a capa entre foto e fundo gráfico">Capa gráfica</button>
+  <button class="b-print" onclick="window.print()">Imprimir / Salvar PDF</button>
+  <button class="b-ghost" onclick="window.close()">Fechar</button>
+</div>
+<div class="bar-space"></div>
+
+<div id="doc"></div>
+
+<script>
+/* ============================================================
+   DOCUMENTO DE PROPOSTA · renderizador
+   Lê o payload gravado pelo CRM em localStorage:
+     crm_proposta_doc    (formato novo, completo)
+     crm_proposta_gerada (formato antigo do gerador, compatível)
+   ============================================================ */
+const Doc = (() => {
+
+  const EMPRESA_PADRAO = {
+    razao: 'BIKOWS EMPREENDIMENTOS LTDA',
+    cnpj: '47.121.646/0001-90',
+    endereco: 'Rua João Paulo II, 39/49/588, Centro',
+    cidade: 'Ribeirão do Pinhal', uf: 'PR', cep: '86.490-000',
+    email: 'contato@bikows.com.br', telefone: '(43) 98426-2950',
+    site: 'www.bikows.com.br', crea: 'CREA 83340',
+    tagline: 'Soluções em Engenharia Industrial NR-12 e NR-13',
+  };
+
+  const ENG_PADRAO = {
+    nome: 'MARCOS DA SILVA ISRAEL',
+    titulo1: 'ENGENHEIRO MECÂNICO',
+    titulo2: 'ENG. SEGURANÇA DO TRABALHO',
+    titulo3: 'ENG. AUTOMAÇÃO INDUSTRIAL',
+    crea: 'CREA PR-206397/D',
+  };
+
+  const NUMEROS_PADRAO = [
+    { n: '+1.000', l: 'Máquinas adequadas à NR-12' },
+    { n: '+500',   l: 'Inspeções NR-13 realizadas' },
+    { n: '+2.000', l: 'Laudos técnicos emitidos' },
+    { n: '1999',   l: 'Atuando desde' },
+  ];
+
+  const SOBRE_PADRAO = 'A Bikows atua em engenharia industrial com foco em conformidade normativa, '
+    + 'segurança de máquinas e desenvolvimento de equipamentos. Cada entrega é conduzida por responsável '
+    + 'técnico habilitado, com ART registrada no CREA e documentação completa para auditoria.';
+
+  const DIFERENCIAIS_PADRAO = [
+    { titulo: 'Responsabilidade técnica formal', texto: 'Todo serviço sai com ART registrada no CREA e laudo assinado por engenheiro habilitado, com validade perante auditoria e fiscalização.' },
+    { titulo: 'Especialização normativa', texto: 'Domínio prático de NR-10, NR-12, NR-13, NR-35, ABNT NBR ISO 12100 e ISO 13849-1 aplicado à realidade da operação, não apenas ao texto da norma.' },
+    { titulo: 'Engenharia de ponta a ponta', texto: 'Da apreciação de risco ao projeto, fabricação, instalação e comissionamento, com um único responsável técnico do início ao fim.' },
+    { titulo: 'Experiência em interdição e autuação', texto: 'Atuação em casos envolvendo fiscalização do trabalho e Ministério Público, com histórico de regularização e liberação de máquinas.' },
+    { titulo: 'Documentação pronta para auditoria', texto: 'Relatórios, prontuários e memoriais organizados no padrão que o auditor espera encontrar, evitando retrabalho e nova notificação.' },
+    { titulo: 'Atendimento multiestado', texto: 'Operação em Paraná, São Paulo, Santa Catarina, Minas Gerais, Mato Grosso do Sul e Rio Grande do Sul.' },
+  ];
+
+  const INCLUI_PADRAO = [
+    'Deslocamento e despesas de campo da equipe técnica',
+    'Emissão de laudo técnico de conformidade',
+    'Emissão da ART perante o CREA-PR',
+    'Nota fiscal de serviços de engenharia',
+  ];
+
+  const MESES = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+
+  let D = {};
+  let _modelo = 'completa';
+  let _usarFoto = true;
+
+  /* ---------------- utilidades ---------------- */
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const money = v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v) || 0);
+  const nf = v => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0);
+  function dataBR(iso) {
+    if (!iso) return '';
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso);
+  }
+  function mesAno(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})/);
+    const d = m ? { mes: MESES[+m[2] - 1], ano: m[1] } : { mes: MESES[new Date().getMonth()], ano: String(new Date().getFullYear()) };
+    return d;
+  }
+  function somaDias(iso, dias) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    d.setDate(d.getDate() + (parseInt(dias, 10) || 0));
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  const naoVazio = a => (Array.isArray(a) ? a.filter(x => x != null && String(x).trim() !== '') : []);
+  const paras = t => String(t || '').split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+
+  /* Normas citadas no texto da proposta (NR-12, NBR ISO 12100 ...) */
+  function normas(d) {
+    const alvo = [d.titulo, d.objetivo, d.servicoSolicitado,
+      ...(d.escopoSections || []).map(s => s.titulo + ' ' + (s.itens || []).join(' ')),
+      ...(d.itens || []).map(i => i.desc)].join(' ');
+    const achados = [];
+    const push = v => { if (v && !achados.includes(v)) achados.push(v); };
+    (alvo.match(/NR[\s-]?0?(\d{1,2})/gi) || []).forEach(m => push('NR-' + m.replace(/\D/g, '').replace(/^0+/, '')));
+    (alvo.match(/NBR\s?(ISO\s?)?\d{3,5}(-\d)?/gi) || []).forEach(m => push('ABNT ' + m.toUpperCase().replace(/\s+/g, ' ')));
+    (alvo.match(/ISO\s?1(2100|3849)(-\d)?/gi) || []).forEach(m => {
+      const n = (String(m).match(/\d{4,5}/) || [''])[0];
+      if (n) push('ISO ' + n);
+    });
+    // "ABNT NBR ISO 12100" já cobre "ISO 12100": fica só a referência completa
+    const numeros = achados.map(a => a.replace(/\D/g, ''));
+    return achados
+      .filter((a, i) => !achados.some((b, j) => j !== i && b.length > a.length && numeros[j] === numeros[i]))
+      .slice(0, 8);
+  }
+
+  /* ---------------- normalização do payload ---------------- */
+  function carregar() {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem('crm_proposta_doc') || 'null'); } catch (e) { raw = null; }
+    if (!raw || !raw.numero) {
+      try {
+        const velho = JSON.parse(localStorage.getItem('crm_proposta_gerada') || 'null');
+        if (velho && velho.numero) raw = velho;
+      } catch (e) { /* ignora */ }
+    }
+    if (/[?&]demo=1/.test(location.search)) raw = demo();
+    return raw ? normalizar(raw) : null;
+  }
+
+  function normalizar(r) {
+    const d = Object.assign({}, r);
+    d.empresa = Object.assign({}, EMPRESA_PADRAO, r.empresa || {});
+    d.engenheiro = Object.assign({}, ENG_PADRAO, r.engenheiro || {});
+    d.cliente = Object.assign({}, r.cliente || {});
+    d.titulo = r.titulo || r.servicoSolicitado || 'Proposta técnico-comercial';
+    d.servicoSolicitado = r.servicoSolicitado || r.titulo || '';
+    d.itens = naoVazio(r.itens).map(i => ({
+      desc: i.desc || i.nome || '',
+      detalhe: i.detalhe || '',
+      qtd: Number(i.qtd) || 1,
+      unidade: i.unidade || '',
+      valorUnit: Number(i.valorUnit) || 0,
+      total: Number(i.total) || (Number(i.qtd) || 1) * (Number(i.valorUnit) || 0),
+    }));
+    d.escopoSections = naoVazio(r.escopoSections || r.escopoGerado).map(s => ({
+      titulo: s.titulo || '', itens: naoVazio(s.itens),
+    })).filter(s => s.titulo || s.itens.length);
+    d.cronograma = naoVazio(r.cronograma || r.cronogramaGerado).map((e, i) => ({
+      num: e.num || String(i + 1), nome: e.nome || '', descricao: e.descricao || '', prazo: e.prazo || '',
+    })).filter(e => e.nome);
+    d.incluiNoValor = naoVazio(r.incluiNoValor).length ? naoVazio(r.incluiNoValor) : INCLUI_PADRAO.slice();
+    d.naoIncluso = naoVazio(r.naoIncluso);
+    d.diferenciais = (r.diferenciais && r.diferenciais.length ? r.diferenciais : DIFERENCIAIS_PADRAO)
+      .filter(x => x && (x.titulo || x.texto));
+    d.numeros = (r.numeros && r.numeros.length ? r.numeros : NUMEROS_PADRAO);
+    d.sobre = r.sobre || SOBRE_PADRAO;
+    d.clientesRef = naoVazio(r.clientesRef);
+    d.subtotal = Number(r.subtotal) || d.itens.reduce((s, i) => s + i.total, 0) || Number(r.valor) || 0;
+    d.descontoPerc = Number(r.descontoPerc) || 0;
+    d.descontoValor = Number(r.descontoValor) || Math.round(d.subtotal * d.descontoPerc) / 100;
+    d.valor = Number(r.valor) || (d.subtotal - d.descontoValor);
+    d.validadeDias = parseInt(r.validadeDias || r.validade, 10) || 15;
+    d.validadeData = r.validadeData || somaDias(r.data, d.validadeDias);
+    d.modelo = r.modelo || 'completa';
+    d.capa = r.capa || {};
+    d.blocos = Object.assign({ apresentacao: true, diferenciais: true, aceite: true, escopo: true, cronograma: true }, r.blocos || {});
+    if (r.incluirDiferenciais === false) d.blocos.diferenciais = false;
+    if (r.incluirClientesPage === false) d.blocos.apresentacao = false;
+    return d;
+  }
+
+  /* ---------------- peças reutilizáveis ---------------- */
+  function logoImg(h) {
+    return `<img src="img/logo-bikows.png" alt="Bikows" style="height:${h}"
+      onerror="this.outerHTML='<span class=&quot;fb&quot;>BIKOWS</span>'">`;
+  }
+  function cabecalho(pag) {
+    const e = D.empresa;
+    return `<div class="hd">
+      <div class="hd-logo">${logoImg('13mm')}</div>
+      <div class="hd-meta">
+        <b>PROPOSTA ${esc(D.numero || '')}</b>
+        <span>FL. <span class="fl"></span></span><br>
+        ${esc(dataBR(D.data))} · REV. ${esc(D.revisao || '00')}
+      </div>
+    </div>
+    <div class="hd-rule"></div>`;
+  }
+  function rodape() {
+    const e = D.empresa;
+    return `<div class="ft">
+      <div class="ft-l"><b>${esc(e.razao)}</b><br>CNPJ ${esc(e.cnpj)} · ${esc(e.crea)}<br>${esc(e.endereco)}, ${esc(e.cidade)}/${esc(e.uf)}</div>
+      <div class="ft-c">FL. <span class="fl"></span></div>
+      <div class="ft-r">${esc(e.site)}<br>${esc(e.telefone)}<br>${esc(e.email)}</div>
+    </div>`;
+  }
+  function pagina(conteudo, cls) {
+    return `<section class="pg${cls ? ' ' + cls : ''}">${cabecalho()}<div class="pg-body">${conteudo}</div>${rodape()}</section>`;
+  }
+  const tituloSecao = (eyebrow, titulo) =>
+    `<div class="eyebrow">${esc(eyebrow)}</div><h2 class="sec">${esc(titulo)}</h2><div class="cota"></div>`;
+
+  /* ---------------- 1. capa ---------------- */
+  function capa() {
+    const foto = _usarFoto ? (D.capa.fotoUrl || '') : '';
+    const t = String(D.titulo || '');
+    const cls = t.length > 76 ? ' xs' : t.length > 42 ? ' sm' : '';
+    const cliLogo = D.cliente.logoUrl
+      ? `<div class="cover-cli-logo"><img src="${esc(D.cliente.logoUrl)}" alt="" onerror="this.parentNode.remove()"></div>` : '';
+    const ma = mesAno(D.data);
+    return `<section class="cover">
+      ${foto ? `<div class="cover-photo" style="background-image:url('${esc(foto)}')"></div>` : ''}
+      <div class="cover-veil"></div>
+      <div class="mesh"></div>
+      <div class="cover-in">
+        <div class="cover-top">
+          <div class="plaque">${logoImg('15mm')}</div>
+          <div class="cover-code">
+            <b>${esc(D.numero || '')}</b>
+            ${esc(ma.mes)} ${esc(ma.ano)}
+          </div>
+        </div>
+        <div class="cover-mid">
+          <div class="cover-eyebrow">Proposta técnico-comercial</div>
+          <div class="cover-h1${cls}">${esc(D.titulo)}</div>
+          <div class="cover-para-cli">
+            ${cliLogo}
+            <div class="cover-para">Preparada para <strong>${esc(D.cliente.nome || '')}</strong>${D.cliente.cidade ? ' · ' + esc(D.cliente.cidade) + (D.cliente.uf ? '/' + esc(D.cliente.uf) : '') : ''}</div>
+          </div>
+          <div class="cover-cota"></div>
+          <div class="cover-grid">
+            <div class="cover-cell"><div class="k">Emissão</div><div class="v">${esc(dataBR(D.data) || '')}</div></div>
+            <div class="cover-cell"><div class="k">Validade</div><div class="v">${esc(D.validadeDias)} dias${D.validadeData ? ' (até ' + esc(dataBR(D.validadeData)) + ')' : ''}</div></div>
+            <div class="cover-cell"><div class="k">Responsável técnico</div><div class="v">${esc(D.engenheiro.crea)}</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cover-foot">
+        <span>${esc(D.empresa.site)}</span>
+        <span>${esc(D.empresa.telefone)}</span>
+        <span>${esc(D.empresa.email)}</span>
+      </div>
+    </section>`;
+  }
+
+  /* ---------------- 2. apresentação ---------------- */
+  function apresentacao() {
+    const nums = D.numeros.slice(0, 4).map(x =>
+      `<div><div class="n">${esc(x.n)}</div><div class="l">${esc(x.l)}</div></div>`).join('');
+    const logos = D.clientesRef.length
+      ? `<div class="eyebrow" style="margin-top:6mm">Empresas atendidas</div>
+         <div class="logos">${D.clientesRef.slice(0, 12).map(c => `<div>${esc(c)}</div>`).join('')}</div>` : '';
+    return pagina(`
+      ${tituloSecao('Quem executa', 'A Bikows')}
+      <div class="lead">${paras(D.sobre).map(p => `<p>${esc(p)}</p>`).join('')}</div>
+      <div class="nums">${nums}</div>
+      <div class="dual">
+        <div class="box">
+          <h3>Identificação</h3>
+          <dl class="kv"><dt>Razão social</dt><dd>${esc(D.empresa.razao)}</dd></dl>
+          <dl class="kv"><dt>CNPJ</dt><dd>${esc(D.empresa.cnpj)}</dd></dl>
+          <dl class="kv"><dt>Registro</dt><dd>${esc(D.empresa.crea)}</dd></dl>
+          <dl class="kv"><dt>Endereço</dt><dd>${esc(D.empresa.endereco)}, ${esc(D.empresa.cidade)}/${esc(D.empresa.uf)}, CEP ${esc(D.empresa.cep)}</dd></dl>
+        </div>
+        <div class="box">
+          <h3>Contato</h3>
+          <dl class="kv"><dt>Telefone</dt><dd>${esc(D.empresa.telefone)}</dd></dl>
+          <dl class="kv"><dt>E-mail</dt><dd>${esc(D.empresa.email)}</dd></dl>
+          <dl class="kv"><dt>Site</dt><dd>${esc(D.empresa.site)}</dd></dl>
+          <dl class="kv"><dt>Resp. técnico</dt><dd>${esc(D.engenheiro.nome)}</dd></dl>
+        </div>
+      </div>
+      ${logos}
+      <div class="quote">${esc(D.empresa.tagline)}</div>
+      <div class="uf">Paraná · São Paulo · Santa Catarina · Minas Gerais · Mato Grosso do Sul · Rio Grande do Sul</div>
+    `);
+  }
+
+  /* ---------------- 3. identificação + objetivo ---------------- */
+  function identificacao() {
+    const c = D.cliente;
+    const linha = (k, v) => v ? `<dl class="kv"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></dl>` : '';
+    const ns = normas(D);
+    const objetivo = D.objetivo
+      ? paras(D.objetivo).map(p => `<p>${esc(p)}</p>`).join('')
+      : `<p>Apresentamos o escopo técnico, o cronograma de execução e o investimento referentes a ${esc(D.titulo)}.</p>`;
+    return pagina(`
+      ${tituloSecao('Proposta ' + (D.numero || ''), 'Identificação')}
+      <div class="dual">
+        <div class="box">
+          <h3>Cliente</h3>
+          ${linha('Razão social', c.nome)}
+          ${linha('CNPJ', c.cnpj)}
+          ${linha('Contato', c.contato)}
+          ${linha('Departamento', c.departamento)}
+          ${linha('Unidade', c.unidadeDest)}
+          ${linha('Endereço', c.endereco)}
+          ${linha('Cidade', [c.cidade, c.uf].filter(Boolean).join('/'))}
+          ${linha('E-mail', c.email)}
+          ${linha('Telefone', c.telefone)}
+        </div>
+        <div class="box marinho">
+          <h3>Dados da proposta</h3>
+          ${linha('Número', D.numero)}
+          ${linha('Emissão', dataBR(D.data))}
+          ${linha('Validade', D.validadeDias + ' dias' + (D.validadeData ? ' (até ' + dataBR(D.validadeData) + ')' : ''))}
+          ${linha('Prazo', D.prazoEntrega)}
+          ${linha('Investimento', money(D.valor))}
+          ${linha('Resp. técnico', D.engenheiro.nome)}
+        </div>
+      </div>
+
+      <div style="margin-top:6mm">
+        ${tituloSecao('Serviço solicitado', D.servicoSolicitado || D.titulo)}
+        <div class="lead">${objetivo}</div>
+        ${D.introTexto ? `<div class="lead" style="margin-top:3mm"><p>${esc(D.introTexto)}</p></div>` : ''}
+        ${ns.length ? `<div class="eyebrow" style="margin-top:5mm">Referências normativas</div>
+          <div class="chips">${ns.map(n => `<span class="chip">${esc(n)}</span>`).join('')}</div>` : ''}
+      </div>
+
+      ${D.escopoSections.length ? `<div style="margin-top:6mm">
+        ${tituloSecao('Como o serviço se organiza', 'Etapas da execução')}
+        <div class="etapas">
+          ${D.escopoSections.map((sec, i) => `<div class="etapa">
+            <span class="etapa-n">${String(i + 1).padStart(2, '0')}</span>
+            <span class="etapa-t">${esc(sec.titulo)}</span>
+            <span class="etapa-q">${(sec.itens || []).length} item${(sec.itens || []).length === 1 ? '' : 's'}</span>
+          </div>`).join('')}
+        </div>
+        <div class="lead" style="margin-top:3mm;font-size:8.6pt">O detalhamento de cada etapa está nas páginas de escopo técnico.</div>
+      </div>` : ''}
+    `);
+  }
+
+  /* ---------------- 4. escopo (paginado por medida real) ---------------- */
+  function escopoBlocos() {
+    return D.escopoSections.map((s, i) => `
+      <div class="scope">
+        <div class="scope-h">
+          <span class="scope-n">${String(i + 1).padStart(2, '0')}</span>
+          <span class="scope-t">${esc(s.titulo)}</span>
+        </div>
+        <ul>${s.itens.map(it => `<li>${esc(it)}</li>`).join('')}</ul>
+      </div>`);
+  }
+
+  /* ---------------- 5. cronograma ---------------- */
+  function cronograma() {
+    const dias = D.cronograma.reduce((s, e) => s + (parseInt(String(e.prazo).replace(/\D/g, ''), 10) || 0), 0);
+    const fluxo = D.cronograma.map(e => e.nome);
+    return pagina(`
+      ${tituloSecao('Execução', 'Cronograma')}
+      <table class="t">
+        <thead><tr>
+          <th style="width:9mm">#</th><th style="width:48mm">Etapa</th><th>Descrição</th><th style="width:20mm">Prazo</th>
+        </tr></thead>
+        <tbody>
+          ${D.cronograma.map(e => `<tr>
+            <td class="ctr">${esc(e.num)}</td>
+            <td class="it-desc">${esc(e.nome)}</td>
+            <td>${esc(e.descricao)}</td>
+            <td class="num">${esc(e.prazo)}</td>
+          </tr>`).join('')}
+        </tbody>
+        ${dias ? `<tfoot><tr><td colspan="3" class="lbl">Soma das etapas</td><td class="num">${dias} dias</td></tr></tfoot>` : ''}
+      </table>
+      ${fluxo.length ? `<div class="eyebrow" style="margin-top:6mm">Sequência de execução</div>
+        <div class="chips">${fluxo.map((f, i) => `<span class="chip${i === 0 ? ' ouro' : ''}">${String(i + 1).padStart(2, '0')} ${esc(f)}</span>`).join('')}</div>` : ''}
+      ${D.prazoEntrega ? `<div class="box" style="margin-top:6mm"><h3>Prazo de entrega</h3><div class="cond"><div class="v">${esc(D.prazoEntrega)}</div></div></div>` : ''}
+      ${D.cronogramaObs ? `<div class="lead" style="margin-top:4mm"><p>${esc(D.cronogramaObs)}</p></div>` : ''}
+    `);
+  }
+
+  /* ---------------- 6. investimento ---------------- */
+  function tabelaItens() {
+    if (!D.itens.length) {
+      return `<table class="t">
+        <thead><tr><th>Descrição do serviço</th><th style="width:34mm">Valor</th></tr></thead>
+        <tbody><tr><td class="it-desc">${esc(D.titulo)}</td><td class="num">${money(D.valor)}</td></tr></tbody>
+      </table>`;
+    }
+    const temDesconto = D.descontoValor > 0;
+    return `<table class="t">
+      <thead><tr>
+        <th style="width:9mm">#</th><th>Descrição do serviço</th>
+        <th style="width:14mm">Qtd</th><th style="width:22mm">Unidade</th>
+        <th style="width:28mm">Valor unit.</th><th style="width:30mm">Total</th>
+      </tr></thead>
+      <tbody>
+        ${D.itens.map((i, idx) => `<tr>
+          <td class="ctr">${String(idx + 1).padStart(2, '0')}</td>
+          <td class="it-desc">${esc(i.desc)}${i.detalhe ? `<div class="it-sub">${esc(i.detalhe)}</div>` : ''}</td>
+          <td class="ctr">${esc(i.qtd)}</td>
+          <td style="font-size:8.2pt;color:var(--texto)">${esc(i.unidade)}</td>
+          <td class="num">${nf(i.valorUnit)}</td>
+          <td class="num">${nf(i.total)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="5" class="lbl">Subtotal</td><td class="num">${money(D.subtotal)}</td></tr>
+        ${temDesconto ? `<tr><td colspan="5" class="lbl">Desconto comercial ${D.descontoPerc ? '(' + String(D.descontoPerc).replace('.', ',') + '%)' : ''}</td><td class="num">- ${money(D.descontoValor)}</td></tr>` : ''}
+      </tfoot>
+    </table>`;
+  }
+
+  function blocoTotal() {
+    return `<div class="total">
+      <div>
+        <div class="k">Investimento total</div>
+        <div class="v">${money(D.valor)}</div>
+        ${D.valorPorExtenso ? `<div class="ext">(${esc(D.valorPorExtenso)})</div>` : ''}
+      </div>
+      <div class="val">Validade<b>${esc(D.validadeDias)} dias</b>${D.validadeData ? esc(dataBR(D.validadeData)) : ''}</div>
+    </div>`;
+  }
+
+  function blocoInclui() {
+    return `<div class="incl">
+      <div>
+        <div class="eyebrow">O valor contempla</div>
+        <ul>${D.incluiNoValor.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+      </div>
+      ${D.naoIncluso.length ? `<div class="nao">
+        <div class="eyebrow">Não contempla</div>
+        <ul>${D.naoIncluso.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+      </div>` : ''}
+    </div>`;
+  }
+
+  function conteudoInvestimento() {
+    return `
+      ${tituloSecao('Proposta ' + (D.numero || ''), 'Investimento')}
+      ${tabelaItens()}
+      ${blocoTotal()}
+      ${blocoInclui()}
+    `;
+  }
+
+  /* ---------------- 7. condições + aceite ---------------- */
+  function assinatura() {
+    const e = D.engenheiro;
+    return `<div class="sign">
+      <div><div class="sign-line">
+        <div class="sign-name">${esc(e.nome)}</div>
+        <div class="sign-role">${esc(e.titulo1)}${e.titulo2 ? '<br>' + esc(e.titulo2) : ''}${e.titulo3 ? '<br>' + esc(e.titulo3) : ''}<br>${esc(e.crea)}</div>
+      </div></div>
+      <div><div class="sign-line">
+        <div class="sign-name">${esc(D.cliente.nome || 'Cliente')}</div>
+        <div class="sign-role">Assinatura e carimbo<br>Data: ___/___/______</div>
+      </div></div>
+    </div>`;
+  }
+
+  function conteudoCondicoes() {
+    return `
+      ${tituloSecao('Fechamento', 'Condições comerciais')}
+      <div class="cond">
+        <div class="box">
+          <h3>Prazo de entrega</h3>
+          <div class="v">${esc(D.prazoEntrega || 'A combinar')}</div>
+        </div>
+        <div class="box">
+          <h3>Forma de pagamento</h3>
+          <div class="v">${esc(D.formaPagamento || 'A combinar')}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:5mm"><span class="stamp-val">Validade da proposta: ${esc(D.validadeDias)} dias</span></div>
+      ${D.observacoes ? `<div class="lead" style="margin-top:3mm"><p>${esc(D.observacoes)}</p></div>` : ''}
+      ${assinatura()}
+      ${D.blocos.aceite ? `<div class="aceite">
+        <h3>Aceite da proposta</h3>
+        <p>Ao assinar, o cliente declara ciência e concordância com o escopo, o prazo, a forma de pagamento e o valor desta proposta ${esc(D.numero || '')}. O aceite autoriza o início dos trabalhos conforme o cronograma apresentado.</p>
+        <div class="aceite-fields">
+          <div>Nome / cargo</div><div>CPF ou CNPJ</div><div>Data</div>
+        </div>
+      </div>` : ''}
+    `;
+  }
+
+  /* ---------------- 8. diferenciais ---------------- */
+  function diferenciais() {
+    return pagina(`
+      ${tituloSecao('Por que a Bikows', 'Diferenciais técnicos')}
+      ${D.diferenciais.map(d => `<div class="dif"><b>${esc(d.titulo)}.</b> <span>${esc(d.texto)}</span></div>`).join('')}
+      <div class="quote">${esc(D.empresa.tagline)}</div>
+    `);
+  }
+
+  /* ---------------- modelo enxuto (1 página) ---------------- */
+  function enxuta() {
+    const c = D.cliente;
+    const linha = (k, v) => v ? `<dl class="kv"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></dl>` : '';
+    const ns = normas(D);
+    return `<section class="pg">
+      <div class="band">
+        <div class="mesh"></div>
+        <div class="band-in">
+          <div class="plaque">${logoImg('12mm')}</div>
+          <div class="band-r">
+            <div class="k">Proposta nº</div>
+            <div class="v">${esc(D.numero || '')}</div>
+            <div class="k" style="margin-top:1.5mm">${esc(dataBR(D.data))} · validade ${esc(D.validadeDias)} dias</div>
+          </div>
+        </div>
+        <div class="band-title">${esc(D.titulo)}</div>
+      </div>
+      <div class="pg-body tight">
+        <div class="dual">
+          <div class="box">
+            <h3>Cliente</h3>
+            ${linha('Razão social', c.nome)}
+            ${linha('CNPJ', c.cnpj)}
+            ${linha('Contato', c.contato || c.email)}
+            ${linha('Cidade', [c.cidade, c.uf].filter(Boolean).join('/'))}
+          </div>
+          <div class="box">
+            <h3>Execução</h3>
+            ${linha('Prazo', D.prazoEntrega || 'A combinar')}
+            ${linha('Pagamento', D.formaPagamento || 'A combinar')}
+            ${linha('Resp. técnico', D.engenheiro.nome)}
+            ${linha('Registro', D.engenheiro.crea)}
+          </div>
+        </div>
+        ${ns.length ? `<div class="chips" style="margin-top:3mm">${ns.map(n => `<span class="chip">${esc(n)}</span>`).join('')}</div>` : ''}
+        <div style="margin-top:5mm">${tituloSecao('Objeto', 'Serviços e investimento')}</div>
+        ${tabelaItens()}
+        ${blocoTotal()}
+        ${blocoInclui()}
+        ${D.escopoSections.length ? `<div class="eyebrow" style="margin-top:5mm">Escopo resumido</div>
+          <div class="chips">${D.escopoSections.map(s => `<span class="chip">${esc(s.titulo)}</span>`).join('')}</div>` : ''}
+        ${assinatura()}
+      </div>
+      ${rodape()}
+    </section>`;
+  }
+
+  /* ---------------- montagem ---------------- */
+  function render() {
+    const alvo = document.getElementById('doc');
+    if (!D) {
+      alvo.innerHTML = `<div class="aviso"><strong>Nenhuma proposta carregada.</strong><br>
+        Gere o documento pelo CRM (Propostas ou Orçamento Rápido). Para ver o modelo em branco,
+        abra esta página com <code>?demo=1</code> no fim do endereço.</div>`;
+      return;
+    }
+    let html = '';
+    if (_modelo === 'enxuta') {
+      html = enxuta();
+    } else {
+      html += capa();
+      if (_modelo === 'completa' && D.blocos.apresentacao) html += apresentacao();
+      html += identificacao();
+      if (D.blocos.escopo && D.escopoSections.length) html += '<!--ESCOPO-->';
+      if (D.blocos.cronograma && D.cronograma.length) html += cronograma();
+      const inv = conteudoInvestimento();
+      const cond = conteudoCondicoes();
+      // junta numa folha só quando couber, para não sobrar meia página vazia
+      if (cabeNaFolha(inv + cond)) html += pagina(inv + cond);
+      else { html += pagina(inv); html += pagina(cond); }
+      if (_modelo === 'completa' && D.blocos.diferenciais) html += diferenciais();
+    }
+    alvo.innerHTML = html;
+    if (html.indexOf('<!--ESCOPO-->') >= 0) montarEscopo(alvo);
+    numerarFolhas();
+    titulo();
+  }
+
+  /* Altura útil do corpo de uma folha e largura de medição, em pixels.
+     Sem layout (ambiente de teste) devolve zero e quem chama usa o plano B. */
+  let _met = null;
+  function metricas() {
+    if (_met) return _met;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = pagina('');
+    const folha = wrap.firstElementChild;
+    folha.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden';
+    document.body.appendChild(folha);
+    const corpo = folha.querySelector('.pg-body');
+    const cs = window.getComputedStyle(corpo);
+    const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    _met = {
+      disponivel: (corpo.clientHeight || 0) - (padV || 0),
+      largura: (corpo.clientWidth || 0) - (padH || 0),
+    };
+    folha.remove();
+    if (!(_met.disponivel > 100) || !(_met.largura > 100)) _met = { disponivel: 0, largura: 0 };
+    return _met;
+  }
+
+  function cabeNaFolha(html) {
+    const m = metricas();
+    if (!m.disponivel) return false;
+    const medidor = document.createElement('div');
+    medidor.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden;width:' + m.largura + 'px';
+    medidor.innerHTML = html;
+    document.body.appendChild(medidor);
+    const h = medidor.offsetHeight;
+    medidor.remove();
+    return h <= m.disponivel - 40;
+  }
+
+  /* Insere as páginas de escopo no lugar do marcador, quebrando pela altura
+     real de cada bloco. Sem layout (ambiente de teste), cai para 4 seções por
+     página. */
+  function montarEscopo(alvo) {
+    const marcador = [...alvo.childNodes].find(n => n.nodeType === 8 && n.nodeValue === 'ESCOPO');
+    if (!marcador) return;
+    const blocos = escopoBlocos();
+    const cabecalhoSecao = tituloSecao('O que será executado', 'Escopo técnico');
+    const paginas = [];
+    let atual = [];
+
+    const novaPagina = conteudo => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = pagina(cabecalhoSecao + conteudo);
+      return wrap.firstElementChild;
+    };
+
+    // Página de prova: dá a altura útil do corpo em pixels
+    const prova = novaPagina('');
+    prova.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden';
+    document.body.appendChild(prova);
+    const corpo = prova.querySelector('.pg-body');
+    const estilo = window.getComputedStyle(corpo);
+    const padding = parseFloat(estilo.paddingTop) + parseFloat(estilo.paddingBottom);
+    const disponivel = corpo.clientHeight - padding;
+    const larguraUtil = corpo.clientWidth - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
+
+    if (disponivel > 100 && larguraUtil > 100) {
+      const medidor = document.createElement('div');
+      medidor.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden;width:'
+        + larguraUtil + 'px';
+      document.body.appendChild(medidor);
+      const alturaDe = html => { medidor.innerHTML = html; return medidor.offsetHeight + 17; };
+      const alturaCabecalho = alturaDe(cabecalhoSecao);
+      let usado = alturaCabecalho;
+      blocos.forEach(b => {
+        const h = alturaDe(b);
+        if (atual.length && usado + h > disponivel) {
+          paginas.push(atual.join(''));
+          atual = [];
+          usado = alturaCabecalho;
+        }
+        atual.push(b);
+        usado += h;
+      });
+      medidor.remove();
+    } else {
+      blocos.forEach((b, i) => {
+        atual.push(b);
+        if (atual.length === 4 && i < blocos.length - 1) { paginas.push(atual.join('')); atual = []; }
+      });
+    }
+    if (atual.length) paginas.push(atual.join(''));
+    prova.remove();
+
+    paginas.forEach(pg => marcador.parentNode.insertBefore(novaPagina(pg), marcador));
+    marcador.remove();
+  }
+
+  function numerarFolhas() {
+    const folhas = document.querySelectorAll('.pg, .cover');
+    const total = folhas.length;
+    folhas.forEach((f, i) => {
+      f.querySelectorAll('.fl').forEach(el => {
+        el.textContent = String(i + 1).padStart(2, '0') + '/' + String(total).padStart(2, '0');
+      });
+    });
+  }
+
+  function titulo() {
+    const t = `Proposta ${D.numero || ''} · ${D.cliente.nome || 'Cliente'}`;
+    document.title = t;
+    const bt = document.getElementById('barTitle');
+    if (bt) bt.innerHTML = `<b>${esc(D.numero || '')}</b> · ${esc(D.cliente.nome || 'Cliente')} · ${esc(D.titulo)}`;
+  }
+
+  /* ---------------- controles ---------------- */
+  function trocarModelo(m) {
+    _modelo = m;
+    render();
+    try { localStorage.setItem('crm_proposta_doc_modelo', m); } catch (e) { /* ignora */ }
+    window.scrollTo(0, 0);
+  }
+  function togglePhoto() {
+    _usarFoto = !_usarFoto;
+    const b = document.getElementById('btnFoto');
+    if (b) b.textContent = _usarFoto ? 'Capa gráfica' : 'Capa com foto';
+    render();
+  }
+
+  /* ---------------- demonstração ---------------- */
+  function demo() {
+    const hoje = new Date();
+    const p = n => String(n).padStart(2, '0');
+    const iso = `${hoje.getFullYear()}-${p(hoje.getMonth() + 1)}-${p(hoje.getDate())}`;
+    return {
+      numero: 'BIK-' + hoje.getFullYear() + '-CTR-000',
+      data: iso, validadeDias: 15,
+      titulo: 'Adequação de prensas à NR-12 e laudo de conformidade',
+      servicoSolicitado: 'Adequação à NR-12 de 3 prensas excêntricas e emissão de laudo técnico',
+      objetivo: 'Adequar as máquinas às exigências da NR-12 e da ABNT NBR ISO 12100, eliminando as não conformidades apontadas em auditoria interna.\n\nAo final, a planta recebe laudo técnico de conformidade e ART registrada no CREA, com documentação pronta para apresentação à fiscalização.',
+      cliente: { nome: 'INDÚSTRIA MODELO LTDA', cnpj: '00.000.000/0001-00', contato: 'Eng. responsável pela manutenção', cidade: 'Londrina', uf: 'PR', email: 'manutencao@exemplo.com.br' },
+      itens: [
+        { desc: 'Adequação NR-12 de prensa excêntrica', qtd: 3, unidade: 'máquina', valorUnit: 13000, total: 39000 },
+        { desc: 'Laudo técnico de conformidade com ART', qtd: 1, unidade: 'laudo', valorUnit: 1900, total: 1900 },
+      ],
+      descontoPerc: 5,
+      prazoEntrega: '45 dias', formaPagamento: '40% na assinatura\n30% na entrega do projeto\n30% na liberação técnica',
+      escopoSections: [
+        { titulo: 'Análise de risco', itens: ['Levantamento das máquinas e equipamentos', 'Identificação de perigos e riscos por zona e fase de vida', 'Avaliação conforme ABNT NBR ISO 12100', 'Registro fotográfico técnico'] },
+        { titulo: 'Projeto de adequação', itens: ['Projeto das proteções fixas e móveis', 'Especificação dos componentes de segurança', 'Definição da categoria conforme ISO 13849-1', 'Memorial descritivo e cálculos'] },
+        { titulo: 'Execução', itens: ['Fabricação e instalação dos sistemas de segurança', 'Configuração dos dispositivos eletroeletrônicos', 'Testes funcionais e de segurança'] },
+        { titulo: 'Documentação final', itens: ['Laudo técnico de conformidade NR-12', 'ART perante o CREA', 'Programa de manutenção preventiva', 'Treinamento operacional'] },
+      ],
+      cronograma: [
+        { num: '1', nome: 'Levantamento em campo', descricao: 'Inventário, registro fotográfico e identificação de perigos.', prazo: '3 dias' },
+        { num: '2', nome: 'Apreciação de risco', descricao: 'Estimativa de risco e definição da categoria de segurança.', prazo: '7 dias' },
+        { num: '3', nome: 'Projeto e fabricação', descricao: 'Projeto das proteções, fabricação e pintura.', prazo: '25 dias' },
+        { num: '4', nome: 'Instalação e comissionamento', descricao: 'Montagem, testes funcionais e liberação técnica.', prazo: '10 dias' },
+      ],
+      incluiNoValor: ['Deslocamento e despesas de campo', 'Matéria prima e componentes de segurança', 'Garantia de 12 meses', 'Laudo técnico e ART no CREA'],
+      naoIncluso: ['Obras civis', 'Fornecimento de energia e ar comprimido no local'],
+      clientesRef: ['Continental', 'MESSER', 'EBSERH', 'Eletran', 'FCM Mancais', 'Prosmaq'],
+      observacoes: 'Documento de demonstração. Os valores não representam um orçamento real.',
+    };
+  }
+
+  /* ---------------- partida ---------------- */
+  function init() {
+    D = carregar();
+    if (D) {
+      _modelo = D.modelo || 'completa';
+      _usarFoto = !!(D.capa && D.capa.fotoUrl);
+      const sel = document.getElementById('selModelo');
+      if (sel) sel.value = _modelo;
+      const b = document.getElementById('btnFoto');
+      if (b) b.textContent = _usarFoto ? 'Capa gráfica' : 'Capa com foto';
+    }
+    render();
+  }
+
+  return { init, render, trocarModelo, togglePhoto, _normalizar: normalizar, get dados() { return D; } };
+})();
+
+Doc.init();
+</script>
+</body>
+</html>

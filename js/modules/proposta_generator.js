@@ -621,7 +621,10 @@ enerlab</textarea>
 
     Modal.close();
     Toast.success('Proposta gerada e registrada no CRM!');
-    setTimeout(() => window.open('proposta_viewer.html', '_blank'), 400);
+    setTimeout(() => {
+      if (typeof PropostaDoc !== 'undefined') PropostaDoc.abrirDados(data);
+      else window.open('proposta_viewer.html', '_blank');
+    }, 400);
   }
 
   /* ================================================================
@@ -771,6 +774,7 @@ enerlab</textarea>
 
     localStorage.setItem('crm_proposta_gerada', JSON.stringify(data));
 
+    if (typeof PropostaDoc !== 'undefined') { PropostaDoc.abrirDados(data); return; }
     const printWin = window.open('proposta_viewer.html', '_blank');
     if (!printWin) {
       Toast.error('Pop-up bloqueado. Permita pop-ups e tente novamente.');

@@ -26,3 +26,6 @@ npm-debug.log*
 
 # Claude Code (configurações locais do editor)
 .claude/
+
+# Auditorias e notas internas: NÃO publicar (o repositório é público via GitHub Pages)
+docs/

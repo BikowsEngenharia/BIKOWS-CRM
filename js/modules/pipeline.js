@@ -188,6 +188,7 @@ const Pipeline = (() => {
 
   let _periodo = 'mes'; // 'mes' | 'trimestre' | 'semestre' | 'ano' | 'tudo'
   let _pipelineTab = 'ativo'; // 'ativo' | 'historico'
+  let _vista = null;          // null = decide pela largura da tela · 'kanban' | 'foco'
 
   function _filtrarPorPeriodo(lista, campo) {
     if (_periodo === 'tudo') return lista;
@@ -433,13 +434,20 @@ const Pipeline = (() => {
         </div>
       </div>
 
-      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;width:fit-content">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
         <button onclick="Pipeline.setPipelineTab('ativo')" style="padding:8px 20px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='ativo'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">📋 Pipeline Ativo</button>
         <button onclick="Pipeline.setPipelineTab('historico')" style="padding:8px 20px;border:none;border-left:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='historico'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">🗂 Histórico <span style="font-size:11px;opacity:.85">(${leads.filter(l=>['fechado_ganho','executado','fechado_perdido'].includes(l.status)).length})</span></button>
       </div>
+        <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
+          <button onclick="Pipeline.setVista('kanban')" title="Quadro com colunas (arrastar e soltar)" style="padding:8px 14px;border:none;font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='kanban'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">▦ Quadro</button>
+          <button onclick="Pipeline.setVista('foco')" title="Lista vertical com ação direta (indicado para celular)" style="padding:8px 14px;border:none;border-left:1px solid var(--border);font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='foco'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">☰ Foco</button>
+        </div>
+      </div>
 
-      ${_pipelineTab === 'ativo' ? _renderProbabilidadeLegend() : ''}
+      ${_pipelineTab === 'ativo' && _vistaAtual() === 'kanban' ? _renderProbabilidadeLegend() : ''}
 
+      ${_vistaAtual() === 'foco' ? renderFoco(leads) : `
       <div class="kanban-wrap">
         <div class="kanban-board" id="kanbanBoard">
           ${(() => {
@@ -450,11 +458,11 @@ const Pipeline = (() => {
             return stagesToShow.map(s => renderColumn(s, leads)).join('');
           })()}
         </div>
-      </div>
+      </div>`}
     `;
     // Note: kanban board shows all leads regardless of period (period only affects KPI summary)
 
-    initDragDrop();
+    if (_vistaAtual() === 'kanban') initDragDrop();
     // Auto-check desabilitado: use o botão 🧊 Frios para verificar manualmente
     // setTimeout(() => _checkLeadsFrios(), 300);
   }
@@ -468,8 +476,11 @@ const Pipeline = (() => {
     </div>`;
   }
 
-  function renderColumn(stage, allLeads) {
-    let leads = allLeads.filter(l => l.status === stage.key);
+  /* Filtros do topo da tela — fonte única para as duas vistas (quadro e foco).
+     Antes este bloco vivia solto dentro de renderColumn; a vista Foco precisa
+     do mesmo recorte, e duplicar a regra significaria uma vista mostrando
+     lead que a outra esconde. */
+  function _aplicarFiltros(leads) {
     if (_filter.responsavel) leads = leads.filter(l => l.responsavel === _filter.responsavel);
     if (_filter.origemLead) leads = leads.filter(l => l.origemLead === _filter.origemLead);
     if (_filter.segmento) leads = leads.filter(l => l.segmento === _filter.segmento);
@@ -477,6 +488,100 @@ const Pipeline = (() => {
     if (_filter.valorMax) leads = leads.filter(l => (l.valorEstimado||0) <= Number(_filter.valorMax));
     if (_filter.dataEntradaDe) leads = leads.filter(l => (l.dataEntrada||l.createdAt||'').slice(0,10) >= _filter.dataEntradaDe);
     if (_filter.dataEntradaAte) leads = leads.filter(l => (l.dataEntrada||l.createdAt||'').slice(0,10) <= _filter.dataEntradaAte);
+    return leads;
+  }
+
+  /* ---- Vista Foco ---------------------------------------------------------
+     No quadro o funil tem 6 colunas e cada cartão carrega 8 botões de 11px:
+     no celular isso virava rolagem horizontal e toque errado. Aqui cada lead
+     é uma faixa vertical com os quatro caminhos que se usam em campo
+     (WhatsApp, ligar, registrar contato, avançar etapa) e alvo de toque
+     grande. É a vista padrão em tela de até 760px; trocar vale pela sessão.
+     ---------------------------------------------------------------------- */
+  function _vistaAtual() {
+    if (_vista) return _vista;
+    return window.innerWidth <= 760 ? 'foco' : 'kanban';
+  }
+
+  function setVista(v) { _vista = (v === 'foco' || v === 'kanban') ? v : null; render(); }
+
+  function renderFoco(allLeads) {
+    const TERMINAL = ['fechado_ganho','executado','fechado_perdido'];
+    const stages = _pipelineTab === 'ativo'
+      ? STAGES.filter(s => !TERMINAL.includes(s.key))
+      : STAGES.filter(s => TERMINAL.includes(s.key));
+
+    const blocos = stages.map(stage => {
+      const leads = _aplicarFiltros(allLeads.filter(l => l.status === stage.key))
+        .sort((a, b) => {
+          // próxima ação mais antiga primeiro; lead sem data vai para o fim
+          const da = a.dataProximaAcao || '9999-12-31';
+          const db = b.dataProximaAcao || '9999-12-31';
+          if (da !== db) return da.localeCompare(db);
+          return (b.valorEstimado || 0) - (a.valorEstimado || 0);
+        });
+      if (!leads.length) return '';
+      const total = Utils.sum(leads, 'valorEstimado');
+      return `
+        <div class="foco-bloco" style="--fc:${stage.color}">
+          <div class="foco-bloco-head">
+            <div class="foco-bloco-tit">${stage.label}
+              <span class="badge badge-gray" style="margin-left:4px">${leads.length}</span>
+            </div>
+            <div class="foco-bloco-val">${total > 0 ? Utils.formatCurrency(total) : ''}</div>
+          </div>
+          ${leads.map(l => _focoCard(l, stage)).join('')}
+          <button class="foco-add" onclick="Pipeline.openForm(null,'${stage.key}')">+ Lead nesta etapa</button>
+        </div>`;
+    }).join('');
+
+    if (!blocos) {
+      return `<div class="card"><div class="card-body"><div class="empty-state">
+        <div class="empty-icon">💼</div>
+        <div class="empty-title">Nenhum lead nesta visão</div>
+        <div class="empty-sub">Ajuste os filtros do topo ou cadastre um lead com o botão + Novo Lead.</div>
+      </div></div></div>`;
+    }
+    return blocos;
+  }
+
+  function _focoCard(lead, stage) {
+    const client = DB.get('clientes', lead.clienteId);
+    const empresa = client ? (client.razaoSocial || client.nome || lead.empresa || '') : (lead.empresa || '');
+    const fone = lead.contato || client?.telefone || '';
+    const alerta = Utils.dateAlert(lead.dataProximaAcao, '');
+    const frio = _isLeadFrio(lead);
+    const idx = _ORDEM_MOVER.indexOf(lead.status);
+    const podeAvancar = idx !== -1 && idx < _ORDEM_MOVER.length - 1;
+    const proxima = podeAvancar ? (Utils.LEAD_STATUS[_ORDEM_MOVER[idx + 1]]?.label || '') : '';
+
+    const sub = [
+      empresa ? '🏢 ' + Utils.escHtml(empresa) : '',
+      lead.dataProximaAcao
+        ? '📅 ' + Utils.formatDate(lead.dataProximaAcao)
+        : '<span style="color:var(--warning)">sem próxima ação</span>',
+      lead.proximaAcao ? '➜ ' + Utils.escHtml(Utils.truncate(lead.proximaAcao, 40)) : '',
+    ].filter(Boolean).join(' · ');
+
+    return `
+      <div class="foco-card">
+        <div class="foco-card-top">
+          <div class="foco-card-tit">${frio ? '🧊 ' : ''}${Utils.escHtml(lead.titulo || empresa || '(sem título)')}</div>
+          <div class="foco-card-val">${Utils.formatCurrency(lead.valorEstimado)}</div>
+        </div>
+        <div class="foco-card-sub">${sub} ${alerta}</div>
+        <div class="foco-card-acts">
+          ${fone ? `<button class="btn btn-sm btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escJs(fone)}')" title="WhatsApp">💬 WhatsApp</button>
+            <a class="btn btn-sm btn-secondary" href="tel:${Utils.escHtml(String(fone).replace(/\D/g, ''))}" title="Ligar">📞</a>` : ''}
+          ${typeof Hoje !== 'undefined' ? `<button class="btn btn-sm btn-primary" onclick="Hoje.registrarContato('${lead.id}')" title="Registrar o que foi conversado e marcar o próximo passo">Registrar</button>` : ''}
+          ${podeAvancar ? `<button class="btn btn-sm btn-secondary" onclick="Pipeline.moverEtapa('${lead.id}',1)" title="Avançar para ${Utils.escHtml(proxima)}">▶ Avançar</button>` : ''}
+          <button class="btn btn-sm btn-secondary" onclick="Pipeline.viewLead('${lead.id}')">Abrir</button>
+        </div>
+      </div>`;
+  }
+
+  function renderColumn(stage, allLeads) {
+    let leads = _aplicarFiltros(allLeads.filter(l => l.status === stage.key));
     const total = Utils.sum(leads, 'valorEstimado');
     const ponderado = leads.reduce((s,l) => s + (l.valorEstimado||0) * (stage.prob/100), 0);
 
@@ -1903,7 +2008,7 @@ const Pipeline = (() => {
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
     criarPropostaLead, abrirContratoLead, _fecharSemProposta,
     relatorioOrigem, filtrarLicitacoes,
-    setFilter, clearFilters, setPeriodo, setPipelineTab,
+    setFilter, clearFilters, setPeriodo, setPipelineTab, setVista, _vistaAtual,
     drillDown,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
     importCSV, downloadCSVTemplate,

@@ -4,6 +4,7 @@
 const App = (() => {
 
   const PAGES = {
+    hoje:       { title: 'Hoje',            module: Hoje,        addLabel: null },
     dashboard:  { title: 'Dashboard',       module: Dashboard,   addLabel: null },
     pipeline:   { title: 'Pipeline CRM',    module: Pipeline,    addLabel: '+ Novo Lead' },
     clientes:   { title: 'Clientes',        module: Clientes,    addLabel: '+ Novo Cliente' },
@@ -57,7 +58,7 @@ const App = (() => {
     // Dashboard e Relatórios agregam TODAS as entidades — precisam recarregar
     // com qualquer mudança, não só com a da "própria" entidade. Sem isto, um
     // negócio fechado em outra aba/dispositivo não refletia no Dashboard.
-    if (_currentPage === 'dashboard' || _currentPage === 'relatorios') {
+    if (_currentPage === 'hoje' || _currentPage === 'dashboard' || _currentPage === 'relatorios') {
       try { PAGES[_currentPage]?.module?.render?.(); } catch (e) { /* silencioso */ }
     } else if (page && page === _currentPage) {
       try { PAGES[page]?.module?.render?.(); } catch (e) { /* silencioso */ }
@@ -80,7 +81,7 @@ const App = (() => {
       });
     });
 
-    navigate('dashboard');
+    navigate(_paginaInicial());
     updateNotifBadge();
     // Licitações com abertura passada viram 'Expirada' já na abertura do
     // sistema (senão o Dashboard mostrava R$ 80 mi 'em disputa' até
@@ -190,6 +191,20 @@ const App = (() => {
         }
       }
     });
+  }
+
+  /* Tela de abertura. Padrao: 'hoje' (a tela que se resolve com cliques de
+     feito/adiar). Quem preferir abrir no Dashboard muda em Configuracoes e a
+     escolha fica salva no proprio navegador. */
+  function _paginaInicial() {
+    const salva = localStorage.getItem('crm_pagina_inicial');
+    return salva && PAGES[salva] ? salva : 'hoje';
+  }
+
+  function setPaginaInicial(page) {
+    if (!PAGES[page]) return;
+    localStorage.setItem('crm_pagina_inicial', page);
+    Toast.success('Abertura do sistema definida para "' + PAGES[page].title + '".');
   }
 
   function navigate(page) {
@@ -947,6 +962,12 @@ const App = (() => {
     Modal.open({
       title: '⚡ Captura Rápida',
       body: `
+        ${typeof Captura !== 'undefined' ? Captura.campoHtml() : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin:14px 0 12px">
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+          <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;font-weight:700">ou preencha o formulário</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">
           ${[
             { id:'qc-lead',   icon:'💼', label:'Lead',       color:'#1a56db' },
@@ -966,7 +987,12 @@ const App = (() => {
       saveLabel: '⚡ Salvar rápido',
       saveCb: () => _saveQuickCapture(),
     });
-    setTimeout(() => _renderQcForm('qc-lead'), 50);
+    setTimeout(() => {
+      _renderQcForm('qc-lead');
+      // o formulário abaixo tem autofocus próprio; o cursor pertence ao campo
+      // de uma linha, que é o caminho rápido
+      document.getElementById('capLinha')?.focus();
+    }, 50);
   }
 
   function _renderQcForm(tipo) {
@@ -1133,7 +1159,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, adiarNotif, adiarTodasNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, setPaginaInicial, _paginaInicial, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, adiarNotif, adiarTodasNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

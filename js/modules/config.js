@@ -655,10 +655,10 @@ const Config = (() => {
   // Páginas permitidas por perfil
   const ROLE_PAGES = {
     admin:      null, // null = tudo
-    comercial:  ['dashboard','pipeline','clientes','contatos','propostas','orcamento','atividades','calendario','relatorios','metas','config','equipamentos','visitas'],
-    tecnico:    ['dashboard','projetos','atividades','clientes','contatos','calendario','relatorios','licitacoes','config','visitas','equipamentos','documentos'],
-    financeiro: ['dashboard','financeiro','relatorios','clientes','contatos','contratos','config'],
-    viewer:     ['dashboard','relatorios'],
+    comercial:  ['hoje','dashboard','pipeline','clientes','contatos','propostas','orcamento','atividades','calendario','relatorios','metas','config','equipamentos','visitas'],
+    tecnico:    ['hoje','dashboard','projetos','atividades','clientes','contatos','calendario','relatorios','licitacoes','config','visitas','equipamentos','documentos'],
+    financeiro: ['hoje','dashboard','financeiro','relatorios','clientes','contatos','contratos','config'],
+    viewer:     ['hoje','dashboard','relatorios'],
   };
 
   function _renderUsuariosPerfis(cfg) {

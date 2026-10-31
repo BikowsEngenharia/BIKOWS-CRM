@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="img/simbolo-bikows.png">
   <link rel="apple-touch-icon" href="img/simbolo-bikows.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/styles.css?v=20261018b">
+  <link rel="stylesheet" href="css/styles.css?v=20261030">
   <!-- Supabase JS SDK — versão fixada para evitar breaking changes -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"
     onerror="document.getElementById('loadingText').innerHTML='Erro ao carregar dependências.<br><button onclick=\'location.reload()\' style=\'margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px\'>🔄 Recarregar</button>'"></script>
@@ -80,7 +80,11 @@
       </button>
     </div>
     <nav class="sidebar-nav" id="sidebarNav">
-      <a class="nav-link active" data-page="dashboard" href="#">
+      <a class="nav-link active" data-page="hoje" href="#">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+        <span>Hoje</span>
+      </a>
+      <a class="nav-link" data-page="dashboard" href="#">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         <span>Dashboard</span>
       </a>
@@ -239,9 +243,9 @@
 <!-- BOTTOM NAVIGATION (mobile only) — 5 atalhos principais -->
 <nav class="bottom-nav" id="bottomNav" aria-label="Navegação principal mobile">
   <div class="bottom-nav-grid">
-    <button class="bottom-nav-item" data-page="dashboard" onclick="App.navigate('dashboard')">
-      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <span>Início</span>
+    <button class="bottom-nav-item" data-page="hoje" onclick="App.navigate('hoje')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+      <span>Hoje</span>
     </button>
     <button class="bottom-nav-item" data-page="pipeline" onclick="App.navigate('pipeline')">
       <svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
@@ -308,8 +312,10 @@
 <script src="js/auth.js?v=20260524b"></script>
 <script src="js/utils.js?v=20261018"></script>
 <script src="js/charts.js?v=20260920"></script>
+<script src="js/modules/hoje.js?v=20261030"></script>
+<script src="js/modules/captura.js?v=20261030"></script>
 <script src="js/modules/dashboard.js?v=20261018b"></script>
-<script src="js/modules/pipeline.js?v=20261018b"></script>
+<script src="js/modules/pipeline.js?v=20261030"></script>
 <script src="js/modules/clientes.js?v=20260920"></script>
 <script src="js/modules/contatos.js?v=20260523"></script>
 <script src="js/modules/projetos.js?v=20261018"></script>
@@ -337,10 +343,10 @@
 <script src="js/modules/contratos.js?v=20261018"></script>
 <script src="js/modules/projeto-financeiro.js?v=20260725"></script>
 <script src="js/modules/relatorios.js?v=20261018b"></script>
-<script src="js/modules/config.js?v=20261018c"></script>
+<script src="js/modules/config.js?v=20261030"></script>
 <script src="js/modules/prospeccao.js?v=20260920"></script>
 <script src="js/modules/documentos.js?v=20260920c"></script>
 <script src="js/notifications.js?v=20261018"></script>
-<script src="js/app.js?v=20261018c"></script>
+<script src="js/app.js?v=20261030"></script>
 </body>
 </html>

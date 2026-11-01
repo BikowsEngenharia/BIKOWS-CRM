@@ -83,6 +83,13 @@ const App = (() => {
 
     navigate(_paginaInicial());
     updateNotifBadge();
+
+    // Estado da rede: checa na abertura, nas mudanças do navegador e a cada
+    // 10s (a fila esvazia em segundo plano, sem evento próprio)
+    atualizarStatusRede();
+    window.addEventListener('online', () => { atualizarStatusRede(); DB.flushSync?.(); });
+    window.addEventListener('offline', atualizarStatusRede);
+    setInterval(atualizarStatusRede, 10000);
     // Licitações com abertura passada viram 'Expirada' já na abertura do
     // sistema (senão o Dashboard mostrava R$ 80 mi 'em disputa' até
     // alguém abrir a aba Licitações)
@@ -251,6 +258,31 @@ const App = (() => {
 
     // Scroll to top
     document.getElementById('pageContent').scrollTop = 0;
+  }
+
+  /* ================================================
+     ESTADO DA REDE
+     Em campo o celular perde sinal o tempo todo. Sem aviso, a pessoa não
+     sabe se o que acabou de salvar chegou na nuvem ou está só neste
+     aparelho. A faixa aparece quando falta sinal ou quando há escrita
+     na fila, e some sozinha quando tudo sincroniza.
+     ================================================ */
+  function atualizarStatusRede() {
+    const el = document.getElementById('statusRede');
+    if (!el) return;
+    const offline = navigator.onLine === false;
+    const pendentes = (typeof DB !== 'undefined' && DB.pendingSync) ? DB.pendingSync() : 0;
+
+    if (!offline && !pendentes) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    if (offline) {
+      el.className = 'status-rede offline';
+      el.innerHTML = `📡 Sem conexão — o que você salvar fica neste aparelho`
+        + (pendentes ? ` · <strong>${pendentes}</strong> aguardando envio` : '');
+    } else {
+      el.className = 'status-rede sincronizando';
+      el.innerHTML = `☁ Enviando <strong>${pendentes}</strong> alteração(ões) para a nuvem…`;
+    }
   }
 
   function addNew() {
@@ -1159,7 +1191,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, setPaginaInicial, _paginaInicial, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, adiarNotif, adiarTodasNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, setPaginaInicial, _paginaInicial, atualizarStatusRede, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, adiarNotif, adiarTodasNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

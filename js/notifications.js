@@ -62,11 +62,29 @@ const Notifications = (() => {
     //  Contratos vencendo já entram pelo sino e pelo _checkAll.)
   }
 
-  /* ---- Service Worker ---- */
+  /* ---- Service Worker ----
+     O caminho vem da própria URL da página, não fixo em '/BIKOWS-CRM/': assim
+     funciona igual no GitHub Pages (que serve sob um subdiretório), em
+     pré-visualização local e em qualquer domínio que o CRM venha a ter. Antes,
+     fora do GitHub Pages o registro dava 404 e o app ficava sem offline e sem
+     notificação, em silêncio. */
   function _registerSW() {
     if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('/BIKOWS-CRM/sw.js', { scope: '/BIKOWS-CRM/' })
-      .then(reg => console.log('[SW] Registrado:', reg.scope))
+    const base = location.pathname.replace(/[^/]*$/, '');   // .../BIKOWS-CRM/
+    navigator.serviceWorker.register(base + 'sw.js', { scope: base })
+      .then(reg => {
+        console.log('[SW] Registrado:', reg.scope);
+        // Versão nova encontrada: assume na hora, sem esperar fechar as abas
+        reg.addEventListener('updatefound', () => {
+          const novo = reg.installing;
+          if (!novo) return;
+          novo.addEventListener('statechange', () => {
+            if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+              novo.postMessage('skip-waiting');
+            }
+          });
+        });
+      })
       .catch(err => console.warn('[SW] Erro:', err));
   }
 

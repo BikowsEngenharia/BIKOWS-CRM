@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="img/simbolo-bikows.png">
   <link rel="apple-touch-icon" href="img/simbolo-bikows.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/styles.css?v=20261030">
+  <link rel="stylesheet" href="css/styles.css?v=20261101">
   <!-- Supabase JS SDK — versão fixada para evitar breaking changes -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"
     onerror="document.getElementById('loadingText').innerHTML='Erro ao carregar dependências.<br><button onclick=\'location.reload()\' style=\'margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px\'>🔄 Recarregar</button>'"></script>
@@ -236,6 +236,7 @@
         <button class="dark-toggle" id="darkToggle" onclick="App.toggleDark()" title="Alternar modo escuro">🌙</button>
       </div>
     </header>
+    <div id="statusRede" class="status-rede" style="display:none"></div>
     <main class="page-content" id="pageContent"></main>
   </div>
 </div>
@@ -308,7 +309,7 @@
 
 <!-- SCRIPTS — v=20260518 para invalidar cache do browser -->
 <script src="js/supabase-client.js?v=20260523"></script>
-<script src="js/db.js?v=20261018c"></script>
+<script src="js/db.js?v=20261101"></script>
 <script src="js/auth.js?v=20260524b"></script>
 <script src="js/utils.js?v=20261018"></script>
 <script src="js/charts.js?v=20260920"></script>
@@ -346,7 +347,7 @@
 <script src="js/modules/config.js?v=20261030"></script>
 <script src="js/modules/prospeccao.js?v=20260920"></script>
 <script src="js/modules/documentos.js?v=20260920c"></script>
-<script src="js/notifications.js?v=20261018"></script>
-<script src="js/app.js?v=20261030"></script>
+<script src="js/notifications.js?v=20261101"></script>
+<script src="js/app.js?v=20261101"></script>
 </body>
 </html>

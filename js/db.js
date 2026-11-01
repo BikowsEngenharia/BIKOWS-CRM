@@ -62,9 +62,39 @@ const DB = (() => {
 
   /* Fila de sincronização: escritas que falharam (conexão fraca, erro no
      Supabase) ficam aqui e são reenviadas a cada 30s. Antes, a falha era
-     silenciosa — o usuário via "criado" mas o dado só existia neste aparelho. */
+     silenciosa — o usuário via "criado" mas o dado só existia neste aparelho.
+
+     A fila é gravada no localStorage a cada mudança porque antes vivia só na
+     memória: quem registrasse uma visita sem sinal e fechasse o aplicativo
+     perdia o registro, já que na carga seguinte o loadAll substitui o cache
+     pelo que veio da nuvem — onde aquele dado nunca chegou. Agora ela é
+     restaurada e reenviada antes de qualquer leitura. */
+  const SYNC_KEY = 'crm_sync_queue';
   const _syncQueue = [];
   let _lastSyncWarn = 0;
+
+  function _persistQueue() {
+    try {
+      if (_syncQueue.length) localStorage.setItem(SYNC_KEY, JSON.stringify(_syncQueue));
+      else localStorage.removeItem(SYNC_KEY);
+    } catch (e) { /* cota estourada: a fila em memória ainda vale para esta sessão */ }
+  }
+
+  function _restoreQueue() {
+    try {
+      const raw = localStorage.getItem(SYNC_KEY);
+      if (!raw) return;
+      const itens = JSON.parse(raw);
+      if (Array.isArray(itens) && itens.length) {
+        _syncQueue.push(...itens);
+        console.info('[DB] fila de sincronização restaurada:', itens.length, 'escrita(s) pendente(s)');
+      }
+    } catch (e) { console.warn('[DB] fila de sincronização ilegível, ignorando:', e); }
+  }
+  _restoreQueue();
+
+  /* Quantas escritas ainda não chegaram à nuvem (a interface mostra isso). */
+  function pendingSync() { return _syncQueue.length; }
 
   function _notifySyncFail() {
     const agora = Date.now();
@@ -77,14 +107,19 @@ const DB = (() => {
 
   async function _flushSyncQueue() {
     if (_syncQueue.length === 0) return;
+    // Sem rede, tentar só re-enfileira tudo e gasta bateria
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     const pendentes = _syncQueue.splice(0, _syncQueue.length);
+    _persistQueue();
     for (const item of pendentes) {
       if (item.op === 'upsert') await _sbUpsert(item.entity, item.record);
       else if (item.op === 'delete') await _sbDelete(item.entity, item.id);
     }
+    _persistQueue();   // o que falhou de novo voltou para a fila
     if (_syncQueue.length === 0 && pendentes.length > 0 && typeof Toast !== 'undefined') {
       Toast.success('☁ Sincronização com a nuvem restabelecida');
     }
+    if (typeof App !== 'undefined' && App.atualizarStatusRede) App.atualizarStatusRede();
   }
   setInterval(_flushSyncQueue, 30000);
   window.addEventListener('online', _flushSyncQueue);
@@ -95,6 +130,7 @@ const DB = (() => {
       if (error) {
         console.warn('[DB] upsert:', table, error.message);
         _syncQueue.push({ op: 'upsert', entity: table, record });
+        _persistQueue();
         _notifySyncFail();
       } else {
         _saveLocalBackup(table); // atualiza backup após escrita bem-sucedida
@@ -102,6 +138,7 @@ const DB = (() => {
     } catch (e) {
       console.warn('[DB] upsert exception:', e);
       _syncQueue.push({ op: 'upsert', entity: table, record });
+      _persistQueue();
       _notifySyncFail();
     }
   }
@@ -112,11 +149,13 @@ const DB = (() => {
       if (error) {
         console.warn('[DB] delete:', table, error.message);
         _syncQueue.push({ op: 'delete', entity: table, id });
+        _persistQueue();
         _notifySyncFail();
       }
     } catch (e) {
       console.warn('[DB] delete exception:', e);
       _syncQueue.push({ op: 'delete', entity: table, id });
+      _persistQueue();
       _notifySyncFail();
     }
   }
@@ -243,6 +282,11 @@ const DB = (() => {
      LOAD ALL — busca Supabase → popula cache
      ==================================================== */
   async function loadAll() {
+    // Primeiro empurra o que ficou pendente de uma sessão anterior sem sinal.
+    // Se a leitura viesse antes, o cache seria substituído pelo estado da
+    // nuvem e o registro feito offline sumiria da tela antes de ser enviado.
+    try { await _flushSyncQueue(); } catch (e) { console.warn('[DB] flush inicial:', e); }
+
     const fetches = ENTITIES.map(async (entity) => {
       try {
         const { data: rows, error } = await _supabase
@@ -614,6 +658,7 @@ const DB = (() => {
 
   return {
     getAll, get, create, update, remove, undoRemove, restoreDeleted, peekLastDeleted,
+    pendingSync, flushSync: _flushSyncQueue,
     entities: () => [...ENTITIES],
     getConfig, saveConfig,
     loadAll, subscribeRealtime, initSampleData,

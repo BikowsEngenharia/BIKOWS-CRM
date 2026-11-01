@@ -124,6 +124,7 @@ const Notifications = (() => {
     items.push(..._checkContasPagar(prefs));
     items.push(..._checkInspecoes(prefs));
     items.push(..._checkARTPendente(prefs));
+    items.push(..._checkAnexosVencendo(prefs));
     items.push(..._checkMarketing(prefs));
     items.push(..._checkCPLTrafico(prefs));
 
@@ -357,6 +358,24 @@ const Notifications = (() => {
         title: '📜 Projeto sem ART registrada',
         body: (p.ordemServico ? p.ordemServico + ' — ' : '') + p.titulo + ' · ' + (Utils.getClientName(p.clienteId) || ''),
       }));
+  }
+
+  /* ---- Anexos com validade (ART, certificado, laudo, contrato) ----
+     É o motivo de o anexo ter campo de validade: avisar antes de vencer,
+     em vez de a pessoa descobrir no dia da fiscalização. */
+  function _checkAnexosVencendo(prefs) {
+    if (typeof Anexos === 'undefined' || !Anexos.vencendo) return [];
+    const ant = prefs.antecedencia?.anexos ?? 30;
+    return Anexos.vencendo(ant).map(a => {
+      const d = _daysUntil(a.validade);
+      const label = d < 0 ? `vencido há ${Math.abs(d)}d` : d === 0 ? 'vence hoje' : `vence em ${d}d`;
+      const t = Anexos.tipoDe(a.tipo);
+      return {
+        tag: 'anx_' + a.id,
+        title: t.label + ' — ' + label,
+        body: (a.nome || 'arquivo') + ' · ' + Anexos.ondeEsta(a),
+      };
+    });
   }
 
   /* ---- Marketing (posts agendados) ---- */

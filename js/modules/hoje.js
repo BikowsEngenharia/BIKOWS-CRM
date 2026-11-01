@@ -88,6 +88,18 @@ const Hoje = (() => {
     return Equipamentos.getVencendo(horizonte);
   }
 
+  /* Documento com validade estourando. Horizonte mínimo de 30 dias porque
+     renovar ART ou certificado não se resolve no mesmo dia.
+
+     Vale para qualquer anexo com data preenchida, não só para os tipos com
+     prazo típico: se a pessoa se deu ao trabalho de informar a validade, é
+     porque quer ser avisada. Filtrar por tipo faria uma foto datada avisar
+     no sino e não avisar aqui. */
+  function _documentos() {
+    if (typeof Anexos === 'undefined' || !Anexos.vencendo) return [];
+    return Anexos.vencendo(Math.max(_horizonte, 30));
+  }
+
   function _visitas() {
     return DB.getAll('visitas')
       .filter(v => v.data && _dentro(v.data, 0) && !['realizada', 'cancelada'].includes(v.status))
@@ -103,6 +115,7 @@ const Hoje = (() => {
     const licitacoes = _licitacoes();
     const inspecoes  = _inspecoes();
     const visitas    = _visitas();
+    const documentos = _documentos();
 
     const atrasadas = atividades.filter(a => _dias(a.data) < 0).length;
     const deHoje    = atividades.filter(a => _dias(a.data) === 0).length;
@@ -110,7 +123,8 @@ const Hoje = (() => {
     const aPagar    = Utils.sum(contas, 'valor');
 
     const total = atividades.length + followups.length + parcelas.length
-      + contas.length + licitacoes.length + inspecoes.length + visitas.length;
+      + contas.length + licitacoes.length + inspecoes.length + visitas.length
+      + documentos.length;
 
     const agora = new Date();
     const hora = agora.getHours();
@@ -153,6 +167,11 @@ const Hoje = (() => {
         id: 'ins', icone: '⚙️', cor: '#8B2222',
         titulo: 'Inspeções vencendo',
         itens: inspecoes, linha: _linhaInspecao,
+      }),
+      _bloco({
+        id: 'doc', icone: '📜', cor: '#f59e0b',
+        titulo: 'Documentos vencendo',
+        itens: documentos, linha: _linhaDocumento,
       }),
     ].filter(Boolean).join('');
 
@@ -335,6 +354,16 @@ const Hoje = (() => {
       `${Utils.escHtml(e.tag || e.nome || 'Equipamento')} ${_prazoLabel(e.proximaInspecao, 'vencida', 'vence em')}`,
       [e.norma ? '📐 ' + Utils.escHtml(e.norma) : '', cli && cli !== '—' ? '🏢 ' + Utils.escHtml(cli) : ''].filter(Boolean).join(' · '),
       `<button class="btn btn-xs btn-secondary" onclick="App.navigate('equipamentos')" title="Abrir equipamentos">Abrir</button>`
+    );
+  }
+
+  function _linhaDocumento(a) {
+    const t = Anexos.tipoDe(a.tipo);
+    return _linha(
+      `${Utils.escHtml(a.nome || 'arquivo')} ${_prazoLabel(a.validade, 'vencido', 'vence em')}`,
+      [`<span style="color:${t.cor};font-weight:600">${Utils.escHtml(t.label)}</span>`,
+       Utils.escHtml(Anexos.ondeEsta(a))].filter(Boolean).join(' · '),
+      `<button class="btn btn-xs btn-secondary" onclick="Anexos.ver('${a.id}')" title="Abrir o arquivo">Ver</button>`
     );
   }
 

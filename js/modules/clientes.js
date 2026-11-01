@@ -202,7 +202,7 @@ const Clientes = (() => {
           <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">✅ Atividades (${atividades.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">👤 Contatos (${contatos.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabTimeline360')">🕐 Interações</button>
-          <button class="tab-btn" onclick="switchTab(this,'tabDocs360');Documentos.renderLista('docsCliente',{clienteId:'${id}'})">📎 Documentos</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabDocs360');Anexos.renderLista('docsCliente',{entidade:'clientes',registroId:'${id}'})">📎 Arquivos ${(()=>{const n=typeof Anexos!=='undefined'?Anexos.contar('clientes',id):0;return n?`(${n})`:'';})()}</button>
           <button class="tab-btn" onclick="switchTab(this,'tabAudit360')">📜 Alterações</button>
         </div>
 

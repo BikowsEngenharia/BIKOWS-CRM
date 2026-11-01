@@ -676,7 +676,7 @@ const Projetos = (() => {
           <button ${tabStyle('overview')} onclick="Projetos._switchViewTab('${id}','overview')">📋 Overview</button>
           <button ${tabStyle('horas')} onclick="Projetos._switchViewTab('${id}','horas')">⏱ Horas ${tsHoras > 0 ? `<span style="background:var(--primary);color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${tsHoras.toFixed(0)}h</span>` : ''}</button>
           <button ${tabStyle('arts')} onclick="Projetos._switchViewTab('${id}','arts')">📜 ARTs ${artsEntity.length > 0 ? `<span style="background:#10b981;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${artsEntity.length}</span>` : ''}</button>
-          <button ${tabStyle('docs')} onclick="Projetos._switchViewTab('${id}','docs')">📎 Documentos ${(() => { const nd = DB.getAll('documentos').filter(d => d.projetoId === id).length; return nd > 0 ? `<span style="background:#8b5cf6;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${nd}</span>` : ''; })()}</button>
+          <button ${tabStyle('docs')} onclick="Projetos._switchViewTab('${id}','docs')">📎 Arquivos ${(() => { const nd = typeof Anexos !== 'undefined' ? Anexos.contar('projetos', id) : 0; return nd > 0 ? `<span style="background:#8b5cf6;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${nd}</span>` : ''; })()}</button>
         </div>
 
         <div id="viewProjetoTabContent">
@@ -733,12 +733,15 @@ const Projetos = (() => {
     }
   }
 
+  /* Arquivos do projeto. Passou do módulo Documentos (que só guardava link,
+     nunca o arquivo, e tinha zero registros na base) para o módulo Anexos,
+     que guarda o arquivo de verdade e controla tipo e validade. */
   function _renderDocsTab(projetoId) {
     const el = document.getElementById('viewProjetoTabContent');
     if (!el) return;
     el.innerHTML = '<div id="docsProjeto" style="min-height:80px;padding:4px 0"></div>';
-    if (typeof Documentos !== 'undefined') {
-      Documentos.renderLista('docsProjeto', { projetoId });
+    if (typeof Anexos !== 'undefined') {
+      Anexos.renderLista('docsProjeto', { entidade: 'projetos', registroId: projetoId });
     }
   }
 

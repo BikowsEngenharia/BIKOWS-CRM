@@ -183,6 +183,8 @@ const Clientes = (() => {
           </div>
         </div>
 
+        ${typeof Anexos !== 'undefined' ? `<div class="mb-3">${Anexos.botao('clientes', c.id, c.nome)}</div>` : ''}
+
         <div class="stats-row mb-4">
           <div class="stat-box"><div class="stat-val">${leads.length}</div><div class="stat-lbl">Leads</div></div>
           <div class="stat-box"><div class="stat-val">${projetos.length}</div><div class="stat-lbl">Projetos</div></div>

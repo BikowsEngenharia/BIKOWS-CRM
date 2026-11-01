@@ -686,6 +686,7 @@ const Projetos = (() => {
         <div class="mt-4 flex gap-2" style="border-top:1px solid var(--border);padding-top:12px">
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-secondary btn-sm" onclick="Modal.close();ProjetoFinanceiro.open('${id}')">💰 Financeiro</button>
+          ${typeof Anexos !== 'undefined' ? Anexos.botao('projetos', id, p.titulo) : ''}
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
       `,

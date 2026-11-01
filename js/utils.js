@@ -470,12 +470,16 @@ const Modal = (() => {
       _saveCb();
     };
     document.getElementById('modalBackdrop').classList.add('open');
+    // esconde o botão flutuante de captura: no celular ele fica por cima do
+    // conteúdo da janela (apareceu tapando a lista de anexos)
+    document.body.classList.add('modal-aberto');
     const first = document.querySelector('#modalBody input, #modalBody select, #modalBody textarea');
     if (first) setTimeout(() => first.focus(), 100);
   }
 
   function close() {
     document.getElementById('modalBackdrop').classList.remove('open');
+    document.body.classList.remove('modal-aberto');
     _saveCb = null;
   }
 

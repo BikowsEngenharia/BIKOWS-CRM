@@ -429,6 +429,7 @@ const Visitas = (() => {
           <span class="badge badge-gray">${tipo.icon} ${Utils.escHtml(tipo.label)}</span>
           ${v.pendencias && !v.pendenciasResolvidas && v.status === 'realizada' ? '<span class="badge badge-red">⚠ Pendência em aberto</span>' : ''}
           <span style="flex:1"></span>
+          ${typeof Anexos !== 'undefined' ? Anexos.botao('visitas', v.id, v.numero || 'Visita') : ''}
           <button class="btn btn-sm btn-secondary" onclick="Visitas.imprimirRVT('${v.id}')">🖨 Relatório (RVT)</button>
           <button class="btn btn-sm btn-secondary" onclick="Modal.close();Visitas.openForm('${v.id}')">✏ Editar</button>
         </div>

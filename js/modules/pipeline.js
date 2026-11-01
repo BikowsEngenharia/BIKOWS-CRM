@@ -853,6 +853,7 @@ const Pipeline = (() => {
           <div class="detail-field"><div class="detail-label">Serviços</div><div class="detail-value">${Utils.escHtml(servicos || '—')}</div></div>
           <div class="detail-field"><div class="detail-label">Proposta Nº</div><div class="detail-value">${Utils.escHtml(lead.propostaNum || '—')}</div></div>
         </div>
+        ${typeof Anexos !== 'undefined' ? `<div class="mb-4">${Anexos.botao('leads', lead.id, lead.titulo)}</div>` : ''}
         <!-- LICITAÇÃO -->
         ${(() => {
           const lic = _getLic(lead);

@@ -2261,3 +2261,31 @@ body.dark-mode .bottom-nav {
 .status-rede strong { font-weight: 800; }
 body.dark-mode .status-rede.offline { background: #3B2F0B; color: #FCD34D; border-bottom-color: #57430F; }
 @media (max-width: 760px) { .status-rede { padding: 7px 14px; font-size: 12px; } }
+
+/* ==========================================
+   ANEXOS — lista de arquivos do registro
+   ========================================== */
+.anx-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 7px; background: var(--surface);
+  transition: var(--t);
+}
+.anx-item:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.anx-icone { font-size: 21px; flex-shrink: 0; width: 28px; text-align: center; }
+.anx-txt { flex: 1; min-width: 0; }
+.anx-nome {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.anx-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.anx-acts { display: flex; gap: 4px; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .anx-item { flex-wrap: wrap; }
+  .anx-txt { flex-basis: calc(100% - 42px); }
+  .anx-acts { flex-basis: 100%; justify-content: flex-end; }
+  .anx-acts .btn { min-height: 32px; min-width: 44px; }
+}
+
+/* Botão flutuante de captura some com janela aberta (tapava o conteúdo no celular) */
+body.modal-aberto .quick-capture-btn { display: none; }

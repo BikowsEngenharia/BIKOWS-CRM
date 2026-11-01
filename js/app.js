@@ -51,6 +51,7 @@ const App = (() => {
     trafego_campanhas: 'trafego', trafego_metas: 'trafego',
     documentos: 'documentos',
     visitas: 'visitas', equipamentos: 'equipamentos', catalogo_servicos: 'orcamento',
+    // anexos nao tem pagina propria: aparece dentro da ficha de cada registro
   };
 
   function refreshIfNeeded(entity) {

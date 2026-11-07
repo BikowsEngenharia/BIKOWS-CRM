@@ -109,6 +109,22 @@ const Hoje = (() => {
       .sort((a, b) => (a.prazo || '').localeCompare(b.prazo || ''));
   }
 
+  /* Ação do plano de negócios com prazo estourando. Eram 20 ações pendentes
+     paradas desde agosto: estratégia que não aparece no dia a dia não é
+     executada, vira documento. Só entram as críticas e as de prazo vencido,
+     para não transformar a tela Hoje em lista de plano. */
+  function _acoesPlano() {
+    return DB.getAll('plano_acoes')
+      .filter(a => a.status !== 'concluida' && a.status !== 'cancelada' && a.prazo)
+      .filter(a => {
+        const d = Utils.daysUntil(a.prazo);
+        if (d === null) return false;
+        const critica = String(a.criticidade || '').toLowerCase().startsWith('alta');
+        return d < 0 || (critica && d <= _horizonte);
+      })
+      .sort((a, b) => (a.prazo || '').localeCompare(b.prazo || ''));
+  }
+
   function _visitas() {
     return DB.getAll('visitas')
       .filter(v => v.data && _dentro(v.data, 0) && !['realizada', 'cancelada'].includes(v.status))
@@ -126,6 +142,7 @@ const Hoje = (() => {
     const visitas    = _visitas();
     const documentos = _documentos();
     const projetos   = _projetos();
+    const acoesPlano = _acoesPlano();
 
     const atrasadas = atividades.filter(a => _dias(a.data) < 0).length;
     const deHoje    = atividades.filter(a => _dias(a.data) === 0).length;
@@ -134,7 +151,7 @@ const Hoje = (() => {
 
     const total = atividades.length + followups.length + parcelas.length
       + contas.length + licitacoes.length + inspecoes.length + visitas.length
-      + documentos.length + projetos.length;
+      + documentos.length + projetos.length + acoesPlano.length;
 
     const agora = new Date();
     const hora = agora.getHours();
@@ -182,6 +199,11 @@ const Hoje = (() => {
         id: 'ins', icone: '⚙️', cor: '#8B2222',
         titulo: 'Inspeções vencendo',
         itens: inspecoes, linha: _linhaInspecao,
+      }),
+      _bloco({
+        id: 'plano', icone: '📘', cor: '#6366f1',
+        titulo: 'Ações do plano de negócios',
+        itens: acoesPlano, linha: _linhaAcaoPlano,
       }),
       _bloco({
         id: 'doc', icone: '📜', cor: '#f59e0b',
@@ -390,6 +412,21 @@ const Hoje = (() => {
       sub,
       `<button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}')" title="Abrir o projeto">Abrir</button>
        <button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}','tarefas')" title="Ver as atividades do projeto">Atividades</button>`
+    );
+  }
+
+  function _linhaAcaoPlano(a) {
+    const critica = String(a.criticidade || '').toLowerCase().startsWith('alta');
+    const sub = [
+      a.area ? '📂 ' + Utils.escHtml(a.area) : '',
+      a.fase ? Utils.escHtml(a.fase) : '',
+      critica ? '<span style="color:var(--danger);font-weight:700">crítica</span>' : '',
+      a.resultado ? '➜ ' + Utils.escHtml(Utils.truncate(a.resultado, 45)) : '',
+    ].filter(Boolean).join(' · ');
+    return _linha(
+      `${Utils.escHtml(Utils.truncate(a.acao || 'Ação', 70))} ${_prazoLabel(a.prazo, 'atrasada')}`,
+      sub,
+      `<button class="btn btn-xs btn-secondary" onclick="App.navigate('plano')" title="Abrir o plano de negócios">Abrir plano</button>`
     );
   }
 

@@ -134,6 +134,7 @@ const Pipeline = (() => {
     'Evento / Feira':    { icon: '📅', color: '#f59e0b', bg: '#fffbeb' },
     'Parceria':          { icon: '🔗', color: '#6366f1', bg: '#eef2ff' },
     'Licitação Pública': { icon: '🏛', color: '#0f766e', bg: '#f0fdfa' },
+    'Produto / Loja':    { icon: '🏭', color: '#f59e0b', bg: '#fffbeb' },
     'Outro':             { icon: '❓', color: '#94a3b8', bg: '#f8fafc' },
   };
 

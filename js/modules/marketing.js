@@ -15,7 +15,45 @@ const Marketing = (() => {
   const PRIOR_ICONS = { alta:'🔴', media:'🟡', baixa:'🟢' };
 
   /* ---- Estado ---- */
-  let _tab = 'calendario';
+  let _tab = 'canais';
+
+  /* ====================================================
+     OS 6 CANAIS DE AQUISIÇÃO — Plano de Negócios V3 (ago/2026)
+
+     O pipeline registra 10 origens diferentes; o plano trabalha com 6
+     canais. Este mapa liga uma coisa na outra. O que não casa com nenhum
+     canal cai em "não classificado" de propósito: inventar um encaixe
+     esconderia que a origem não está sendo preenchida direito.
+     ==================================================== */
+  const CANAIS_AQUISICAO = [
+    { id: 1, nome: 'Tráfego pago',        icon: '🎯', cor: '#C42B2B',
+      papel: 'Motor de caixa imediato',
+      meta: '15 a 20 leads/mês · CPL abaixo de R$ 250',
+      origens: ['Tráfego Pago'], apelidos: ['google ads','adwords','ads','trafego','mídia paga','midia paga','anuncio','anúncio'] },
+    { id: 2, nome: 'Conteúdo e orgânico', icon: '🌐', cor: '#06b6d4',
+      papel: 'Reduzir o custo de aquisição',
+      meta: 'Publicar o estoque do Ciclo 1',
+      origens: ['Site / SEO', 'LinkedIn'], apelidos: ['site','seo','blog','organico','orgânico','conteudo','conteúdo','instagram','youtube','google meu negocio','redes sociais'] },
+    { id: 3, nome: 'Prospecção ativa',    icon: '📞', cor: '#1D4F8C',
+      papel: 'Previsibilidade de agenda',
+      meta: '40 contatos/semana · 4 propostas/mês',
+      origens: ['Prospecção Ativa', 'Evento / Feira'], apelidos: ['prospeccao','prospecção','outbound','cold call','feira','evento','visita fria'] },
+    { id: 4, nome: 'Licitações',          icon: '🏛', cor: '#0f766e',
+      papel: 'Ticket alto e previsível',
+      meta: '1ª proposta nov/26 · 1º contrato mar/27',
+      origens: ['Licitação Pública'], apelidos: ['licitacao','licitação','pregao','pregão','pncp','edital','orgao publico','órgão público'] },
+    { id: 5, nome: 'Recorrência e indicação', icon: '🔁', cor: '#8b5cf6',
+      papel: 'Receita previsível, maior margem',
+      meta: '3 contratos até dez/26 · 10 até dez/27',
+      origens: ['Recorrência', 'Indicação'], apelidos: ['recorrencia','recorrência','indicacao','indicação','cliente antigo','retorno','pos-venda','pós-venda','renovacao','renovação'] },
+    { id: 6, nome: 'Produtos fabricados', icon: '🏭', cor: '#f59e0b',
+      papel: 'Diversificação e uso de ociosidade',
+      meta: '3 a 5 SKUs · margem acima de 35%',
+      origens: ['Produto / Loja'], apelidos: ['produto','loja','marketplace','mercado livre','ecommerce','e-commerce'] },
+  ];
+
+  // Meta de dependência do canal 1, definida no plano
+  const META_DEPENDENCIA = { pct: 60, prazo: 'dez/26' };
   let _filtroCanal = '';
   let _filtroStatus = '';
   let _filtroMes = new Date().toISOString().slice(0,7);
@@ -70,6 +108,7 @@ const Marketing = (() => {
 
       <div class="tabs" style="margin:16px 0 0 0">
         ${[
+          {id:'canais',     label:'🧭 Canais'},
           {id:'calendario', label:'📅 Calendário'},
           {id:'campanhas',  label:'🚀 Campanhas'},
           {id:'ideias',     label:'💡 Banco de Ideias'},
@@ -95,7 +134,8 @@ const Marketing = (() => {
   }
 
   function _renderTab() {
-    if (_tab === 'calendario')  _renderCalendario();
+    if (_tab === 'canais')      _renderCanais();
+    else if (_tab === 'calendario')  _renderCalendario();
     else if (_tab === 'campanhas')   _renderCampanhas();
     else if (_tab === 'ideias')      _renderIdeias();
     else if (_tab === 'kpis')        _renderKpis();
@@ -105,6 +145,131 @@ const Marketing = (() => {
   /* ====================================================
      TAB: CALENDÃRIO
      ==================================================== */
+  /* ====================================================
+     TAB: CANAIS
+     ==================================================== */
+  function _renderCanais() {
+    const el = document.getElementById('mktContent');
+    if (!el) return;
+
+    const leads = DB.getAll('leads');
+    const GANHOS = ['fechado_ganho', 'executado'];
+    /* Casamento tolerante: a origem é texto livre e na prática vem escrita de
+       várias formas ("Google Ads", "Tráfego Pago", "trafego"). Comparar sem
+       acento e por apelido evita que variação de escrita esconda um canal
+       inteiro na linha "não classificado". */
+    const semAcento = s => String(s || '').toLowerCase().trim()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const canalDaOrigem = (origem) => {
+      const o = semAcento(origem);
+      if (!o) return null;
+      for (const c of CANAIS_AQUISICAO) {
+        if (c.origens.some(x => semAcento(x) === o)) return c.id;
+      }
+      for (const c of CANAIS_AQUISICAO) {
+        if ((c.apelidos || []).some(a => o.includes(semAcento(a)))) return c.id;
+      }
+      return null;
+    };
+
+    const dados = {};
+    CANAIS_AQUISICAO.forEach(c => { dados[c.id] = { leads: 0, pipeline: 0, ganhos: 0, ganho: 0 }; });
+    const soltos = { leads: 0, pipeline: 0, ganhos: 0, ganho: 0, origens: {} };
+
+    leads.forEach(l => {
+      const origem = (l.origemLead || '').trim();
+      const canal = canalDaOrigem(origem);
+      const alvo = canal ? dados[canal] : soltos;
+      alvo.leads++;
+      alvo.pipeline += Number(l.valorEstimado) || 0;
+      if (GANHOS.includes(l.status)) {
+        alvo.ganhos++;
+        alvo.ganho += Number(l.valorFechado) || Number(l.valorEstimado) || 0;
+      }
+      if (!canal) {
+        const chave = origem || '(em branco)';
+        soltos.origens[chave] = (soltos.origens[chave] || 0) + 1;
+      }
+    });
+
+    const totalLeads = leads.length || 1;
+    const pctCanal1 = Math.round((dados[1].leads / totalLeads) * 100);
+    const dentroDaMeta = pctCanal1 <= META_DEPENDENCIA.pct;
+
+    // Licitações vivem em entidade própria: o canal 4 também conta de lá
+    const licAtivas = DB.getAll('licitacoes').filter(l => !Utils.licEncerrada(l.status)).length;
+
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:14px;border-left:4px solid ${dentroDaMeta ? 'var(--success)' : 'var(--danger)'}">
+        <div class="card-body">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div class="text-xs text-muted">Dependência do tráfego pago</div>
+              <div style="font-size:30px;font-weight:800;color:${dentroDaMeta ? 'var(--success)' : 'var(--danger)'};line-height:1.1">${pctCanal1}%</div>
+              <div class="text-sm text-muted">${dados[1].leads} de ${leads.length} oportunidades vieram do canal 1</div>
+            </div>
+            <div style="text-align:right">
+              <div class="text-xs text-muted">Meta do plano</div>
+              <div style="font-size:17px;font-weight:700">até ${META_DEPENDENCIA.pct}% em ${META_DEPENDENCIA.prazo}</div>
+              <div class="text-xs" style="color:${dentroDaMeta ? 'var(--success)' : 'var(--danger)'};font-weight:700">
+                ${dentroDaMeta ? '✓ dentro da meta' : `${pctCanal1 - META_DEPENDENCIA.pct} pontos acima`}
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;height:10px;background:var(--bg);border-radius:99px;overflow:hidden;display:flex">
+            ${CANAIS_AQUISICAO.map(c => {
+              const pct = (dados[c.id].leads / totalLeads) * 100;
+              return pct > 0 ? `<div title="${Utils.escHtml(c.nome)}: ${Math.round(pct)}%" style="width:${pct}%;background:${c.cor}"></div>` : '';
+            }).join('')}
+            ${soltos.leads ? `<div title="Não classificado" style="width:${(soltos.leads / totalLeads) * 100}%;background:#cbd5e1"></div>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <table class="tbl">
+        <thead><tr>
+          <th>Canal</th><th>Papel no plano</th><th>Oportunidades</th><th>Participação</th>
+          <th>Em pipeline</th><th>Ganhos</th><th>Conversão</th><th>Meta</th>
+        </tr></thead>
+        <tbody>
+          ${CANAIS_AQUISICAO.map(c => {
+            const d = dados[c.id];
+            const part = Math.round((d.leads / totalLeads) * 100);
+            const conv = d.leads ? Math.round((d.ganhos / d.leads) * 100) : 0;
+            const vazio = d.leads === 0;
+            return `<tr style="${vazio ? 'opacity:.55' : ''}">
+              <td><div class="font-bold text-sm" style="color:${c.cor}">${c.icon} ${Utils.escHtml(c.nome)}</div>
+                  <div class="text-xs text-muted">canal ${c.id}${c.id === 4 && licAtivas ? ` · ${licAtivas} licitação(ões) em disputa` : ''}</div></td>
+              <td class="text-xs text-muted">${Utils.escHtml(c.papel)}</td>
+              <td class="font-bold">${d.leads}</td>
+              <td>${part}%</td>
+              <td class="text-sm">${Utils.formatCurrency(d.pipeline)}</td>
+              <td class="text-sm">${d.ganhos}${d.ganho ? ` · ${Utils.formatCurrency(d.ganho)}` : ''}</td>
+              <td>${d.leads ? conv + '%' : '—'}</td>
+              <td class="text-xs text-muted">${Utils.escHtml(c.meta)}</td>
+            </tr>`;
+          }).join('')}
+          ${soltos.leads ? `<tr style="background:var(--surface-2)">
+            <td><div class="font-bold text-sm">⚪ Não classificado</div>
+                <div class="text-xs text-muted">${Object.entries(soltos.origens).map(([o, n]) => `${Utils.escHtml(o)} (${n})`).join(', ')}</div></td>
+            <td class="text-xs text-muted">Origem que não casa com nenhum canal do plano</td>
+            <td class="font-bold">${soltos.leads}</td>
+            <td>${Math.round((soltos.leads / totalLeads) * 100)}%</td>
+            <td class="text-sm">${Utils.formatCurrency(soltos.pipeline)}</td>
+            <td class="text-sm">${soltos.ganhos}${soltos.ganho ? ` · ${Utils.formatCurrency(soltos.ganho)}` : ''}</td>
+            <td>${soltos.leads ? Math.round((soltos.ganhos / soltos.leads) * 100) + '%' : '—'}</td>
+            <td class="text-xs text-muted">Classificar a origem desses leads</td>
+          </tr>` : ''}
+        </tbody>
+      </table>
+
+      <div class="text-xs text-muted" style="margin-top:10px">
+        Medido pela origem registrada em cada oportunidade do funil. Canal sem
+        oportunidade aparece apagado: é canal previsto no plano que ainda não
+        originou nada.
+      </div>`;
+  }
+
   function _renderCalendario() {
     const el = document.getElementById('mktContent');
     if (!el) return;

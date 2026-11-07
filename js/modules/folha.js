@@ -724,34 +724,79 @@ const Folha = (() => {
       });
     });
 
-    // Cria lançamento de despesa automaticamente para que o Financeiro reflita
-    const totalBruto = funcs.reduce((s, f) => s + (f.salarioBase || 0) + (f.vt || 0) + (f.vr || 0), 0);
-    const encargos   = funcs.reduce((s, f) => s + (_temFGTS(f) ? Math.round(f.salarioBase * 0.08 * 100) / 100 : 0), 0); // FGTS — só CLT
-    if (!DB.getAll('lancamentos').some(l => l.descricao?.includes(_mesFolha) && l.categoria === 'Folha de Pagamento' && l.tipo === 'despesa')) {
-      DB.create('lancamentos', {
-        tipo: 'despesa', categoria: 'Folha de Pagamento',
-        descricao: `Folha de Pagamento — ${_mesFolha}`,
-        valor: Math.round(totalBruto * 100) / 100,
-        data: _mesFolha + '-05', status: 'a_pagar', observacoes: `${funcs.length} funcionários`,
+    /* A folha vira CONTA A PAGAR, uma por funcionário mais uma de FGTS.
+       Antes virava lançamento com status 'a_pagar', e nenhum indicador lê esse
+       status: o DRE soma despesa 'pago' e o "A Pagar" lê contas a pagar. A
+       folha existia no banco e não aparecia em lugar nenhum do financeiro.
+       Como conta a pagar, ela entra no "A Pagar", no sino, na tela Hoje, e ao
+       ser paga gera o lançamento com a data real do pagamento. Uma por
+       funcionário porque o pagamento é marcado por pessoa. */
+    const vencFolha = _mesFolha + '-05';
+    funcs.forEach(f => {
+      const liquido = calcFolhaFuncionario(f).liquido
+        || ((f.salarioBase || 0) + (f.vt || 0) + (f.vr || 0));
+      const jaTem = DB.getAll('contaspagar').some(c =>
+        c.categoria === 'Folha de Pagamento' && c.folhaMes === _mesFolha && c.funcionarioId === f.id);
+      if (jaTem) return;
+      DB.create('contaspagar', {
+        fornecedor: f.nome, descricao: `Salário ${f.nome} — ${_mesFolha}`,
+        categoria: 'Folha de Pagamento',
+        valor: Math.round(liquido * 100) / 100,
+        vencimento: vencFolha, status: 'pendente', recorrente: false,
+        folhaMes: _mesFolha, funcionarioId: f.id,
+        observacoes: 'Gerada automaticamente pela folha de pagamento.',
       });
-      if (encargos > 0) {
-        DB.create('lancamentos', {
-          tipo: 'despesa', categoria: 'Encargos/FGTS',
-          descricao: `Encargos FGTS — ${_mesFolha}`,
-          valor: Math.round(encargos * 100) / 100,
-          data: _mesFolha + '-07', status: 'a_pagar', observacoes: 'FGTS patronal 8% — apenas funcionários CLT',
-        });
-      }
+    });
+
+    const encargos = funcs.reduce((s, f) => s + (_temFGTS(f) ? Math.round(f.salarioBase * 0.08 * 100) / 100 : 0), 0); // FGTS — só CLT
+    const temFgts = DB.getAll('contaspagar').some(c =>
+      c.categoria === 'Encargos/FGTS' && c.folhaMes === _mesFolha);
+    if (encargos > 0 && !temFgts) {
+      DB.create('contaspagar', {
+        fornecedor: 'FGTS', descricao: `Encargos FGTS — ${_mesFolha}`,
+        categoria: 'Encargos/FGTS',
+        valor: Math.round(encargos * 100) / 100,
+        vencimento: _mesFolha + '-07', status: 'pendente', recorrente: false,
+        folhaMes: _mesFolha,
+        observacoes: 'FGTS patronal 8% — apenas funcionários CLT.',
+      });
     }
     const mesLbl = new Date(_mesFolha + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    Toast.success(`Folha de ${mesLbl} gerada para ${funcs.length} funcionários. Lançamentos criados no Financeiro.`);
+    Toast.success(`Folha de ${mesLbl} gerada para ${funcs.length} funcionários. Contas a pagar criadas no Financeiro.`);
     render();
+    if (typeof App !== 'undefined') App.updateNotifBadge();
   }
 
+  /* Marcar o funcionário como pago também quita a conta a pagar dele, pelo
+     mesmo caminho do Financeiro: pergunta a data real e gera o lançamento de
+     despesa, que é o que entra no DRE. Antes isso só marcava um booleano na
+     folha e o dinheiro nunca aparecia no resultado do mês. */
   function marcarPago(folhaId) {
-    DB.update('folha', folhaId, { pago: true, dataPagamento: Utils.todayStr() });
-    Toast.success('Marcado como pago');
-    render();
+    const r = DB.get('folha', folhaId);
+    if (!r) return;
+    const conta = DB.getAll('contaspagar').find(c =>
+      c.categoria === 'Folha de Pagamento' && c.folhaMes === r.mes
+      && c.funcionarioId === r.funcionarioId && c.status === 'pendente');
+
+    const concluir = (quando) => {
+      DB.update('folha', folhaId, { pago: true, dataPagamento: quando || Utils.todayStr() });
+      Toast.success('Marcado como pago');
+      render();
+      if (typeof App !== 'undefined') App.updateNotifBadge();
+    };
+
+    if (conta && typeof Financeiro !== 'undefined' && Financeiro.pagarConta) {
+      // deixa o Financeiro perguntar a data e gerar o lançamento
+      Financeiro.pagarConta(conta.id);
+      // a folha acompanha a conta: confere depois que o fluxo terminar
+      const checar = setInterval(() => {
+        const c2 = DB.get('contaspagar', conta.id);
+        if (c2 && c2.status === 'pago') { clearInterval(checar); concluir(c2.dataPagamento); }
+      }, 400);
+      setTimeout(() => clearInterval(checar), 60000);
+      return;
+    }
+    concluir();
   }
 
   function marcarTodosPagos(mes) {

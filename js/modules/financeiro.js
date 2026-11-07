@@ -56,7 +56,11 @@ const Financeiro = (() => {
     const aRecParcelas=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>Utils.parcelaAberta(p)&&!Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
     const aRecLanc=lanc.filter(l=>l.tipo==='receita'&&l.status==='a_receber').reduce((s,l)=>s+l.valor,0);
     const aRec=aRecParcelas+aRecLanc;
-    const aPag=pag.filter(p=>p.status==='pendente').reduce((s,p)=>s+p.valor,0);
+    // Soma conta a pagar pendente + lançamento marcado como 'a_pagar'. Antes só
+    // lia contas a pagar, então despesa lançada direto com esse status não
+    // aparecia em indicador nenhum: nem aqui, nem no DRE (que soma 'pago').
+    const aPagLanc=lanc.filter(l=>l.tipo==='despesa'&&l.status==='a_pagar').reduce((s,l)=>s+(Number(l.valor)||0),0);
+    const aPag=pag.filter(p=>p.status==='pendente').reduce((s,p)=>s+p.valor,0)+aPagLanc;
     const venc=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>Utils.parcelaAberta(p)&&Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
 
     return `

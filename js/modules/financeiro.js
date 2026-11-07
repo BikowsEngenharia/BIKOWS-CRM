@@ -517,17 +517,74 @@ const Financeiro = (() => {
     if(id){DB.update('contaspagar',id,data);Toast.success('Atualizado');}else{DB.create('contaspagar',data);Toast.success('Conta criada');}
     Modal.close();renderTab();
   }
+  /* Pergunta a data em que o dinheiro realmente entrou ou saiu.
+     Antes o lançamento nascia sempre com a data de hoje, sem perguntar: uma
+     parcela vencida em 15/09 marcada como recebida em 07/11 ia para a receita
+     de novembro. Isso inflava o mês corrente e esvaziava os anteriores, e era
+     a causa do "resultado do mês não bate". */
+  function _pedirData(titulo, cb){
+    const hoje = Utils.todayStr();
+    Modal.open({
+      title: titulo,
+      body: `
+        <div class="form-group">
+          <label class="form-label">Data em que o dinheiro entrou ou saiu</label>
+          <input class="form-control" type="date" id="finDataReal" value="${hoje}" max="${hoje}">
+          <div class="text-xs text-muted" style="margin-top:4px">
+            É esta data que vai para o DRE e para o resultado do mês. Vem com hoje;
+            mude se o pagamento aconteceu em outro dia.
+          </div>
+        </div>`,
+      saveLabel: 'Confirmar',
+      saveCb: () => {
+        const d = document.getElementById('finDataReal')?.value || hoje;
+        Modal.close();
+        cb(d);
+      },
+    });
+  }
+
+  /* Avisa quando já existe lançamento igual por perto. Não bloqueia: parcela
+     mensal de mesmo valor é legítima. Existe porque dois caminhos diferentes
+     (recebível e financeiro do projeto) gravavam o mesmo dinheiro duas vezes. */
+  function _pareceDuplicata(tipo, valor, data){
+    const alvo = new Date(data + 'T00:00:00');
+    return DB.getAll('lancamentos').filter(l => {
+      if (l.tipo !== tipo) return false;
+      if (Math.abs((Number(l.valor) || 0) - valor) > 0.009) return false;
+      if (!l.data) return false;
+      const d = new Date(l.data + 'T00:00:00');
+      return Math.abs((d - alvo) / 86400000) <= 7;
+    });
+  }
+
+  function _confirmarSeDuplicata(tipo, valor, data, seguir){
+    const iguais = _pareceDuplicata(tipo, valor, data);
+    if (!iguais.length) { seguir(); return; }
+    const l = iguais[0];
+    Confirm.show(
+      'Já existe lançamento igual',
+      `Encontrei ${iguais.length === 1 ? 'um lançamento' : iguais.length + ' lançamentos'} de `
+        + `${Utils.formatCurrency(valor)} por volta de ${Utils.formatDate(l.data)} `
+        + `("${Utils.truncate(l.descricao || '', 40)}"). Se for o mesmo dinheiro, cancele. Lançar assim mesmo?`,
+      seguir
+    );
+  }
+
   /* Núcleo de "pagar 1 conta": usado tanto pelo pagamento individual quanto
      pela quitação em massa (openQuitarAteModal), pra manter sempre o mesmo
-     efeito colateral (lançamento de despesa + geração da recorrência). */
-  function _quitarContaCore(id, obsExtra){
+     efeito colateral (lançamento de despesa + geração da recorrência).
+     dataReal: dia em que o dinheiro saiu. Na quitação em massa é perguntado
+     uma vez e vale para todas. */
+  function _quitarContaCore(id, obsExtra, dataReal){
     const p=DB.get('contaspagar',id);if(!p||p.status==='pago')return false;
-    DB.update('contaspagar',id,{status:'pago',dataPagamento:Utils.todayStr(),observacoes:obsExtra?(p.observacoes?p.observacoes+' · ':'')+obsExtra:p.observacoes});
+    const dtPag=dataReal||Utils.todayStr();
+    DB.update('contaspagar',id,{status:'pago',dataPagamento:dtPag,observacoes:obsExtra?(p.observacoes?p.observacoes+' · ':'')+obsExtra:p.observacoes});
     // Cria lançamento de despesa para alimentar KPIs, DRE e relatórios
     DB.create('lancamentos',{
       tipo:'despesa',categoria:p.categoria||'Outros',
       descricao:p.descricao||p.fornecedor||'Pagamento',
-      valor:p.valor,data:Utils.todayStr(),status:'pago',
+      valor:p.valor,data:dtPag,status:'pago',
       clienteId:'',contaId:id,observacoes:'Criado automaticamente ao pagar conta: '+(p.fornecedor||''),
     });
     // Conta recorrente: gera automaticamente a do próximo mês
@@ -547,8 +604,15 @@ const Financeiro = (() => {
     return true;
   }
   function pagarConta(id){
-    if(!_quitarContaCore(id))return;
-    Toast.success('Conta paga e lançamento registrado');renderTab();
+    const p=DB.get('contaspagar',id);
+    if(!p||p.status==='pago')return;
+    _pedirData('💸 Pagar: '+Utils.truncate(p.fornecedor||p.descricao||'conta',35), (dt)=>{
+      _confirmarSeDuplicata('despesa', Number(p.valor)||0, dt, ()=>{
+        if(!_quitarContaCore(id,'',dt))return;
+        Toast.success('Conta paga e lançamento registrado em '+Utils.formatDate(dt));
+        renderTab();
+      });
+    });
   }
   function deleteContaPagar(id){Utils.confirmDelete('esta conta a pagar',()=>{DB.remove('contaspagar',id);Toast.success('Removida');renderTab();});}
 
@@ -563,14 +627,21 @@ const Financeiro = (() => {
       body: `
         <p class="text-sm text-muted mb-3">Marca como <b>pago</b> todas as contas a pagar pendentes com vencimento até o mês selecionado (gera o lançamento de despesa correspondente para cada uma) — use para fechar de uma vez as pendências antigas ao iniciar um novo ciclo financeiro.</p>
         <div class="form-group"><label class="form-label">Quitar tudo até (mês/ano)</label><input type="month" class="form-control" id="qtMes" value="${mesDefault}" onchange="Financeiro._atualizarPreviaQuitar()"></div>
+        <div class="form-group"><label class="form-label">Data do acerto</label>
+          <input type="date" class="form-control" id="qtData" value="${Utils.todayStr()}" max="${Utils.todayStr()}">
+          <div class="text-xs text-muted" style="margin-top:4px">Data que vai para o DRE em todos os lançamentos gerados aqui.</div>
+        </div>
         <div id="qtPreview" class="text-sm text-muted mt-2"></div>`,
       saveCb: () => {
         const mes=document.getElementById('qtMes').value;
         if(!mes){Toast.error('Selecione o mês');return;}
         const pend=_pendentesAte(mes);
         if(pend.length===0){Toast.warning('Nenhuma conta pendente até esse mês.');Modal.close();return;}
+        // Data do acerto perguntada uma vez e aplicada a todas: antes cada
+        // lançamento nascia com a data de hoje, jogando pagamento antigo no mês corrente
+        const dtAcerto=document.getElementById('qtData')?.value||Utils.todayStr();
         let count=0;
-        pend.forEach(c=>{ if(_quitarContaCore(c.id,'Quitado no acerto de saldo até '+mes)) count++; });
+        pend.forEach(c=>{ if(_quitarContaCore(c.id,'Quitado no acerto de saldo até '+mes, dtAcerto)) count++; });
         Toast.success(`✅ ${count} conta(s) marcada(s) como paga(s) e lançada(s)`);
         Modal.close(); renderTab(); if(typeof App!=='undefined')App.updateNotifBadge();
       }
@@ -647,16 +718,30 @@ const Financeiro = (() => {
       Toast.error('Esta parcela está sem valor. Edite o recebível e informe o valor antes de marcar como recebida.');
       return;
     }
-    DB.update('recebiveis',rId,{parcelas:(r.parcelas||[]).map(p=>p.id===pId?{...p,status:'recebido',dataPagamento:Utils.todayStr()}:p)});
-    // Cria lançamento de receita para alimentar KPIs, DRE e relatórios
-    DB.create('lancamentos',{
-      tipo:'receita',categoria:'Serviços de Engenharia',
-      descricao:(r.descricao||'Recebimento')+' — Parcela',
-      valor:valorParcela,data:Utils.todayStr(),status:'recebido',
-      clienteId:r.clienteId||'',recebivelId:rId,parcelaId:pId,
-      observacoes:'Criado automaticamente ao receber parcela do recebível.',
+    // Guarda contra o mesmo dinheiro entrar duas vezes: se já existe lançamento
+    // amarrado a esta parcela, não cria outro. Era por aqui que o recebível e o
+    // financeiro do projeto lançavam a mesma entrada em duplicidade.
+    const jaLancada=DB.getAll('lancamentos').some(l=>l.parcelaId===pId&&l.recebivelId===rId);
+    if(jaLancada){
+      Toast.warning('Esta parcela já tem lançamento no financeiro. Nada foi duplicado.');
+      return;
+    }
+
+    _pedirData('💰 Receber: '+Utils.truncate(r.descricao||'parcela',35), (dt)=>{
+      _confirmarSeDuplicata('receita', valorParcela, dt, ()=>{
+        DB.update('recebiveis',rId,{parcelas:(r.parcelas||[]).map(p=>p.id===pId?{...p,status:'recebido',dataPagamento:dt}:p)});
+        // Cria lançamento de receita para alimentar KPIs, DRE e relatórios
+        DB.create('lancamentos',{
+          tipo:'receita',categoria:'Serviços de Engenharia',
+          descricao:(r.descricao||'Recebimento')+' — Parcela',
+          valor:valorParcela,data:dt,status:'recebido',
+          clienteId:r.clienteId||'',recebivelId:rId,parcelaId:pId,
+          observacoes:'Criado automaticamente ao receber parcela do recebível.',
+        });
+        Toast.success('Parcela recebida e lançamento registrado em '+Utils.formatDate(dt));
+        renderTab();
+      });
     });
-    Toast.success('Parcela recebida e lançamento registrado');renderTab();
   }
   function addParcela(rId){editRecebivel(rId);}
   function deleteRecebivel(id){Utils.confirmDelete('este recebível',()=>{DB.remove('recebiveis',id);Toast.success('Removido');renderTab();});}

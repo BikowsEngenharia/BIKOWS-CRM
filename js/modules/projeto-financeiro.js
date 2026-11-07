@@ -554,6 +554,11 @@ const ProjetoFinanceiro = (() => {
             descricao: `${p.titulo} — ${rec.descricao}`,
             valor: rec.valor,
             tipo: 'receita',
+            // status é obrigatório: o DRE soma receita com status 'recebido' e
+            // "A Receber" soma 'a_receber'. Sem status, o lançamento existia na
+            // lista mas não entrava em cálculo nenhum — R$ 55.929,78 de receita
+            // ficaram invisíveis assim até 07/11/2026.
+            status: 'recebido',
             data: dataRecebimento,
             categoria: 'Serviços de Engenharia',
             formaPagamento: forma,
@@ -895,6 +900,7 @@ const ProjetoFinanceiro = (() => {
             descricao: `Comissão ${par.nome} — ${p.titulo}`,
             valor: valorPagar,
             tipo: 'despesa',
+            status: 'pago',   // mesma razão do lançamento de receita acima
             data,
             categoria: 'Comissões / Parcerias',
             formaPagamento: forma,

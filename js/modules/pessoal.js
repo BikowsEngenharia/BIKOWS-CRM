@@ -244,10 +244,13 @@ const Pessoal = (() => {
 
   /* Gera os lançamentos do mês atual a partir das despesas fixas ativas.
      Idempotente: não duplica se já foi gerada (marca origemId). */
-  function gerarLancamentosDoMes() {
+  function gerarLancamentosDoMes(silencioso) {
     const mes = Utils.todayStr().substring(0, 7);
     const fixas = DB.getAll('pessoal_despesas_fixas').filter(d => d.ativo !== false);
-    if (fixas.length === 0) { Toast.warning('Nenhuma despesa fixa ativa cadastrada.'); return; }
+    if (fixas.length === 0) {
+      if (!silencioso) Toast.warning('Nenhuma despesa fixa ativa cadastrada.');
+      return 0;
+    }
     const existentes = new Set(DB.getAll('pessoal_lancamentos').map(l => l.origemId).filter(Boolean));
     let criadas = 0;
     fixas.forEach(d => {
@@ -262,19 +265,25 @@ const Pessoal = (() => {
       });
       criadas++;
     });
-    if (criadas > 0) Toast.success(`⚡ ${criadas} lançamento(s) do mês gerado(s)`);
-    else Toast.warning('Todas as despesas fixas deste mês já foram geradas.');
-    render();
+    if (!silencioso) {
+      if (criadas > 0) Toast.success(`⚡ ${criadas} lançamento(s) do mês gerado(s)`);
+      else Toast.warning('Todas as despesas fixas deste mês já foram geradas.');
+      render();
+    }
+    return criadas;
   }
 
   /* Puxa o salário/retirada de um mês. Usa a folha do RH quando existe;
      senão calcula do cadastro do funcionário (regras do módulo Folha —
      sócio/PJ recebem valor cheio, sem INSS/IRRF). */
-  function puxarSalario(mes) {
+  function puxarSalario(mes, silencioso) {
     const cfg = DB.getConfig();
     const meuFuncId = cfg.pessoalFuncId || '';
     const func = meuFuncId ? DB.get('funcionarios', meuFuncId) : null;
-    if (!func) { Toast.error('Vincule seu nome (funcionário) primeiro.'); return; }
+    if (!func) {
+      if (!silencioso) Toast.error('Vincule seu nome (funcionário) primeiro.');
+      return false;
+    }
 
     const folhaMes = DB.getAll('folha').find(r => r.funcionarioId === meuFuncId && r.mes === mes);
     const ehSocio = typeof Folha !== 'undefined' && Folha.ehCLT ? !Folha.ehCLT(func) : false;
@@ -289,12 +298,15 @@ const Pessoal = (() => {
     }
 
     if (!valor) {
-      Toast.error('Sem valor cadastrado. Preencha o salário/retirada em RH / Folha.');
-      return;
+      if (!silencioso) Toast.error('Sem valor cadastrado. Preencha o salário/retirada em RH / Folha.');
+      return false;
     }
 
     const origemId = folhaMes ? 'folha:' + folhaMes.id : 'retirada-cad:' + meuFuncId + ':' + mes;
-    if (DB.getAll('pessoal_lancamentos').some(l => l.origemId === origemId)) { Toast.warning('Já puxado.'); return; }
+    if (DB.getAll('pessoal_lancamentos').some(l => l.origemId === origemId)) {
+      if (!silencioso) Toast.warning('Já puxado.');
+      return false;
+    }
 
     const rotulo = ehSocio ? 'Retirada' : 'Salário';
     DB.create('pessoal_lancamentos', {
@@ -305,8 +317,47 @@ const Pessoal = (() => {
       data: mes + '-05',
       origem: 'folha', origemId,
     });
-    Toast.success(`💵 ${rotulo} de ${_mesLabel(mes)} lançada no seu financeiro`);
-    render();
+    if (!silencioso) {
+      Toast.success(`💵 ${rotulo} de ${_mesLabel(mes)} lançada no seu financeiro`);
+      render();
+    }
+    return true;
+  }
+
+  /* ---- Sincronização automática ----
+     Roda uma vez por sessão, na abertura do sistema, no mesmo padrão das
+     outras automações. Faz duas coisas que antes exigiam abrir a tela e
+     clicar: gera os lançamentos das despesas fixas do mês e puxa o
+     salário ou a retirada quando a empresa já pagou.
+
+     Só puxa quando a folha do mês está marcada como paga: antes disso o
+     dinheiro não entrou na sua conta, e lançar como entrada seria mentira
+     no seu caixa pessoal. As guardas de idempotência por origemId são as
+     mesmas do caminho manual, então rodar de novo não duplica nada. */
+  let _autoSincronizou = false;
+
+  function autoSincronizar() {
+    if (_autoSincronizou) return;
+    _autoSincronizou = true;
+    setTimeout(() => {
+      try {
+        const partes = [];
+        const fixas = gerarLancamentosDoMes(true);
+        if (fixas) partes.push(`${fixas} despesa(s) fixa(s)`);
+
+        const mes = Utils.todayStr().substring(0, 7);
+        const meuFuncId = DB.getConfig().pessoalFuncId || '';
+        const minhaFolha = meuFuncId
+          ? DB.getAll('folha').find(r => r.funcionarioId === meuFuncId && r.mes === mes && r.pago)
+          : null;
+        if (minhaFolha && puxarSalario(mes, true)) partes.push('salário/retirada do mês');
+
+        if (partes.length) {
+          Toast.show(`💳 Meu espaço atualizado: ${partes.join(' e ')}.`, 6000);
+          if (typeof App !== 'undefined') App.refreshIfNeeded('pessoal_lancamentos');
+        }
+      } catch (e) { console.warn('[Pessoal] sincronização automática:', e); }
+    }, 1200);
   }
 
   // Mantida por compatibilidade (folhas geradas antes desta versão)
@@ -402,5 +453,5 @@ const Pessoal = (() => {
   function irHoje()    { _mes = Utils.todayStr().substring(0, 7); render(); }
   function addNew()    { novaDespesa(); }
 
-  return { render, mudarMes, irHoje, novaReceita, novaDespesa, editar, excluir, setFuncionario, puxarSalario, puxarFolha, puxarRetirada, addNew, openFormDespFixa, toggleDespFixa, deleteDespFixa, gerarLancamentosDoMes };
+  return { render, mudarMes, irHoje, novaReceita, novaDespesa, editar, excluir, setFuncionario, puxarSalario, puxarFolha, puxarRetirada, addNew, openFormDespFixa, toggleDespFixa, deleteDespFixa, gerarLancamentosDoMes, autoSincronizar };
 })();

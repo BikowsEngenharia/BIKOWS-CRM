@@ -125,6 +125,16 @@ const Hoje = (() => {
       .sort((a, b) => (a.prazo || '').localeCompare(b.prazo || ''));
   }
 
+  /* Despesa pessoal vencendo. Entra na mesma tela de propósito: o pedido foi
+     "não ficar abrindo vários locais", e só o dono usa o sistema. Fica em
+     bloco separado e rotulado, porque misturar caixa pessoal com o resultado
+     da empresa é outro assunto — isso aqui é lembrete, não contabilidade. */
+  function _pessoais() {
+    return DB.getAll('pessoal_lancamentos')
+      .filter(l => l.tipo === 'despesa' && l.status !== 'pago' && l.data && _dentro(l.data, -90))
+      .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+  }
+
   function _visitas() {
     return DB.getAll('visitas')
       .filter(v => v.data && _dentro(v.data, 0) && !['realizada', 'cancelada'].includes(v.status))
@@ -143,6 +153,7 @@ const Hoje = (() => {
     const documentos = _documentos();
     const projetos   = _projetos();
     const acoesPlano = _acoesPlano();
+    const pessoais   = _pessoais();
 
     const atrasadas = atividades.filter(a => _dias(a.data) < 0).length;
     const deHoje    = atividades.filter(a => _dias(a.data) === 0).length;
@@ -151,7 +162,7 @@ const Hoje = (() => {
 
     const total = atividades.length + followups.length + parcelas.length
       + contas.length + licitacoes.length + inspecoes.length + visitas.length
-      + documentos.length + projetos.length + acoesPlano.length;
+      + documentos.length + projetos.length + acoesPlano.length + pessoais.length;
 
     const agora = new Date();
     const hora = agora.getHours();
@@ -199,6 +210,11 @@ const Hoje = (() => {
         id: 'ins', icone: '⚙️', cor: '#8B2222',
         titulo: 'Inspeções vencendo',
         itens: inspecoes, linha: _linhaInspecao,
+      }),
+      _bloco({
+        id: 'pess', icone: '💳', cor: '#64748b',
+        titulo: 'Pessoal — contas do mês',
+        itens: pessoais, linha: _linhaPessoal,
       }),
       _bloco({
         id: 'plano', icone: '📘', cor: '#6366f1',
@@ -412,6 +428,15 @@ const Hoje = (() => {
       sub,
       `<button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}')" title="Abrir o projeto">Abrir</button>
        <button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}','tarefas')" title="Ver as atividades do projeto">Atividades</button>`
+    );
+  }
+
+  function _linhaPessoal(l) {
+    return _linha(
+      `${Utils.escHtml(l.descricao || 'Despesa pessoal')} ${_prazoLabel(l.data, 'vencida', 'vence em')}`,
+      [Utils.formatCurrency(l.valor), l.categoria ? Utils.escHtml(l.categoria) : '']
+        .filter(Boolean).join(' · '),
+      `<button class="btn btn-xs btn-secondary" onclick="App.navigate('pessoal')" title="Abrir Meu espaço">Abrir</button>`
     );
   }
 

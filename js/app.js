@@ -176,6 +176,8 @@ const App = (() => {
     if (typeof Licitacoes !== 'undefined' && Licitacoes.autoExpirar) setTimeout(() => { try { Licitacoes.autoExpirar(); } catch (e) { /* silencioso */ } }, 400);
     // Inspeção vencendo vira oportunidade de renovação sozinha (canal 5 do plano)
     if (typeof Equipamentos !== 'undefined' && Equipamentos.autoRenovacoes) setTimeout(() => { try { Equipamentos.autoRenovacoes(); } catch (e) { /* silencioso */ } }, 900);
+    // Meu espaço: despesas fixas do mês e salário já pago entram sozinhos
+    if (typeof Pessoal !== 'undefined' && Pessoal.autoSincronizar) setTimeout(() => { try { Pessoal.autoSincronizar(); } catch (e) { /* silencioso */ } }, 1400);
     // Aplicar restrições de navegação após carregamento inicial
     setTimeout(() => aplicarPermissoesNavegacao(), 200);
 

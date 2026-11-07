@@ -145,7 +145,7 @@ const Dashboard = (() => {
     let totalReceberAnt = 0;
     recebiveisAnt.forEach(r => {
       (r.parcelas || []).forEach(p => {
-        if (p.status !== 'recebido') totalReceberAnt += (p.valor || 0);
+        if (Utils.parcelaAberta(p)) totalReceberAnt += (p.valor || 0);
       });
     });
 
@@ -768,7 +768,7 @@ const Dashboard = (() => {
 
     // 5. Parcelas vencendo hoje
     recebiveis.forEach(r => {
-      (r.parcelas||[]).filter(p => p.status !== 'recebido' && p.vencimento === hoje).forEach(p => {
+      (r.parcelas||[]).filter(p => Utils.parcelaAberta(p) && p.vencimento === hoje).forEach(p => {
         const cli = DB.get('clientes', r.clienteId);
         items.push({
           prioridade: 1,

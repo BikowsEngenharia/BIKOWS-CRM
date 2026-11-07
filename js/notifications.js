@@ -279,7 +279,7 @@ const Notifications = (() => {
     const items = [];
     DB.getAll('recebiveis').forEach(r => {
       (r.parcelas || []).forEach(p => {
-        if (p.status === 'recebido') return;
+        if (!Utils.parcelaAberta(p)) return;
         const d = _daysUntil(p.vencimento);
         if (d !== null && d <= ant && d >= -30) {
           const label = d < 0 ? `${Math.abs(d)}d vencida` : d === 0 ? 'vence hoje' : `vence em ${d}d`;
@@ -492,7 +492,7 @@ const Notifications = (() => {
     let parcelasVencendoSemana = 0, parcelasVencidas = 0;
     recebiveis.forEach(r => {
       (r.parcelas||[]).forEach(p => {
-        if (p.status === 'recebido') return;
+        if (!Utils.parcelaAberta(p)) return;
         if (p.vencimento >= hojeStr && p.vencimento <= semanaFimStr) parcelasVencendoSemana++;
         else if (p.vencimento < hojeStr) parcelasVencidas++;
       });

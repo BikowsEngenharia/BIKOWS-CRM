@@ -140,7 +140,7 @@ const Calendario = (() => {
     DB.getAll('recebiveis').forEach(r => {
       (r.parcelas || []).forEach(parc => {
         if (!parc.vencimento) return;
-        if (parc.status === 'recebido') return;
+        if (!Utils.parcelaAberta(parc)) return;
         const overdue = Utils.isOverdue(parc.vencimento);
         const nearDue = !overdue && Utils.daysUntil(parc.vencimento) <= 3;
         addEvent(parc.vencimento, {
@@ -243,7 +243,7 @@ const Calendario = (() => {
     // parcelas
     DB.getAll('recebiveis').forEach(r => {
       (r.parcelas || []).forEach(parc => {
-        if (parc.status !== 'recebido' && inMonth(parc.vencimento)) {
+        if (Utils.parcelaAberta(parc) && inMonth(parc.vencimento)) {
           totalEventos++;
           if (Utils.isOverdue(parc.vencimento)) vencidos++;
         }

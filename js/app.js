@@ -506,7 +506,7 @@ const App = (() => {
     recebiveis.forEach(r => {
       const c = DB.get('clientes', r.clienteId);
       (r.parcelas||[]).forEach(p => {
-        if (p.status !== 'recebido' && Utils.isOverdue(p.vencimento) && isLive('parc_'+p.id)) {
+        if (Utils.parcelaAberta(p) && Utils.isOverdue(p.vencimento) && isLive('parc_'+p.id)) {
           parcelasVencidas.push({ ...p, clienteNome: c?.nome||'—', descricao: r.descricao });
         }
       });

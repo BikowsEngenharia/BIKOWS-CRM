@@ -1309,7 +1309,7 @@ const Projetos = (() => {
     // Para cada etapa recém-concluída, busca o recebimento vinculado pelo nome
     etapasConcluidas.forEach(etapa => {
       const rec = recs.find(r =>
-        r.status !== 'recebido' &&
+        Utils.parcelaAberta(r) &&
         (r.etapaNome === etapa.nome || r.descricao?.includes(etapa.nome))
       );
       if (!rec) return;
@@ -1381,7 +1381,7 @@ const Projetos = (() => {
   function _checarTodosPagamentos(projetoId) {
     const p = DB.get('projetos', projetoId);
     if (!p) return;
-    const recs = (p.financeiro?.recebimentos || []).filter(r => r.status !== 'recebido');
+    const recs = (p.financeiro?.recebimentos || []).filter(r => Utils.parcelaAberta(r));
     if (recs.length === 0) return;
 
     setTimeout(() => {

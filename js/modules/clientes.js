@@ -838,7 +838,7 @@ const Clientes = (() => {
     var hoje = Utils.todayStr();
     var recVencidas = [];
     DB.getAll('recebiveis').filter(function(r) { return r.clienteId === clienteId; }).forEach(function(r) {
-      (r.parcelas || []).forEach(function(p) { if (p.status !== 'recebido' && p.vencimento < hoje) recVencidas.push(p); });
+      (r.parcelas || []).forEach(function(p) { if (Utils.parcelaAberta(p) && p.vencimento < hoje) recVencidas.push(p); });
     });
     if (recVencidas.length > 0) { score -= 20; detalhes.push('-20 Parcela(s) vencida(s)'); }
     var atividades = DB.getAll('atividades').filter(function(a) { return a.clienteId === clienteId; });

@@ -60,7 +60,7 @@ const ProjetoFinanceiro = (() => {
       .filter(r => r.status === 'recebido')
       .reduce((s, r) => s + (r.valor || 0), 0);
     const totalAReceber = (fin.recebimentos || [])
-      .filter(r => r.status !== 'recebido')
+      .filter(r => Utils.parcelaAberta(r))
       .reduce((s, r) => s + (r.valor || 0), 0);
 
     return {
@@ -240,7 +240,7 @@ const ProjetoFinanceiro = (() => {
           <tbody>
             ${recs.map((r, i) => {
               const dias = Utils.daysUntil(r.vencimento);
-              const atrasado = r.status !== 'recebido' && dias !== null && dias < 0;
+              const atrasado = Utils.parcelaAberta(r) && dias !== null && dias < 0;
               return `<tr>
                 <td class="text-xs text-muted font-bold">${i + 1}</td>
                 <td class="font-bold text-sm">${Utils.escHtml(r.descricao || `Parcela ${i+1}`)}</td>
@@ -258,7 +258,7 @@ const ProjetoFinanceiro = (() => {
                   : `<span class="badge badge-gray text-xs">Não lançado</span>`}</td>
                 <td>
                   <div class="tbl-actions">
-                    ${r.status !== 'recebido' ? `
+                    ${Utils.parcelaAberta(r) ? `
                       <button class="btn btn-xs btn-primary" onclick="ProjetoFinanceiro.marcarRecebido('${p.id}','${r.id}')">✅ Receber</button>
                     ` : ''}
                     ${!r.lancadoFinanceiro ? `

@@ -53,11 +53,11 @@ const Financeiro = (() => {
     const res=recMes-dspMes;
     // A Receber = parcelas de recebíveis em aberto (não vencidas) + lançamentos "a receber"
     // Antes contava só lançamentos e não batia com o detalhamento (que lista parcelas)
-    const aRecParcelas=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>p.status!=='recebido'&&!Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
+    const aRecParcelas=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>Utils.parcelaAberta(p)&&!Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
     const aRecLanc=lanc.filter(l=>l.tipo==='receita'&&l.status==='a_receber').reduce((s,l)=>s+l.valor,0);
     const aRec=aRecParcelas+aRecLanc;
     const aPag=pag.filter(p=>p.status==='pendente').reduce((s,p)=>s+p.valor,0);
-    const venc=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>p.status!=='recebido'&&Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
+    const venc=rec.reduce((s,r)=>s+(r.parcelas||[]).filter(p=>Utils.parcelaAberta(p)&&Utils.isOverdue(p.vencimento)).reduce((a,p)=>a+p.valor,0),0);
 
     return `
       <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
@@ -143,7 +143,13 @@ const Financeiro = (() => {
   function buildReceber() {
     const recs=DB.getAll('recebiveis');
     let tG=0,tR=0,tP=0,tV=0;
-    recs.forEach(r=>(r.parcelas||[]).forEach(p=>{tG+=p.valor;p.status==='recebido'?tR+=p.valor:Utils.isOverdue(p.vencimento)?tV+=p.valor:tP+=p.valor;}));
+    // Parcela cancelada fica fora de tudo: antes caia no 'else' e era somada
+    // como pendente ou vencida, inflando o total a receber.
+    recs.filter(Utils.recebivelAtivo).forEach(r=>(r.parcelas||[]).forEach(p=>{
+      if(p.status==='cancelado')return;
+      tG+=p.valor;
+      p.status==='recebido'?tR+=p.valor:Utils.isOverdue(p.vencimento)?tV+=p.valor:tP+=p.valor;
+    }));
     return `
       <div class="fin-kpi">
         <div class="fin-kpi-cell"><div class="fin-kpi-label">Total Contratos</div><div class="fin-kpi-val">${Utils.formatCurrency(tG)}</div><div class="fk-sub">${recs.length} contrato(s)</div></div>
@@ -170,7 +176,7 @@ const Financeiro = (() => {
       <div class="recebivel-body">
         <div class="progress-bar mb-3" style="height:5px"><div class="progress-fill" style="width:${pct}%;background:linear-gradient(90deg,var(--success),#34d399)"></div></div>
         ${(r.parcelas||[]).map((p,i)=>{
-          const ov=p.status!=='recebido'&&Utils.isOverdue(p.vencimento);
+          const ov=Utils.parcelaAberta(p)&&Utils.isOverdue(p.vencimento);
           return `<div class="parcela-row">
             <div style="flex:1"><div class="text-sm font-semibold">Parcela ${i+1}</div>
             <div class="text-xs text-muted">${Utils.formatDate(p.vencimento)}${ov?' · <span style="color:var(--danger);font-weight:700">VENCIDA</span>':''}</div></div>
@@ -314,7 +320,7 @@ const Financeiro = (() => {
   function _projecaoMes(m,hojeM){
     if(m<hojeM)return{e:0,s:0};
     let e=0;
-    DB.getAll('recebiveis').forEach(r=>(r.parcelas||[]).forEach(p=>{if(p.status!=='recebido'&&(p.vencimento||'').startsWith(m))e+=p.valor;}));
+    DB.getAll('recebiveis').forEach(r=>(r.parcelas||[]).forEach(p=>{if(Utils.parcelaAberta(p)&&(p.vencimento||'').startsWith(m))e+=p.valor;}));
     let s=0;
     DB.getAll('contaspagar').forEach(c=>{if(c.status==='pendente'&&(c.vencimento||'').startsWith(m))s+=c.valor;});
     return{e,s};
@@ -710,7 +716,7 @@ const Financeiro = (() => {
   function marcarRecebido(rId,pId){
     const r=DB.get('recebiveis',rId);if(!r)return;
     const parcela=(r.parcelas||[]).find(p=>p.id===pId);
-    if(!parcela||parcela.status==='recebido')return;
+    if(!parcela||!Utils.parcelaAberta(parcela))return;   // recebida ou cancelada: nada a fazer
     const valorParcela=Number(parcela.valor)||0;
     // Sem valor não há o que lançar — antes criava lançamento de R$ 0,00
     // poluindo o Financeiro e os relatórios.
@@ -759,7 +765,7 @@ const Financeiro = (() => {
       DB.getAll('recebiveis').forEach(r => {
         const clienteNome = DB.get('clientes', r.clienteId)?.nome || r.cliente || r.titulo || r.descricao || '—';
         (r.parcelas || []).forEach(p => {
-          if (p.status !== 'recebido' && p.vencimento >= hoje) {
+          if (Utils.parcelaAberta(p) && p.vencimento >= hoje) {
             items.push({ _clienteNome: clienteNome, _desc: r.descricao, ...p });
           }
         });
@@ -781,7 +787,7 @@ const Financeiro = (() => {
       DB.getAll('recebiveis').forEach(r => {
         const clienteNome = DB.get('clientes', r.clienteId)?.nome || r.cliente || r.titulo || r.descricao || '—';
         (r.parcelas || []).forEach(p => {
-          if (p.status !== 'recebido' && p.vencimento < hoje) {
+          if (Utils.parcelaAberta(p) && p.vencimento < hoje) {
             const dias = Math.round((new Date(hoje) - new Date(p.vencimento)) / 86400000);
             items.push({ _clienteNome: clienteNome, _desc: r.descricao, _dias: dias, ...p });
           }

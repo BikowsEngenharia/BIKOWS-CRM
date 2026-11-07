@@ -217,6 +217,21 @@ const Utils = (() => {
     return '';
   }
 
+  /* Uma parcela está "em aberto" quando ainda não foi recebida E não foi
+     cancelada. Existe como função única porque a regra estava repetida em 21
+     lugares como `p.status !== 'recebido'`, e essa forma deixava a parcela
+     cancelada passar como se estivesse viva: ela continuava somando em
+     "A Receber", em vencidos, no calendário e no sino. */
+  function parcelaAberta(p) {
+    const s = p?.status;
+    return s !== 'recebido' && s !== 'cancelado';
+  }
+
+  /* Recebível anulado (duplicata, desistência) não entra em conta nenhuma. */
+  function recebivelAtivo(r) {
+    return r?.status !== 'cancelado';
+  }
+
   function sum(arr, key) {
     return arr.reduce((acc, x) => acc + (Number(x[key]) || 0), 0);
   }
@@ -441,6 +456,7 @@ const Utils = (() => {
     LEAD_STATUS, PROJ_STATUS, PROP_STATUS, ATIV_TIPO, ATIV_STATUS, LIC_ENCERRADAS, licEncerrada,
     badge, leadBadge, projBadge, propBadge, activBadge, dateAlert,
     sum, groupBy, currentMonth, monthLabel, confirmDelete, getClientName,
+    parcelaAberta, recebivelAtivo,
     validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn, labelTables, collapseActions,
     proximoNumero, numeroEmUso, SERIE_PROPOSTA, SERIE_PROJETO, FONTES_CTR, FONTES_PRJ,
   };

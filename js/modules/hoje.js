@@ -60,7 +60,7 @@ const Hoje = (() => {
     const out = [];
     DB.getAll('recebiveis').forEach(r => {
       (r.parcelas || []).forEach(p => {
-        if (p.status === 'recebido') return;
+        if (!Utils.parcelaAberta(p)) return;
         if (!_dentro(p.vencimento, -365)) return;
         out.push({ ...p, _recebivelId: r.id, _clienteId: r.clienteId });
       });

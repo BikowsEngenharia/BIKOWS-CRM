@@ -675,6 +675,7 @@ const Projetos = (() => {
         <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px">
           <button ${tabStyle('overview')} onclick="Projetos._switchViewTab('${id}','overview')">📋 Overview</button>
           <button ${tabStyle('horas')} onclick="Projetos._switchViewTab('${id}','horas')">⏱ Horas ${tsHoras > 0 ? `<span style="background:var(--primary);color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${tsHoras.toFixed(0)}h</span>` : ''}</button>
+          <button ${tabStyle('tarefas')} onclick="Projetos._switchViewTab('${id}','tarefas')">✅ Atividades ${(() => { const at = DB.getAll('atividades').filter(a => a.projetoId === id && a.status === 'pendente').length; return at > 0 ? `<span style="background:#f59e0b;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${at}</span>` : ''; })()}</button>
           <button ${tabStyle('arts')} onclick="Projetos._switchViewTab('${id}','arts')">📜 ARTs ${artsEntity.length > 0 ? `<span style="background:#10b981;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${artsEntity.length}</span>` : ''}</button>
           <button ${tabStyle('docs')} onclick="Projetos._switchViewTab('${id}','docs')">📎 Arquivos ${(() => { const nd = typeof Anexos !== 'undefined' ? Anexos.contar('projetos', id) : 0; return nd > 0 ? `<span style="background:#8b5cf6;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${nd}</span>` : ''; })()}</button>
         </div>
@@ -686,16 +687,18 @@ const Projetos = (() => {
         <div class="mt-4 flex gap-2" style="border-top:1px solid var(--border);padding-top:12px">
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
           <button class="btn btn-secondary btn-sm" onclick="Modal.close();ProjetoFinanceiro.open('${id}')">💰 Financeiro</button>
+          ${p.status !== 'concluido' && p.status !== 'cancelado' ? `<button class="btn btn-sm btn-success" onclick="Projetos.encerrarProjeto('${id}')" title="Concluir, registrar inspeção e pedir indicação">🏁 Encerrar</button>` : ''}
           ${typeof Anexos !== 'undefined' ? Anexos.botao('projetos', id, p.titulo) : ''}
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
         </div>
       `,
     });
 
-    // Se abaInicial não é 'overview', renderiza a aba correta
-    if (abaInicial === 'horas') setTimeout(() => _renderTimesheetTab(id), 50);
-    if (abaInicial === 'arts') setTimeout(() => _renderArtsTab(id), 50);
-    if (abaInicial === 'docs') setTimeout(() => _renderDocsTab(id), 50);
+    // Se abaInicial não é 'overview', renderiza a aba correta.
+    // Delega para _switchViewTab em vez de repetir a lista aqui: era por isso
+    // que a aba 'tarefas', nova, abria a ficha no overview — quem chamasse
+    // view(id,'tarefas') caía num if que não existia.
+    if (abaInicial && abaInicial !== 'overview') setTimeout(() => _switchViewTab(id, abaInicial), 50);
   }
 
   function _switchViewTab(projetoId, aba) {
@@ -728,9 +731,194 @@ const Projetos = (() => {
       _renderTimesheetTab(projetoId);
     } else if (aba === 'arts') {
       _renderArtsTab(projetoId);
+    } else if (aba === 'tarefas') {
+      _renderTarefasTab(projetoId);
     } else if (aba === 'docs') {
       _renderDocsTab(projetoId);
     }
+  }
+
+  /* Atividades do projeto. A aba Atividades saiu do menu principal na
+     reorganização: tarefa de obra pertence ao projeto, não a uma lista solta.
+     Aqui dá para criar, concluir e reagendar sem sair da ficha. */
+  function _renderTarefasTab(projetoId) {
+    const el = document.getElementById('viewProjetoTabContent');
+    if (!el) return;
+    const p = DB.get('projetos', projetoId);
+    const lista = DB.getAll('atividades')
+      .filter(a => a.projetoId === projetoId)
+      .sort((a, b) => {
+        const pa = a.status === 'pendente' ? 0 : 1, pb = b.status === 'pendente' ? 0 : 1;
+        return pa - pb || (a.data || '').localeCompare(b.data || '');
+      });
+    const pend = lista.filter(a => a.status === 'pendente');
+    const atrasadas = pend.filter(a => Utils.isOverdue(a.data)).length;
+
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <div class="text-sm">
+          <strong>${pend.length}</strong> pendente(s)
+          ${atrasadas ? ` · <span style="color:var(--danger);font-weight:700">${atrasadas} atrasada(s)</span>` : ''}
+          · ${lista.length - pend.length} concluída(s)
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="Projetos.novaTarefa('${projetoId}')">+ Nova atividade</button>
+      </div>
+      ${lista.length ? lista.map(a => {
+        const t = Utils.ATIV_TIPO[a.tipo] || { icon: '✅', label: a.tipo || '' };
+        const feito = a.status !== 'pendente';
+        return `<div class="anx-item"><div class="anx-linha">
+          <div class="anx-icone">${t.icon}</div>
+          <div class="anx-txt">
+            <div class="anx-nome" style="${feito ? 'text-decoration:line-through;opacity:.6' : ''}">${Utils.escHtml(a.titulo || '')}</div>
+            <div class="anx-sub">${Utils.escHtml(t.label)} · ${a.data ? Utils.formatDate(a.data) : 'sem data'}${a.hora ? ' ' + a.hora : ''}${a.responsavel ? ' · ' + Utils.escHtml(a.responsavel) : ''} ${Utils.dateAlert(a.data, a.status)}</div>
+          </div>
+          <div class="anx-acts">
+            ${feito ? '' : `<button class="btn btn-xs btn-success" onclick="Projetos.concluirTarefa('${a.id}','${projetoId}')" title="Marcar como concluída">✓</button>`}
+            <button class="btn btn-xs btn-secondary" onclick="Modal.close();Atividades.openForm('${a.id}')" title="Abrir a atividade">✏</button>
+          </div>
+        </div></div>`;
+      }).join('') : `<div class="text-sm text-muted p-3">
+        Nenhuma atividade neste projeto. O que precisa ser feito em obra fica aqui,
+        junto do serviço, e aparece na tela Hoje quando chega a data.</div>`}`;
+  }
+
+  function novaTarefa(projetoId) {
+    const p = DB.get('projetos', projetoId);
+    Modal.close();
+    setTimeout(() => Atividades.openForm(null, null, { projetoId, clienteId: p?.clienteId || '' }), 200);
+  }
+
+  function concluirTarefa(atividadeId, projetoId) {
+    DB.update('atividades', atividadeId, { status: 'concluida', concluidaEm: Utils.todayStr() });
+    Toast.success('Atividade concluída');
+    _renderTarefasTab(projetoId);
+    if (typeof App !== 'undefined') App.updateNotifBadge();
+  }
+
+  /* ---------- Encerramento do projeto ----------
+     É aqui que o ciclo da recorrência fecha. Antes, concluir um projeto era
+     só trocar o status no formulário de edição: o equipamento atendido não
+     era registrado, a próxima inspeção não era agendada e o pedido de
+     indicação, que o plano aponta como canal 5, nunca acontecia. */
+  function encerrarProjeto(id) {
+    const p = DB.get('projetos', id);
+    if (!p) return;
+    const equipamentos = DB.getAll('equipamentos').filter(e => e.clienteId === p.clienteId && e.status !== 'inativo');
+    const hoje = Utils.todayStr();
+
+    Modal.open({
+      title: '🏁 Encerrar serviço — ' + Utils.truncate(p.titulo || '', 40),
+      size: 'modal-lg',
+      body: `
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data de conclusão</label>
+            <input class="form-control" type="date" id="encData" value="${hoje}" max="${hoje}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Satisfação do cliente (NPS)</label>
+            <select class="form-control" id="encNps">
+              <option value="">— não avaliado —</option>
+              ${[5,4,3,2,1].map(n => `<option value="${n}" ${p.npsCliente==n?'selected':''}>${'⭐'.repeat(n)} ${n}/5</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Equipamentos atendidos neste serviço</label>
+          ${equipamentos.length ? `
+            <div style="max-height:170px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px">
+              ${equipamentos.map(e => {
+                const prox = proximaInspecaoDe(e);
+                return `<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">
+                  <input type="checkbox" class="encEq" value="${e.id}">
+                  <span style="flex:1"><strong>${Utils.escHtml(e.tag || '—')}</strong>
+                    <span class="text-xs text-muted">${Utils.escHtml(e.norma || '')}${prox ? ' · próxima hoje marcada para ' + Utils.formatDate(prox) : ''}</span>
+                  </span>
+                </label>`;
+              }).join('')}
+            </div>
+            <div class="text-xs text-muted" style="margin-top:4px">
+              Marcar aqui grava a inspeção na data de conclusão e reagenda a próxima pela
+              periodicidade. Sessenta dias antes dela, a renovação entra no funil sozinha.
+            </div>`
+            : `<div class="text-sm text-muted" style="padding:8px 0">
+                 Este cliente ainda não tem equipamento cadastrado. Sem parque não há
+                 recorrência: cadastre as máquinas na ficha dele depois.
+               </div>`}
+        </div>
+
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="encIndicacao" checked>
+            <span class="text-sm">Criar lembrete para <strong>pedir indicação</strong> daqui a 7 dias</span>
+          </label>
+          <div class="text-xs text-muted" style="margin-left:24px">
+            Pedido de indicação na entrega é o canal 5 do plano, hoje com zero contratos.
+          </div>
+        </div>`,
+      saveLabel: '🏁 Encerrar serviço',
+      saveCb: () => _salvarEncerramento(id),
+    });
+  }
+
+  function proximaInspecaoDe(e) {
+    return (typeof Equipamentos !== 'undefined' && Equipamentos.proximaInspecao)
+      ? Equipamentos.proximaInspecao(e) : (e.proximaInspecao || '');
+  }
+
+  function _salvarEncerramento(id) {
+    const p = DB.get('projetos', id);
+    if (!p) { Modal.close(); return; }
+    const data = document.getElementById('encData')?.value || Utils.todayStr();
+    const nps = document.getElementById('encNps')?.value || '';
+    const eqIds = [...document.querySelectorAll('.encEq:checked')].map(c => c.value);
+    const querIndicacao = document.getElementById('encIndicacao')?.checked;
+
+    DB.update('projetos', id, {
+      status: 'concluido',
+      dataConclusao: data,
+      ...(nps ? { npsCliente: Number(nps) } : {}),
+    });
+
+    // Equipamento atendido: grava a inspeção e deixa a próxima agendada
+    let reagendados = 0;
+    eqIds.forEach(eqId => {
+      const e = DB.get('equipamentos', eqId);
+      if (!e) return;
+      const nova = {};
+      nova.ultimaInspecao = data;
+      nova.proximaInspecao = '';   // recalculada pela periodicidade
+      if (e.periodicidadeMeses) {
+        const d = Utils.parseDate(data);
+        d.setMonth(d.getMonth() + Number(e.periodicidadeMeses));
+        nova.proximaInspecao = Utils.localDateStr(d);
+      }
+      nova.projetoUltimaInspecao = id;
+      DB.update('equipamentos', eqId, nova);
+      reagendados++;
+    });
+
+    if (querIndicacao) {
+      const d = Utils.parseDate(data); d.setDate(d.getDate() + 7);
+      DB.create('atividades', {
+        titulo: 'Pedir indicação — ' + Utils.truncate(Utils.getClientName(p.clienteId), 40),
+        tipo: 'followup', status: 'pendente', prioridade: 'media',
+        data: Utils.localDateStr(d),
+        clienteId: p.clienteId || '', projetoId: id,
+        responsavel: p.responsavel || '',
+        descricao: 'Serviço "' + (p.titulo || '') + '" entregue em ' + Utils.formatDate(data)
+          + '. Pedir indicação de outra empresa ou outra planta.',
+      });
+    }
+
+    Modal.close();
+    const partes = ['Serviço encerrado em ' + Utils.formatDate(data)];
+    if (reagendados) partes.push(reagendados + ' inspeção(ões) reagendada(s)');
+    if (querIndicacao) partes.push('lembrete de indicação criado');
+    Toast.success(partes.join(' · '));
+    render();
+    if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('projetos'); }
   }
 
   /* Arquivos do projeto. Passou do módulo Documentos (que só guardava link,
@@ -1569,6 +1757,7 @@ const Projetos = (() => {
 
   return {
     render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew,
+    novaTarefa, concluirTarefa, encerrarProjeto, _salvarEncerramento,
     verRentabilidade, addChecklistItem, toggleChecklistItem, aplicarTemplateChecklist,
     _nextOS, setPeriodo, setTabProjetos, drillDown, renumerarDuplicados,
     // Timesheet (Melhoria 2)

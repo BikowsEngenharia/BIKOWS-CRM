@@ -159,16 +159,23 @@ const Atividades = (() => {
 
   function setFilter(k, v) { _filter[k] = v; render(); }
 
-  function openForm(id = null, prefilledDate = null) {
+  /* prefill: { clienteId, projetoId, leadId } — usado quando a atividade nasce
+     de dentro da ficha de um projeto ou de um cliente, para não redigitar. */
+  function openForm(id = null, prefilledDate = null, prefill = {}) {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const leads = DB.getAll('leads').filter(l => !['fechado_perdido'].includes(l.status));
+    const projetos = DB.getAll('projetos').filter(p => !['cancelado'].includes(p.status));
     const a = id ? DB.get('atividades', id) : null;
     const isDiaInteiro = a?.diaInteiro || false;
     const defaultDate  = prefilledDate || a?.data || Utils.todayStr();
 
-    const clientOpts = clientes.map(c => `<option value="${c.id}" ${a?.clienteId===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
-    const leadOpts   = leads.map(l => `<option value="${l.id}" ${a?.leadId===l.id?'selected':''}>${Utils.escHtml(l.titulo)}</option>`).join('');
+    const selCliente = a?.clienteId || prefill.clienteId || '';
+    const selLead    = a?.leadId || prefill.leadId || '';
+    const selProjeto = a?.projetoId || prefill.projetoId || '';
+    const clientOpts = clientes.map(c => `<option value="${c.id}" ${selCliente===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
+    const leadOpts   = leads.map(l => `<option value="${l.id}" ${selLead===l.id?'selected':''}>${Utils.escHtml(l.titulo)}</option>`).join('');
+    const projOpts   = projetos.map(p => `<option value="${p.id}" ${selProjeto===p.id?'selected':''}>${Utils.escHtml((p.ordemServico?p.ordemServico+' — ':'')+(p.titulo||''))}</option>`).join('');
     const tipoOpts   = Object.entries(Utils.ATIV_TIPO).map(([k,v]) => `<option value="${k}" ${a?.tipo===k?'selected':''}>${v.icon} ${v.label}</option>`).join('');
     const respOpts   = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${a?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const statusOpts = Object.entries(Utils.ATIV_STATUS).map(([k,v]) => `<option value="${k}" ${(a?.status||'pendente')===k?'selected':''}>${v.label}</option>`).join('');
@@ -246,6 +253,10 @@ const Atividades = (() => {
           <div class="form-group">
             <label class="form-label">Lead (opcional)</label>
             <select class="form-control" id="faLead"><option value="">—</option>${leadOpts}</select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Projeto (opcional)</label>
+            <select class="form-control" id="faProjeto"><option value="">—</option>${projOpts}</select>
           </div>
         </div>
         <div class="form-group">
@@ -340,6 +351,7 @@ const Atividades = (() => {
       responsavel: document.getElementById('faResp').value,
       clienteId:   document.getElementById('faCliente').value,
       leadId:      document.getElementById('faLead').value,
+      projetoId:   document.getElementById('faProjeto')?.value || '',
       descricao:   document.getElementById('faDescricao').value,
     };
     if (id) { DB.update('atividades', id, data); Toast.success('Atividade atualizada'); }

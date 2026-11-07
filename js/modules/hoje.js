@@ -100,6 +100,15 @@ const Hoje = (() => {
     return Anexos.vencendo(Math.max(_horizonte, 30));
   }
 
+  /* Projeto em execução com prazo vencido ou vencendo. Antes só aparecia se
+     a pessoa abrisse a aba Projetos; agora o atraso procura você. */
+  function _projetos() {
+    return DB.getAll('projetos')
+      .filter(p => !['concluido', 'cancelado'].includes(p.status) && p.prazo)
+      .filter(p => _dentro(p.prazo, -365))
+      .sort((a, b) => (a.prazo || '').localeCompare(b.prazo || ''));
+  }
+
   function _visitas() {
     return DB.getAll('visitas')
       .filter(v => v.data && _dentro(v.data, 0) && !['realizada', 'cancelada'].includes(v.status))
@@ -116,6 +125,7 @@ const Hoje = (() => {
     const inspecoes  = _inspecoes();
     const visitas    = _visitas();
     const documentos = _documentos();
+    const projetos   = _projetos();
 
     const atrasadas = atividades.filter(a => _dias(a.data) < 0).length;
     const deHoje    = atividades.filter(a => _dias(a.data) === 0).length;
@@ -124,7 +134,7 @@ const Hoje = (() => {
 
     const total = atividades.length + followups.length + parcelas.length
       + contas.length + licitacoes.length + inspecoes.length + visitas.length
-      + documentos.length;
+      + documentos.length + projetos.length;
 
     const agora = new Date();
     const hora = agora.getHours();
@@ -142,6 +152,11 @@ const Hoje = (() => {
         id: 'fup', icone: '💼', cor: '#8b5cf6',
         titulo: 'Follow-up de lead',
         itens: followups, linha: _linhaFollowup,
+      }),
+      _bloco({
+        id: 'prj', icone: '🏗', cor: '#0891b2',
+        titulo: 'Projetos com prazo estourando',
+        itens: projetos, linha: _linhaProjeto,
       }),
       _bloco({
         id: 'vis', icone: '🏭', cor: '#f97316',
@@ -354,6 +369,25 @@ const Hoje = (() => {
       `${Utils.escHtml(e.tag || e.nome || 'Equipamento')} ${_prazoLabel(e.proximaInspecao, 'vencida', 'vence em')}`,
       [e.norma ? '📐 ' + Utils.escHtml(e.norma) : '', cli && cli !== '—' ? '🏢 ' + Utils.escHtml(cli) : ''].filter(Boolean).join(' · '),
       `<button class="btn btn-xs btn-secondary" onclick="App.navigate('equipamentos')" title="Abrir equipamentos">Abrir</button>`
+    );
+  }
+
+  function _linhaProjeto(p) {
+    const cli = Utils.getClientName(p.clienteId);
+    const etapas = p.etapas || [];
+    const pct = etapas.length ? Math.round(etapas.reduce((s, e) => s + (e.pct || 0), 0) / etapas.length) : null;
+    const emAberto = DB.getAll('atividades').filter(a => a.projetoId === p.id && a.status === 'pendente').length;
+    const sub = [
+      p.ordemServico ? Utils.escHtml(p.ordemServico) : '',
+      cli && cli !== '—' ? '🏢 ' + Utils.escHtml(cli) : '',
+      pct !== null ? '📊 ' + pct + '% concluído' : '',
+      emAberto ? '✅ ' + emAberto + ' atividade(s) em aberto' : '',
+    ].filter(Boolean).join(' · ');
+    return _linha(
+      `${Utils.escHtml(p.titulo || 'Projeto')} ${_prazoLabel(p.prazo, 'atrasado', 'prazo em')}`,
+      sub,
+      `<button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}')" title="Abrir o projeto">Abrir</button>
+       <button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}','tarefas')" title="Ver as atividades do projeto">Atividades</button>`
     );
   }
 

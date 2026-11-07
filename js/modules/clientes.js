@@ -297,10 +297,19 @@ const Clientes = (() => {
           }).join('') : '<div class="text-sm text-muted p-3">Nenhuma atividade</div>'}
         </div>
         <div id="tabContatos360" class="hidden">
-          ${contatos.length ? contatos.map(ct=>`<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-            <div class="font-bold text-sm">${Utils.escHtml(ct.nome)}${ct.principal?' <span class="badge badge-blue">Principal</span>':''}</div>
-            <div class="text-xs text-muted">${Utils.escHtml(ct.cargo||'')}${ct.email?' · '+Utils.escHtml(ct.email):''}${ct.telefone?' · '+Utils.escHtml(ct.telefone):''}</div>
-          </div>`).join('') : '<div class="text-sm text-muted p-3">Nenhum contato</div>'}
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+            <button class="btn btn-sm btn-primary" onclick="Modal.close();Contatos.openForm(null,'${id}')">+ Novo contato</button>
+          </div>
+          ${contatos.length ? contatos.map(ct=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1;min-width:0">
+              <div class="font-bold text-sm">${Utils.escHtml(ct.nome)}${ct.principal?' <span class="badge badge-blue">Principal</span>':''}</div>
+              <div class="text-xs text-muted">${Utils.escHtml(ct.cargo||'')}${ct.email?' · '+Utils.escHtml(ct.email):''}${ct.telefone?' · '+Utils.escHtml(ct.telefone):''}</div>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0">
+              ${ct.telefone ? Utils.waBtn(ct.telefone) : ''}
+              <button class="btn btn-xs btn-secondary" onclick="Modal.close();Contatos.openForm('${ct.id}')" title="Editar contato">✏</button>
+            </div>
+          </div>`).join('') : '<div class="text-sm text-muted p-3">Nenhum contato cadastrado ainda.</div>'}
         </div>
 
         <!-- TIMELINE DE INTERAÇÕES -->

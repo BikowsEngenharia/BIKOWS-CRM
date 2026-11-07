@@ -5,7 +5,7 @@ const App = (() => {
 
   const PAGES = {
     hoje:       { title: 'Hoje',            module: Hoje,        addLabel: null },
-    dashboard:  { title: 'Dashboard',       module: Dashboard,   addLabel: null },
+    dashboard:  { title: 'Resumo',          module: Dashboard,   addLabel: null },
     pipeline:   { title: 'Pipeline CRM',    module: Pipeline,    addLabel: '+ Novo Lead' },
     clientes:   { title: 'Clientes',        module: Clientes,    addLabel: '+ Novo Cliente' },
     contatos:   { title: 'Contatos',        module: Contatos,    addLabel: '+ Novo Contato' },
@@ -31,6 +31,85 @@ const App = (() => {
     config:     { title: 'Configurações',   module: Config,      addLabel: null },
     prospeccao: { title: 'Prospecção',      module: Prospeccao,  addLabel: null },
   };
+
+  /* ================================================
+     GRUPOS DE NAVEGAÇÃO
+     O menu passou de 26 itens para 11. Cada item de grupo abre a primeira
+     tela do grupo e mostra as irmãs numa faixa de submenu logo abaixo do
+     título. Nenhum módulo precisou ser alterado: cada um continua
+     desenhando em #pageContent como sempre, e o submenu vive fora dele.
+     ================================================ */
+  const GRUPOS = {
+    vendas: {
+      titulo: 'Vendas',
+      itens: [
+        { page: 'pipeline',   label: '🎯 Funil' },
+        { page: 'propostas',  label: '📄 Propostas' },
+        { page: 'orcamento',  label: '⚡ Orçamento' },
+        { page: 'licitacoes', label: '🏛 Licitações' },
+        { page: 'prospeccao', label: '🔍 Prospecção' },
+      ],
+    },
+    execucao: {
+      titulo: 'Projetos',
+      itens: [
+        { page: 'projetos',  label: '🏗 Projetos' },
+        { page: 'contratos', label: '📋 Contratos' },
+      ],
+    },
+    compromissos: {
+      titulo: 'Agenda',
+      itens: [
+        { page: 'calendario', label: '📅 Calendário' },
+        { page: 'atividades', label: '✅ Atividades' },
+      ],
+    },
+    dinheiro: {
+      titulo: 'Financeiro',
+      itens: [
+        { page: 'financeiro', label: '💰 Caixa e resultado' },
+        { page: 'rh',         label: '👥 Equipe e folha' },
+      ],
+    },
+    mkt: {
+      titulo: 'Marketing',
+      itens: [
+        { page: 'marketing', label: '📣 Conteúdo e campanhas' },
+        { page: 'trafego',   label: '🎯 Tráfego pago' },
+      ],
+    },
+    planejamento: {
+      titulo: 'Planejamento',
+      itens: [
+        { page: 'relatorios', label: '📊 Relatórios' },
+        { page: 'metas',      label: '🎯 Metas' },
+        { page: 'plano',      label: '📘 Plano de negócios' },
+      ],
+    },
+    meu_espaco: {
+      titulo: 'Meu espaço',
+      itens: [
+        { page: 'pessoal', label: '💳 Financeiro pessoal' },
+        { page: 'agenda',  label: '🕐 Agenda pessoal' },
+      ],
+    },
+  };
+
+  /* A qual grupo esta página pertence (ou null, se é tela solta). */
+  function _grupoDe(page) {
+    return Object.keys(GRUPOS).find(g => GRUPOS[g].itens.some(i => i.page === page)) || null;
+  }
+
+  function _renderSubnav(grupo, page) {
+    const el = document.getElementById('subNav');
+    if (!el) return;
+    if (!grupo) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    el.innerHTML = GRUPOS[grupo].itens.map(i => `
+      <button class="subnav-btn${i.page === page ? ' ativo' : ''}" onclick="App.navigate('${i.page}')">
+        ${i.label}
+      </button>`).join('');
+  }
 
   let _currentPage = 'dashboard';
   let _sidebarCollapsed = false;
@@ -232,13 +311,19 @@ const App = (() => {
     } catch(e) { /* silencioso */ }
     _currentPage = page;
 
-    // Update active nav link (sidebar + bottom-nav mobile)
+    const grupo = _grupoDe(page);
+
+    // Destaca no menu: a tela solta por data-page, a do grupo por data-grupo
     document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(l => {
-      l.classList.toggle('active', l.dataset.page === page);
+      const ativo = l.dataset.page === page || (!!grupo && l.dataset.grupo === grupo);
+      l.classList.toggle('active', ativo);
     });
 
+    _renderSubnav(grupo, page);
+
     const cfg = PAGES[page];
-    document.getElementById('pageTitle').textContent = cfg.title;
+    // No grupo, o título é o do grupo; o submenu abaixo mostra onde se está
+    document.getElementById('pageTitle').textContent = grupo ? GRUPOS[grupo].titulo : cfg.title;
 
     // Add button
     const btnAdd = document.getElementById('btnAddNew');
@@ -1192,7 +1277,7 @@ const App = (() => {
     }
   }
 
-  return { init, navigate, addNew, setPaginaInicial, _paginaInicial, atualizarStatusRede, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, adiarNotif, adiarTodasNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
+  return { init, navigate, addNew, setPaginaInicial, _paginaInicial, atualizarStatusRede, _grupoDe, GRUPOS, toggleSidebar, updateBrand, updateUserInfo, updateNotifBadge, showPendencias, dismissNotif, dismissAllNotifs, adiarNotif, adiarTodasNotifs, search, closeSearch, toggleMobileSearch, toggleDark, toggleDarkMode, toggleTheme, refreshIfNeeded, quickCapture, _renderQcForm, _saveQuickCapture, aplicarPermissoesNavegacao };
 })();
 
 // Inicialização — Auth verifica sessão e chama App.init() após loadAll()

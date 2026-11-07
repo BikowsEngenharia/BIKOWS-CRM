@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="img/simbolo-bikows.png">
   <link rel="apple-touch-icon" href="img/simbolo-bikows.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/styles.css?v=20261101d">
+  <link rel="stylesheet" href="css/styles.css?v=20261107">
   <!-- Supabase JS SDK — versão fixada para evitar breaking changes -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"
     onerror="document.getElementById('loadingText').innerHTML='Erro ao carregar dependências.<br><button onclick=\'location.reload()\' style=\'margin-top:12px;padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px\'>🔄 Recarregar</button>'"></script>
@@ -86,109 +86,49 @@
       </a>
       <a class="nav-link" data-page="dashboard" href="#">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-        <span>Dashboard</span>
+        <span>Resumo</span>
       </a>
 
       <div class="nav-section-label">Comercial</div>
-      <a class="nav-link" data-page="pipeline" href="#">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-        <span>Pipeline CRM</span>
+      <a class="nav-link" data-page="pipeline" data-grupo="vendas" href="#">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+        <span>Vendas</span>
       </a>
       <a class="nav-link" data-page="clientes" href="#">
         <svg viewBox="0 0 24 24"><path d="M3 21V5a2 2 0 012-2h14a2 2 0 012 2v16M7 10h4M7 14h4M13 10h4M13 14h4"/></svg>
         <span>Clientes</span>
       </a>
-      <a class="nav-link" data-page="contatos" href="#">
-        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-        <span>Contatos</span>
-      </a>
-      <a class="nav-link" data-page="orcamento" href="#">
-        <svg viewBox="0 0 24 24"><path d="M9 7h6M9 11h6M9 15h4"/><path d="M5 3h14a1 1 0 011 1v16l-3-2-3 2-3-2-3 2V4a1 1 0 011-1z"/></svg>
-        <span>Orçamento Rápido</span>
-      </a>
-      <a class="nav-link" data-page="propostas" href="#">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-        <span>Propostas</span>
-      </a>
-      <a class="nav-link" data-page="contratos" href="#">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <span>Contratos</span>
-      </a>
-      <a class="nav-link" data-page="licitacoes" href="#">
-        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span>Licitações</span>
-      </a>
-      <a class="nav-link" data-page="prospeccao" href="#">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <span>Prospecção</span>
-      </a>
 
       <div class="nav-section-label">Operação</div>
-      <a class="nav-link" data-page="projetos" href="#">
+      <a class="nav-link" data-page="projetos" data-grupo="execucao" href="#">
         <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5h6M9 12l2 2 4-4"/></svg>
         <span>Projetos</span>
       </a>
-      <a class="nav-link" data-page="atividades" href="#">
-        <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-        <span>Atividades</span>
-      </a>
-      <a class="nav-link" data-page="visitas" href="#">
-        <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01"/></svg>
-        <span>Visitas Técnicas</span>
-      </a>
-      <a class="nav-link" data-page="equipamentos" href="#">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        <span>Equipamentos</span>
-      </a>
-      <a class="nav-link" data-page="calendario" href="#">
+      <a class="nav-link" data-page="calendario" data-grupo="compromissos" href="#">
         <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span>Calendário</span>
-      </a>
-      <a class="nav-link" data-page="documentos" href="#">
-        <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-        <span>Documentos</span>
+        <span>Agenda</span>
       </a>
 
       <div class="nav-section-label">Financeiro</div>
-      <a class="nav-link" data-page="financeiro" href="#">
+      <a class="nav-link" data-page="financeiro" data-grupo="dinheiro" href="#">
         <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
         <span>Financeiro</span>
       </a>
-      <a class="nav-link" data-page="rh" href="#">
-        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-        <span>RH / Folha</span>
-      </a>
 
-      <div class="nav-section-label">Pessoal</div>
-      <a class="nav-link" data-page="pessoal" href="#">
-        <svg viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4z"/></svg>
-        <span>Meu Financeiro</span>
-      </a>
-      <a class="nav-link" data-page="agenda" href="#">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>Agenda Pessoal</span>
-      </a>
-
-      <div class="nav-section-label">Gestão</div>
-      <a class="nav-link" data-page="relatorios" href="#">
-        <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-        <span>Relatórios</span>
-      </a>
-      <a class="nav-link" data-page="metas" href="#">
-        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        <span>Metas & KPIs</span>
-      </a>
-      <a class="nav-link" data-page="plano" href="#">
-        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-        <span>Plano de Negócios</span>
-      </a>
-      <a class="nav-link" data-page="marketing" href="#">
+      <div class="nav-section-label">Crescimento</div>
+      <a class="nav-link" data-page="marketing" data-grupo="mkt" href="#">
         <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         <span>Marketing</span>
       </a>
-      <a class="nav-link" data-page="trafego" href="#">
-        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/><circle cx="19" cy="5" r="3" fill="currentColor" opacity=".3"/></svg>
-        <span>Tráfego Pago</span>
+      <a class="nav-link" data-page="relatorios" data-grupo="planejamento" href="#">
+        <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        <span>Planejamento</span>
+      </a>
+
+      <div class="nav-section-label">Pessoal</div>
+      <a class="nav-link" data-page="pessoal" data-grupo="meu_espaco" href="#">
+        <svg viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4z"/></svg>
+        <span>Meu espaço</span>
       </a>
     </nav>
     <div class="sidebar-bottom">
@@ -237,6 +177,7 @@
       </div>
     </header>
     <div id="statusRede" class="status-rede" style="display:none"></div>
+    <div id="subNav" class="subnav" style="display:none"></div>
     <main class="page-content" id="pageContent"></main>
   </div>
 </div>
@@ -248,21 +189,21 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
       <span>Hoje</span>
     </button>
-    <button class="bottom-nav-item" data-page="pipeline" onclick="App.navigate('pipeline')">
-      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-      <span>Pipeline</span>
+    <button class="bottom-nav-item" data-page="pipeline" data-grupo="vendas" onclick="App.navigate('pipeline')">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+      <span>Vendas</span>
     </button>
     <button class="bottom-nav-item" data-page="clientes" onclick="App.navigate('clientes')">
       <svg viewBox="0 0 24 24"><path d="M3 21V5a2 2 0 012-2h14a2 2 0 012 2v16M7 10h4M7 14h4M13 10h4M13 14h4"/></svg>
       <span>Clientes</span>
     </button>
-    <button class="bottom-nav-item" data-page="propostas" onclick="App.navigate('propostas')">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6"/></svg>
-      <span>Propostas</span>
+    <button class="bottom-nav-item" data-page="projetos" data-grupo="execucao" onclick="App.navigate('projetos')">
+      <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5h6M9 12l2 2 4-4"/></svg>
+      <span>Projetos</span>
     </button>
-    <button class="bottom-nav-item" data-page="atividades" onclick="App.navigate('atividades')">
-      <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-      <span>Tarefas</span>
+    <button class="bottom-nav-item" data-page="calendario" data-grupo="compromissos" onclick="App.navigate('calendario')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Agenda</span>
     </button>
   </div>
 </nav>
@@ -318,8 +259,8 @@
 <script src="js/modules/anexos.js?v=20261101c"></script>
 <script src="js/modules/dashboard.js?v=20261018b"></script>
 <script src="js/modules/pipeline.js?v=20261101"></script>
-<script src="js/modules/clientes.js?v=20261101b"></script>
-<script src="js/modules/contatos.js?v=20260523"></script>
+<script src="js/modules/clientes.js?v=20261107"></script>
+<script src="js/modules/contatos.js?v=20261107"></script>
 <script src="js/modules/projetos.js?v=20261101b"></script>
 <script src="js/modules/atividades.js?v=20261018b"></script>
 <script src="js/modules/visitas.js?v=20261101"></script>
@@ -349,6 +290,6 @@
 <script src="js/modules/prospeccao.js?v=20260920"></script>
 <script src="js/modules/documentos.js?v=20260920c"></script>
 <script src="js/notifications.js?v=20261101b"></script>
-<script src="js/app.js?v=20261101b"></script>
+<script src="js/app.js?v=20261107"></script>
 </body>
 </html>

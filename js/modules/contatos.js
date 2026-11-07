@@ -69,10 +69,13 @@ const Contatos = (() => {
 
   function setSearch(v) { _search = v; render(); }
 
-  function openForm(id = null) {
+  /* prefillCliente: chamado de dentro da ficha do cliente, já deixa a empresa
+     escolhida. Contato nasce quase sempre a partir de um cliente aberto. */
+  function openForm(id = null, prefillCliente = '') {
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const c = id ? DB.get('contatos', id) : null;
-    const clientOptions = clientes.map(cl => `<option value="${cl.id}" ${c?.clienteId===cl.id?'selected':''}>${Utils.escHtml(cl.nome)}</option>`).join('');
+    const selecionado = c?.clienteId || prefillCliente || '';
+    const clientOptions = clientes.map(cl => `<option value="${cl.id}" ${selecionado===cl.id?'selected':''}>${Utils.escHtml(cl.nome)}</option>`).join('');
 
     Modal.open({
       title: id ? 'Editar Contato' : 'Novo Contato',

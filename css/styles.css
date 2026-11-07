@@ -2298,3 +2298,25 @@ body.dark-mode .status-rede.offline { background: #3B2F0B; color: #FCD34D; borde
 
 /* Botão flutuante de captura some com janela aberta (tapava o conteúdo no celular) */
 body.modal-aberto .quick-capture-btn { display: none; }
+
+/* ==========================================
+   SUBMENU — faixa de abas do grupo, abaixo do título
+   ========================================== */
+.subnav {
+  display: flex; gap: 2px; padding: 0 18px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.subnav::-webkit-scrollbar { display: none; }
+.subnav-btn {
+  padding: 10px 14px; border: none; background: transparent;
+  border-bottom: 2px solid transparent; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--text-muted);
+  white-space: nowrap; transition: var(--t);
+}
+.subnav-btn:hover { color: var(--text); background: var(--surface-2); }
+.subnav-btn.ativo { color: var(--primary); border-bottom-color: var(--primary); }
+@media (max-width: 760px) {
+  .subnav { padding: 0 12px; }
+  .subnav-btn { padding: 10px 11px; font-size: 12.5px; min-height: 40px; }
+}

@@ -772,9 +772,9 @@ const Pipeline = (() => {
     render();
     App.updateNotifBadge();
 
-    // Hook: ao mover para Fechado/Ganho → inicia fluxo de contratação
+    // Hook: ao mover para Fechado/Ganho → garante o cliente e inicia contratação
     if (newStatus === 'fechado_ganho') {
-      setTimeout(() => _promptContratacao(leadId), 350);
+      setTimeout(() => _garantirCliente(leadId, () => _promptContratacao(leadId)), 350);
     }
     // Hook: ao entrar em Proposta em Elaboração → sugere criar proposta
     if (newStatus === 'proposta_elaboracao') {
@@ -1112,6 +1112,86 @@ const Pipeline = (() => {
   }
 
   // Prompt ao arrastar lead para "Fechado/Ganho"
+  /* Negócio ganho sem cliente vinculado é o buraco que mata a recorrência:
+     sem ficha, não há parque de equipamentos, não há próxima inspeção e não
+     há renovação. Medido em 07/11/2026: 3 negócios ganhos ou executados não
+     tinham cliente na base, e nenhum lead trazia o nome da empresa preenchido,
+     então não dá para criar sozinho sem inventar dado. Aqui o sistema pergunta
+     uma vez, no momento em que a informação importa, e segue o fluxo. */
+  function _garantirCliente(leadId, depois) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    if (lead.clienteId && DB.get('clientes', lead.clienteId)) { depois?.(); return; }
+
+    const clientes = DB.getAll('clientes').filter(c => c.ativo !== false)
+      .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    const cfg = DB.getConfig();
+    const sugestao = lead.empresa || '';
+
+    Modal.open({
+      title: '🏢 Qual é o cliente deste negócio?',
+      body: `
+        <div style="background:var(--warning-light);border:1px solid var(--warning-border);border-radius:var(--radius);padding:11px;margin-bottom:14px;font-size:12.5px;color:var(--warning)">
+          Negócio ganho sem cliente na base não gera ficha, nem parque de equipamentos,
+          nem renovação de inspeção depois. Por isso o sistema pede agora.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cliente já cadastrado</label>
+          <select class="form-control" id="gcExistente" onchange="document.getElementById('gcNovoBloco').style.display=this.value?'none':''">
+            <option value="">— cadastrar um novo —</option>
+            ${clientes.map(c => `<option value="${c.id}">${Utils.escHtml(c.nome)}</option>`).join('')}
+          </select>
+        </div>
+        <div id="gcNovoBloco">
+          <div class="form-row">
+            <div class="form-group" style="flex:2">
+              <label class="form-label">Nome da empresa *</label>
+              <input class="form-control" id="gcNome" value="${Utils.escHtml(sugestao)}" placeholder="Razão social ou nome fantasia">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Segmento</label>
+              <select class="form-control" id="gcSegmento">
+                <option value="">—</option>
+                ${(cfg.segmentos || []).map(s => `<option value="${Utils.escHtml(s)}" ${lead.segmento === s ? 'selected' : ''}>${Utils.escHtml(s)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">CNPJ</label><input class="form-control" id="gcCnpj" placeholder="00.000.000/0000-00"></div>
+            <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" id="gcTelefone" value="${Utils.escHtml(lead.contato || '')}"></div>
+          </div>
+        </div>`,
+      saveLabel: 'Vincular e continuar',
+      saveCb: () => {
+        const existente = document.getElementById('gcExistente')?.value || '';
+        let clienteId = existente;
+        if (!clienteId) {
+          const nome = document.getElementById('gcNome')?.value?.trim();
+          if (!nome) { Toast.error('Informe o nome da empresa ou escolha um cliente da lista.'); return; }
+          const jaTem = DB.getAll('clientes').find(c => (c.nome || '').toLowerCase() === nome.toLowerCase());
+          if (jaTem) {
+            clienteId = jaTem.id;
+          } else {
+            clienteId = DB.create('clientes', {
+              nome,
+              segmento: document.getElementById('gcSegmento')?.value || lead.segmento || '',
+              cnpj: document.getElementById('gcCnpj')?.value?.trim() || '',
+              telefone: document.getElementById('gcTelefone')?.value?.trim() || '',
+              origem: 'Convertido do funil',
+              ativo: true,
+            }).id;
+            Toast.success('Cliente cadastrado a partir do negócio ganho.');
+          }
+        }
+        DB.update('leads', leadId, { clienteId });
+        Modal.close();
+        render();
+        if (typeof App !== 'undefined') App.refreshIfNeeded('clientes');
+        setTimeout(() => depois?.(), 250);
+      },
+    });
+  }
+
   function _promptContratacao(leadId) {
     const lead = DB.get('leads', leadId);
     const proposta = _getPropostaLead(leadId);
@@ -1624,7 +1704,10 @@ const Pipeline = (() => {
               clienteId = existente.id;
             } else {
               const segmento = cols[idx('segmento')] || '';
-              clienteId = DB.create('clientes', { nome: clienteNome, segmento, ativo: true });
+              // DB.create devolve o REGISTRO, não o id. Antes guardava o objeto
+              // inteiro aqui, e o lead importado ficava com um vínculo quebrado
+              // que nenhuma tela conseguia resolver.
+              clienteId = DB.create('clientes', { nome: clienteNome, segmento, ativo: true }).id;
             }
           }
 
@@ -2007,7 +2090,7 @@ const Pipeline = (() => {
     render, openForm, saveLead, deleteLead, viewLead, addNew, definirProximaAcao,
     dragStart, dragEnd, dragOver, dragLeave, drop, moverEtapa,
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,
-    criarPropostaLead, abrirContratoLead, _fecharSemProposta,
+    criarPropostaLead, abrirContratoLead, _fecharSemProposta, _garantirCliente,
     relatorioOrigem, filtrarLicitacoes,
     setFilter, clearFilters, setPeriodo, setPipelineTab, setVista, _vistaAtual,
     drillDown,

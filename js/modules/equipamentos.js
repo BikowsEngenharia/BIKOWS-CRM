@@ -201,7 +201,10 @@ const Equipamentos = (() => {
   function setFilter(k, v) { _filter[k] = v; render(); }
 
   /* ── formulário ──────────────────────────────────────────────────────── */
-  function openForm(id = null) {
+  /* prefillCliente: chamado de dentro da ficha do cliente. O equipamento é
+     sempre de um cliente, então quando se entra por lá a empresa já vem
+     escolhida. */
+  function openForm(id = null, prefillCliente = '') {
     const eq = id ? DB.get('equipamentos', id) : null;
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const tipoSel = eq?.tipo || 'vaso';
@@ -214,7 +217,7 @@ const Equipamentos = (() => {
             <label class="form-label">Cliente *</label>
             <select class="form-control" id="eqCliente">
               <option value="">Selecionar cliente</option>
-              ${clientes.map(c => `<option value="${c.id}" ${eq?.clienteId === c.id ? 'selected' : ''}>${Utils.escHtml(c.nome)}</option>`).join('')}
+              ${clientes.map(c => `<option value="${c.id}" ${(eq?.clienteId || prefillCliente) === c.id ? 'selected' : ''}>${Utils.escHtml(c.nome)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
@@ -367,6 +370,20 @@ const Equipamentos = (() => {
   }
 
   /* ── oportunidade de renovação no Pipeline ───────────────────────────── */
+  /* Quanto vale a renovação. Sem isso a oportunidade nascia com R$ 0 e sumia
+     do "Total em Pipeline": existia no funil mas não contava para nada.
+     Ordem: valor da inspeção cadastrado no equipamento, senão o que este mesmo
+     cliente já pagou no último serviço ganho, senão zero. */
+  function _valorRenovacao(eq) {
+    const doEquipamento = Number(eq.valorInspecao) || 0;
+    if (doEquipamento) return doEquipamento;
+    const ganhosDoCliente = DB.getAll('leads')
+      .filter(l => l.clienteId === eq.clienteId && ['fechado_ganho', 'executado'].includes(l.status))
+      .sort((a, b) => (b.dataMudancaStatus || b.updatedAt || '').localeCompare(a.dataMudancaStatus || a.updatedAt || ''));
+    const ultimo = ganhosDoCliente[0];
+    return Number(ultimo?.valorFechado) || Number(ultimo?.valorEstimado) || 0;
+  }
+
   function _criarLead(eq) {
     const t = TIPOS[eq.tipo] || TIPOS.outro;
     const prox = _proxima(eq);
@@ -375,7 +392,7 @@ const Equipamentos = (() => {
     const lead = DB.create('leads', {
       titulo: `Inspeção ${eq.norma || t.norma || ''} — ${eq.tag} — ${Utils.getClientName(eq.clienteId)}`.replace(/\s+/g, ' '),
       clienteId: eq.clienteId, status: 'lead_identificado', origemLead: 'Recorrência',
-      dataEntrada: Utils.todayStr(), valorEstimado: Number(eq.valorInspecao) || 0,
+      dataEntrada: Utils.todayStr(), valorEstimado: _valorRenovacao(eq),
       servicoInteresse: [eq.norma || t.norma].filter(Boolean),
       proximaAcao: `Oferecer renovação da inspeção (vence em ${Utils.formatDate(prox)})`, dataProximaAcao: dataAcao,
       observacoes: `Gerado automaticamente pelo controle de Equipamentos & Inspeções.\nEquipamento: ${t.label} ${eq.tag}${eq.descricao ? ' — ' + eq.descricao : ''}\nÚltima inspeção: ${eq.ultimaInspecao ? Utils.formatDate(eq.ultimaInspecao) : '—'} · Próxima: ${Utils.formatDate(prox)}`,
@@ -393,6 +410,38 @@ const Equipamentos = (() => {
     render();
     if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('leads'); }
   }
+  /* Renovação automática: equipamento com inspeção vencida ou vencendo em até
+     60 dias vira oportunidade no funil sozinho, uma vez por sessão.
+
+     60 dias e não 30 porque ciclo B2B de laudo não fecha em um mês: avisar em
+     cima da hora é avisar tarde. A guarda contra duplicata é a mesma do botão
+     manual (leadRenovacaoId), então rodar duas vezes não cria dois leads.
+     É a automação que ataca o canal 5 do plano, recorrência, hoje com zero
+     contratos e apontado como o maior ponto cego da empresa. */
+  const DIAS_RENOVACAO = 60;
+  let _autoRenovouSessao = false;
+
+  function autoRenovacoes() {
+    if (_autoRenovouSessao) return;
+    _autoRenovouSessao = true;
+    const alvo = DB.getAll('equipamentos').filter(eq => {
+      if (eq.status === 'inativo') return false;
+      const prox = _proxima(eq);
+      if (!prox) return false;
+      const d = Utils.daysUntil(prox);
+      if (d === null || d > DIAS_RENOVACAO) return false;
+      const l = eq.leadRenovacaoId ? DB.get('leads', eq.leadRenovacaoId) : null;
+      return !(l && !['fechado_ganho', 'executado', 'fechado_perdido'].includes(l.status));
+    });
+    if (!alvo.length) return;
+    setTimeout(() => {
+      alvo.forEach(_criarLead);
+      Toast.show(`🔄 ${alvo.length} renovação(ões) de inspeção viraram oportunidade no funil `
+        + `(inspeção vencendo em até ${DIAS_RENOVACAO} dias).`, 7000);
+      if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('leads'); }
+    }, 600);
+  }
+
   function gerarOportunidades() {
     const alvo = DB.getAll('equipamentos').filter(eq => ['vencida', 'critica', 'atencao'].includes(situacao(eq))).filter(eq => {
       const l = eq.leadRenovacaoId ? DB.get('leads', eq.leadRenovacaoId) : null;
@@ -423,5 +472,5 @@ const Equipamentos = (() => {
 
   function addNew() { openForm(); }
 
-  return { render, openForm, save, deleteEq, setFilter, registrarInspecao, gerarOportunidade, gerarOportunidades, agendarVisita, exportCSV, addNew, getVencendo, situacao, _onTipo, TIPOS, SIT };
+  return { render, openForm, save, deleteEq, setFilter, registrarInspecao, gerarOportunidade, gerarOportunidades, autoRenovacoes, agendarVisita, exportCSV, addNew, getVencendo, situacao, proximaInspecao: _proxima, _onTipo, TIPOS, SIT };
 })();

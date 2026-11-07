@@ -156,6 +156,11 @@ const Clientes = (() => {
     const propostas = DB.getAll('propostas').filter(p => p.clienteId === id);
     const atividades= DB.getAll('atividades').filter(a => a.clienteId === id).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
     const recebiveis= DB.getAll('recebiveis').filter(r => r.clienteId === id);
+    // Parque de equipamentos: motor da recorrência. É daqui que sai a próxima
+    // inspeção e, 60 dias antes dela, a oportunidade automática no funil.
+    const equipamentos = DB.getAll('equipamentos').filter(e => e.clienteId === id);
+    const eqVencendo = equipamentos.filter(e => typeof Equipamentos !== 'undefined'
+      && ['vencida','critica','atencao'].includes(Equipamentos.situacao(e))).length;
     const receitaFechada = Utils.sum(leads.filter(l=>l.status==='fechado_ganho'),'valorFechado');
     let totalRecebido=0, totalPendente=0;
     recebiveis.forEach(r=>(r.parcelas||[]).forEach(p=>{ p.status==='recebido'?totalRecebido+=p.valor:totalPendente+=p.valor; }));
@@ -200,6 +205,7 @@ const Clientes = (() => {
           <button class="tab-btn" onclick="switchTab(this,'tabPropostas360')">📄 Propostas (${propostas.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabReceber360')">💰 Financeiro (${recebiveis.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabAtiv360')">✅ Atividades (${atividades.length})</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabEquip360')">⚙️ Equipamentos (${equipamentos.length})${eqVencendo?` <span class="badge badge-orange" style="margin-left:2px">${eqVencendo}</span>`:''}</button>
           <button class="tab-btn" onclick="switchTab(this,'tabContatos360')">👤 Contatos (${contatos.length})</button>
           <button class="tab-btn" onclick="switchTab(this,'tabTimeline360')">🕐 Interações</button>
           <button class="tab-btn" onclick="switchTab(this,'tabDocs360');Anexos.renderLista('docsCliente',{entidade:'clientes',registroId:'${id}'})">📎 Arquivos ${(()=>{const n=typeof Anexos!=='undefined'?Anexos.contar('clientes',id):0;return n?`(${n})`:'';})()}</button>
@@ -296,6 +302,46 @@ const Clientes = (() => {
             </div>`;
           }).join('') : '<div class="text-sm text-muted p-3">Nenhuma atividade</div>'}
         </div>
+        <!-- PARQUE DE EQUIPAMENTOS -->
+        <div id="tabEquip360" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <div class="text-xs text-muted" style="flex:1;min-width:200px">
+              Cada máquina com periodicidade gera a próxima inspeção. Sessenta dias antes
+              do vencimento, o sistema abre a oportunidade de renovação no funil sozinho.
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="Modal.close();Equipamentos.openForm(null,'${id}')">+ Novo equipamento</button>
+          </div>
+          ${equipamentos.length ? `
+            <table class="tbl">
+              <thead><tr><th>Equipamento</th><th>Norma</th><th>Última</th><th>Próxima</th><th>Situação</th><th>Ações</th></tr></thead>
+              <tbody>
+                ${equipamentos.map(e => {
+                  const sit = typeof Equipamentos !== 'undefined' ? Equipamentos.situacao(e) : 'sem_data';
+                  const s = (typeof Equipamentos !== 'undefined' ? Equipamentos.SIT[sit] : null) || { label: sit, badge: 'badge-gray' };
+                  const prox = typeof Equipamentos !== 'undefined' ? Equipamentos.proximaInspecao(e) : '';
+                  const t = (typeof Equipamentos !== 'undefined' ? Equipamentos.TIPOS[e.tipo] : null) || { label: e.tipo || '—' };
+                  return `<tr>
+                    <td><div class="font-bold text-sm">${Utils.escHtml(e.tag || '—')}</div>
+                        <div class="text-xs text-muted">${Utils.escHtml(t.label)}${e.local?' · '+Utils.escHtml(e.local):''}</div></td>
+                    <td class="text-sm">${Utils.escHtml(e.norma || '—')}</td>
+                    <td class="text-sm">${e.ultimaInspecao ? Utils.formatDate(e.ultimaInspecao) : '—'}</td>
+                    <td class="text-sm font-bold">${prox ? Utils.formatDate(prox) : '—'}</td>
+                    <td>${Utils.badge(s.label, s.badge)}</td>
+                    <td><div class="tbl-actions">
+                      <button class="btn btn-xs btn-secondary" onclick="Modal.close();Equipamentos.registrarInspecao('${e.id}')" title="Registrar inspeção feita">✓</button>
+                      <button class="btn btn-xs btn-secondary" onclick="Modal.close();Equipamentos.gerarOportunidade('${e.id}')" title="Criar oportunidade de renovação no funil">🔄</button>
+                      <button class="btn btn-xs btn-secondary" onclick="Modal.close();Equipamentos.openForm('${e.id}')" title="Editar">✏</button>
+                    </div></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>` : `
+            <div class="text-sm text-muted p-3">
+              Nenhum equipamento cadastrado. Cadastrar as máquinas deste cliente, com norma e
+              periodicidade, é o que transforma serviço pontual em receita recorrente.
+            </div>`}
+        </div>
+
         <div id="tabContatos360" class="hidden">
           <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
             <button class="btn btn-sm btn-primary" onclick="Modal.close();Contatos.openForm(null,'${id}')">+ Novo contato</button>

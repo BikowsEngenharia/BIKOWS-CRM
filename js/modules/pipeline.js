@@ -574,6 +574,8 @@ const Pipeline = (() => {
           ${fone ? `<button class="btn btn-sm btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escJs(fone)}')" title="WhatsApp">💬 WhatsApp</button>
             <a class="btn btn-sm btn-secondary" href="tel:${Utils.escHtml(String(fone).replace(/\D/g, ''))}" title="Ligar">📞</a>` : ''}
           ${typeof Hoje !== 'undefined' ? `<button class="btn btn-sm btn-primary" onclick="Hoje.registrarContato('${lead.id}')" title="Registrar o que foi conversado e marcar o próximo passo">Registrar</button>` : ''}
+          ${['qualificacao','proposta_elaboracao','proposta_enviada','negociacao'].includes(lead.status) && typeof Propostas !== 'undefined'
+            ? `<button class="btn btn-sm btn-secondary" onclick="Propostas.propostaRapida('${lead.id}')" title="Gerar proposta a partir de um modelo de serviço" style="background:#7c3aed;color:#fff;border-color:#7c3aed">⚡ Proposta</button>` : ''}
           ${podeAvancar ? `<button class="btn btn-sm btn-secondary" onclick="Pipeline.moverEtapa('${lead.id}',1)" title="Avançar para ${Utils.escHtml(proxima)}">▶ Avançar</button>` : ''}
           <button class="btn btn-sm btn-secondary" onclick="Pipeline.viewLead('${lead.id}')">Abrir</button>
         </div>

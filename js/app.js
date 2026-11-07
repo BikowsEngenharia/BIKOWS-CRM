@@ -45,7 +45,7 @@ const App = (() => {
       itens: [
         { page: 'pipeline',   label: '🎯 Funil' },
         { page: 'propostas',  label: '📄 Propostas' },
-        { page: 'orcamento',  label: '⚡ Orçamento' },
+        { page: 'orcamento',  label: '⚡ Nova proposta' },
         { page: 'licitacoes', label: '🏛 Licitações' },
         { page: 'prospeccao', label: '🔍 Prospecção' },
       ],

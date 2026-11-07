@@ -312,6 +312,8 @@ const Hoje = (() => {
       sub,
       `${fone ? `<button class="btn btn-xs btn-success" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${Utils.escJs(fone)}')" title="WhatsApp">💬</button>
          <a class="btn btn-xs btn-secondary" href="tel:${Utils.escHtml(String(fone).replace(/\D/g, ''))}" title="Ligar">📞</a>` : ''}
+       ${l.status === 'proposta_elaboracao' && typeof Propostas !== 'undefined'
+         ? `<button class="btn btn-xs btn-secondary" onclick="Propostas.propostaRapida('${l.id}')" title="Gerar a proposta deste lead" style="background:#7c3aed;color:#fff;border-color:#7c3aed">⚡ Proposta</button>` : ''}
        <button class="btn btn-xs btn-primary" onclick="Hoje.registrarContato('${l.id}')" title="Registrar o que foi conversado e marcar o próximo passo">Registrar</button>
        <button class="btn btn-xs btn-secondary" onclick="Hoje.adiarLead('${l.id}',3)" title="Reagendar para 3 dias">+3d</button>
        <button class="btn btn-xs btn-secondary" onclick="Hoje.abrirLead('${l.id}')" title="Abrir o lead">Abrir</button>`

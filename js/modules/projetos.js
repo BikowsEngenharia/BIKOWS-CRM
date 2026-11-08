@@ -800,6 +800,103 @@ const Projetos = (() => {
      só trocar o status no formulário de edição: o equipamento atendido não
      era registrado, a próxima inspeção não era agendada e o pedido de
      indicação, que o plano aponta como canal 5, nunca acontecia. */
+  /* Lista os equipamentos do cliente para marcar quais foram atendidos, e
+     deixa cadastrar um na hora. Antes, cliente sem parque recebia um aviso
+     mandando cadastrar "depois", em outra tela: foi por isso que 11 serviços
+     foram concluídos sem gerar um único equipamento, e a renovação
+     automática nunca teve de onde partir. */
+  function _listaEquipamentosEncerramento(clienteId) {
+    const equipamentos = DB.getAll('equipamentos')
+      .filter(e => e.clienteId === clienteId && e.status !== 'inativo');
+    const TIPOS = (typeof Equipamentos !== 'undefined' && Equipamentos.TIPOS) || {};
+
+    const lista = equipamentos.length ? `
+      <div style="max-height:170px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px">
+        ${equipamentos.map(e => {
+          const prox = proximaInspecaoDe(e);
+          return `<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">
+            <input type="checkbox" class="encEq" value="${e.id}" ${e._recemCadastrado ? 'checked' : ''}>
+            <span style="flex:1"><strong>${Utils.escHtml(e.tag || '—')}</strong>
+              <span class="text-xs text-muted">${Utils.escHtml(e.norma || '')}${prox ? ' · próxima marcada para ' + Utils.formatDate(prox) : ''}</span>
+            </span>
+          </label>`;
+        }).join('')}
+      </div>
+      <div class="text-xs text-muted" style="margin-top:4px">
+        Marcar aqui grava a inspeção na data de conclusão e reagenda a próxima pela
+        periodicidade. Sessenta dias antes dela, a renovação entra no funil sozinha.
+      </div>`
+      : `<div class="text-sm text-muted" style="padding:6px 0">
+           Este cliente ainda não tem equipamento cadastrado. Sem parque não há recorrência.
+         </div>`;
+
+    const cadastro = `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;
+                  padding-top:10px;border-top:1px dashed var(--border)">
+        <div style="flex:1 1 150px;min-width:0">
+          <label class="form-label" style="font-size:10.5px">Tipo</label>
+          <select class="form-control" id="encNovoTipo" style="width:100%">
+            ${Object.entries(TIPOS).map(([k, t]) =>
+              `<option value="${k}">${t.icon || ''} ${Utils.escHtml(t.label)}${t.norma ? ' · ' + t.norma : ''}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:2 1 180px;min-width:0">
+          <label class="form-label" style="font-size:10.5px">TAG / identificação</label>
+          <input class="form-control" id="encNovoTag" placeholder="Ex: CALD-01" style="width:100%"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();Projetos.addEquipamentoNoEncerramento('${Utils.escJs(clienteId || '')}');}">
+        </div>
+        <button type="button" class="btn btn-sm btn-secondary"
+          onclick="Projetos.addEquipamentoNoEncerramento('${Utils.escJs(clienteId || '')}')">+ Cadastrar</button>
+      </div>
+      <div class="text-xs text-muted" style="margin-top:4px">
+        A periodicidade vem do tipo e pode ser ajustada depois na ficha do cliente.
+      </div>`;
+
+    return lista + (clienteId ? cadastro : '');
+  }
+
+  /* Cria o equipamento sem sair do encerramento e ja o deixa marcado. */
+  function addEquipamentoNoEncerramento(clienteId) {
+    const tag = (document.getElementById('encNovoTag')?.value || '').trim();
+    if (!clienteId) { Toast.error('Este serviço não tem cliente vinculado.'); return; }
+    if (!tag) { Toast.error('Informe a TAG do equipamento.'); return; }
+
+    const tipoKey = document.getElementById('encNovoTipo')?.value || 'outro';
+    const TIPOS = (typeof Equipamentos !== 'undefined' && Equipamentos.TIPOS) || {};
+    const t = TIPOS[tipoKey] || {};
+
+    const jaExiste = DB.getAll('equipamentos')
+      .some(e => e.clienteId === clienteId && (e.tag || '').trim().toLowerCase() === tag.toLowerCase());
+    if (jaExiste) { Toast.error('Este cliente já tem um equipamento com essa TAG.'); return; }
+
+    /* Marcados ate agora nao podem se perder no redesenho da lista. */
+    const marcados = [...document.querySelectorAll('.encEq:checked')].map(c => c.value);
+
+    const novo = DB.create('equipamentos', {
+      clienteId, tag,
+      tipo: tipoKey,
+      norma: t.norma || '',
+      periodicidadeMeses: t.meses || 12,
+      status: 'ativo',
+      descricao: '', local: '', categoria: '',
+      ultimaInspecao: '', proximaInspecao: '',
+      artNumero: '', valorInspecao: 0, laudoUrl: '',
+      observacoes: 'Cadastrado no encerramento do serviço',
+    });
+
+    const bloco = document.getElementById('encEquipBloco');
+    if (bloco) {
+      novo._recemCadastrado = true;
+      bloco.innerHTML = _listaEquipamentosEncerramento(clienteId);
+      delete novo._recemCadastrado;
+      marcados.concat(novo.id).forEach(id => {
+        const c = document.querySelector(`.encEq[value="${id}"]`);
+        if (c) c.checked = true;
+      });
+    }
+    Toast.success(`${tag} cadastrado e marcado como atendido.`);
+  }
+
   function encerrarProjeto(id) {
     const p = DB.get('projetos', id);
     if (!p) return;
@@ -826,26 +923,7 @@ const Projetos = (() => {
 
         <div class="form-group">
           <label class="form-label">Equipamentos atendidos neste serviço</label>
-          ${equipamentos.length ? `
-            <div style="max-height:170px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px">
-              ${equipamentos.map(e => {
-                const prox = proximaInspecaoDe(e);
-                return `<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">
-                  <input type="checkbox" class="encEq" value="${e.id}">
-                  <span style="flex:1"><strong>${Utils.escHtml(e.tag || '—')}</strong>
-                    <span class="text-xs text-muted">${Utils.escHtml(e.norma || '')}${prox ? ' · próxima hoje marcada para ' + Utils.formatDate(prox) : ''}</span>
-                  </span>
-                </label>`;
-              }).join('')}
-            </div>
-            <div class="text-xs text-muted" style="margin-top:4px">
-              Marcar aqui grava a inspeção na data de conclusão e reagenda a próxima pela
-              periodicidade. Sessenta dias antes dela, a renovação entra no funil sozinha.
-            </div>`
-            : `<div class="text-sm text-muted" style="padding:8px 0">
-                 Este cliente ainda não tem equipamento cadastrado. Sem parque não há
-                 recorrência: cadastre as máquinas na ficha dele depois.
-               </div>`}
+          <div id="encEquipBloco">${_listaEquipamentosEncerramento(p.clienteId)}</div>
         </div>
 
         <div class="form-group">
@@ -1758,6 +1836,7 @@ const Projetos = (() => {
   return {
     render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew,
     novaTarefa, concluirTarefa, encerrarProjeto, _salvarEncerramento,
+    addEquipamentoNoEncerramento,
     verRentabilidade, addChecklistItem, toggleChecklistItem, aplicarTemplateChecklist,
     _nextOS, setPeriodo, setTabProjetos, drillDown, renumerarDuplicados,
     // Timesheet (Melhoria 2)

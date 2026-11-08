@@ -979,7 +979,9 @@ select.form-control { cursor: pointer; }
    ========================================== */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* 5 caixas cabem numa linha */
+  /* 125px e o que permite 5 caixas numa linha so na largura util real
+     (738px no padrao). Com 140px entravam 4 e a quinta caia sozinha. */
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }

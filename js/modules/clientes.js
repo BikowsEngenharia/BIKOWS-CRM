@@ -64,13 +64,47 @@ const Clientes = (() => {
         </div>
       </div>
 
-      <div class="stats-row mb-4">
-        <div class="stat-box"><div class="stat-val">${clientes.length}</div><div class="stat-lbl">Total</div></div>
-        <div class="stat-box"><div class="stat-val">${clientes.filter(c=>c.ativo!==false).length}</div><div class="stat-lbl">Ativos</div></div>
-        <div class="stat-box" style="border-left:3px solid var(--primary)"><div class="stat-val" style="color:var(--primary)">${novosPeriodo}</div><div class="stat-lbl">Novos (${periodoLabels[_periodo]})</div></div>
-        <div class="stat-box"><div class="stat-val">${[...new Set(clientes.map(c=>c.segmento).filter(Boolean))].length}</div><div class="stat-lbl">Segmentos</div></div>
-        <div class="stat-box"><div class="stat-val">${[...new Set(clientes.map(c=>c.estado).filter(Boolean))].length}</div><div class="stat-lbl">Estados</div></div>
-      </div>
+      ${(() => {
+        /* Os cinco de antes eram Total, Ativos, Novos, Segmentos e Estados.
+           Total e Ativos davam o mesmo numero, e Segmentos e Estados sao
+           curiosidade, nao decisao. Esta tela existe para a recorrencia e
+           para o portal: os indicadores agora olham para isso. */
+        const equipAtivos = DB.getAll('equipamentos').filter(e => e.status !== 'inativo');
+        const comParque = new Set(equipAtivos.map(e => e.clienteId).filter(Boolean));
+        const ativos = clientes.filter(c => c.ativo !== false);
+        const semContato = ativos.filter(c => !String(c.telefone || '').trim() && !String(c.email || '').trim());
+        const vencendo = (typeof Equipamentos !== 'undefined' && Equipamentos.getVencendo)
+          ? Equipamentos.getVencendo(90) : [];
+        const clientesVencendo = new Set(vencendo.map(e => e.clienteId).filter(Boolean));
+        const cobertos = ativos.filter(c => comParque.has(c.id)).length;
+
+        return `<div class="stats-row mb-4">
+          <div class="stat-box"><div class="stat-val">${ativos.length}</div><div class="stat-lbl">Clientes ativos</div></div>
+
+          <div class="stat-box" style="--stat-color:${cobertos < ativos.length ? '#d97706' : '#1E7A34'}"
+            title="A renovacao automatica parte do equipamento cadastrado. Cliente sem parque nunca gera recorrencia.">
+            <div class="stat-val">${cobertos}<span style="font-size:13px;color:var(--text-muted)">/${ativos.length}</span></div>
+            <div class="stat-lbl">Com parque</div>
+          </div>
+
+          <div class="stat-box" style="--stat-color:${clientesVencendo.size ? '#C42B2B' : 'var(--border-strong)'}"
+            title="Clientes com inspecao vencendo nos proximos 90 dias. E daqui que sai a renovacao.">
+            <div class="stat-val">${clientesVencendo.size}</div>
+            <div class="stat-lbl">Inspecao em 90 dias</div>
+          </div>
+
+          <div class="stat-box" style="--stat-color:${semContato.length ? '#C42B2B' : 'var(--border-strong)'}${semContato.length ? ';cursor:pointer' : ''}"
+            ${semContato.length ? 'onclick="Clientes.listarSemContato()"' : ''}
+            title="Sem telefone e sem e-mail: nao da para fazer follow-up nem liberar o portal.">
+            <div class="stat-val">${semContato.length}</div>
+            <div class="stat-lbl">Sem contato</div>
+          </div>
+
+          <div class="stat-box" style="--stat-color:var(--primary)">
+            <div class="stat-val">${novosPeriodo}</div><div class="stat-lbl">Novos no periodo</div>
+          </div>
+        </div>`;
+      })()}
 
       <div class="card">
         <div class="card-header">
@@ -453,6 +487,36 @@ const Clientes = (() => {
       return m ? Math.max(max, parseInt(m[1], 10)) : max;
     }, 0);
     return 'CLI-' + String(maior + 1).padStart(4, '0');
+  }
+
+  /* Cliente sem telefone e sem e-mail nao recebe follow-up nem acesso ao
+     portal. Listar e mais util do que so contar. */
+  function listarSemContato() {
+    const semContato = DB.getAll('clientes')
+      .filter(c => c.ativo !== false && !String(c.telefone || '').trim() && !String(c.email || '').trim());
+    if (!semContato.length) { Toast.success('Todo cliente ativo tem telefone ou e-mail.'); return; }
+    Modal.open({
+      title: `📇 ${semContato.length} cliente(s) sem telefone nem e-mail`,
+      size: 'modal-lg', saveLabel: null,
+      body: `
+        <p class="text-sm text-muted" style="margin-bottom:12px">
+          Sem telefone e sem e-mail não dá para fazer follow-up, cobrar nem liberar o
+          acesso ao portal. Vale completar antes de qualquer ação comercial.
+        </p>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead><tr><th>Empresa</th><th>Segmento</th><th>Cidade</th><th>Ação</th></tr></thead>
+            <tbody>
+              ${semContato.map(c => `<tr>
+                <td><div style="min-width:180px;font-weight:600;font-size:13px">${Utils.escHtml(c.nome || c.razaoSocial || '—')}</div></td>
+                <td class="text-sm">${Utils.escHtml(c.segmento || '—')}</td>
+                <td class="text-sm">${Utils.escHtml([c.cidade, c.estado].filter(Boolean).join('/') || '—')}</td>
+                <td><button class="btn btn-xs btn-primary" onclick="Modal.close();Clientes.openForm('${c.id}')">Completar</button></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`,
+    });
   }
 
   function openForm(id = null) {
@@ -910,7 +974,7 @@ const Clientes = (() => {
     return atividades.sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); })[0].data;
   }
 
-  return { render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo, gerarLinkPortal, verTokensPortal, revogarToken, _previewAvatar, calcScore, getUltimaInteracao };
+  return { listarSemContato, render, openForm, saveCliente, deleteCliente, view, setFilter, addNew, importCSV, downloadCSVTemplate, buscarCNPJ, setPeriodo, gerarLinkPortal, verTokensPortal, revogarToken, _previewAvatar, calcScore, getUltimaInteracao };
 })();
 
 // Tab switcher helper

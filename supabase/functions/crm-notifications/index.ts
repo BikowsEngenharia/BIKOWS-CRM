@@ -5,10 +5,14 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 const RESEND_KEY   = Deno.env.get('RESEND_API_KEY') ?? ''
 const EMAIL_TO     = Deno.env.get('NOTIF_EMAIL_TO')   ?? 'contato@bikows.com.br'
 const EMAIL_FROM   = Deno.env.get('NOTIF_EMAIL_FROM') ?? 'CRM Bikows <onboarding@resend.dev>'
-// v9: token do Telegram vem do secret TELEGRAM_BOT_TOKEN (igual às outras
-// functions) — com fallback para o valor antigo para não interromper o digest.
-const TG_TOKEN     = Deno.env.get('TELEGRAM_BOT_TOKEN') || '8781557399:AAFT7HyJxltfr2XpPpmC1oD2Z33kJDJE4rk'
-const TG_CHAT_ID   = Deno.env.get('TELEGRAM_CHAT_ID') || '8675223922'
+/* O token e o chat vem SOMENTE dos secrets do projeto. Ate 08/11/2026 havia
+   aqui um token escrito no codigo como fallback, e este repositorio e
+   publico: qualquer pessoa podia ler e assumir o bot. O fallback saiu, e o
+   token antigo precisa ser revogado no @BotFather, porque continua no
+   historico do Git. Sem o secret, a function falha alto em vez de tentar
+   adivinhar. */
+const TG_TOKEN_ENV   = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? ''
+const TG_CHAT_ID_ENV = Deno.env.get('TELEGRAM_CHAT_ID') ?? ''
 const CRM_URL      = 'https://bikowsengenharia.github.io/BIKOWS-CRM/'
 
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
@@ -66,8 +70,33 @@ function labelAtraso(d: number | null): string {
 /* ================================================================
    TELEGRAM
    ================================================================ */
+/* Busca token e chat na tabela crm_config, que so o service_role enxerga.
+   Mesmo caminho que a crm-licitacoes-monitor ja usava. O secret de ambiente
+   tem preferencia; a config e a rede de seguranca. Nada fica no codigo. */
+let _tgCache: { token: string; chatId: string } | null = null
+async function credenciaisTelegram(): Promise<{ token: string; chatId: string }> {
+  if (_tgCache) return _tgCache
+  let token = TG_TOKEN_ENV, chatId = TG_CHAT_ID_ENV
+  if (!token || !chatId) {
+    try {
+      const { data } = await admin.from('crm_config').select('value').eq('key', 'telegram').maybeSingle()
+      const cfg = (data?.value as any) || {}
+      token  = token  || cfg.token  || ''
+      chatId = chatId || cfg.chatId || cfg.chat_id || ''
+    } catch (e) {
+      console.warn('[TG] nao consegui ler crm_config.telegram:', e)
+    }
+  }
+  _tgCache = { token, chatId }
+  return _tgCache
+}
+
 async function sendTelegram(text: string): Promise<void> {
-  if (!TG_TOKEN || !TG_CHAT_ID) return
+  const { token: TG_TOKEN, chatId: TG_CHAT_ID } = await credenciaisTelegram()
+  if (!TG_TOKEN || !TG_CHAT_ID) {
+    console.warn('[TG] sem token ou chat configurado; mensagem nao enviada')
+    return
+  }
   try {
     await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
       method: 'POST',

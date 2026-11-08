@@ -150,91 +150,62 @@ body {
    COVER PAGE (capa)
    ============================================ */
 .page-cover {
-  background: #0b0f1a;
-  color: white;
   width: 210mm; min-height: 297mm;
   margin: 0 auto 12mm;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: #1a1a1a;
+}
+.cover-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  z-index: 0;
 }
 .cover-overlay {
   position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(12,30,62,.92) 0%, rgba(5,10,20,.85) 100%);
+  background: linear-gradient(135deg, rgba(10,20,40,.75) 40%, rgba(5,10,20,.45) 100%);
   z-index: 1;
 }
-.cover-grid-bg {
-  position: absolute; inset: 0; z-index: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
-  background-size: 20mm 20mm;
-}
 .cover-content { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; }
-
-.cover-top {
-  padding: 12mm 14mm 0;
-  display: flex; align-items: flex-start; justify-content: space-between;
+.cover-top { padding: 10mm 12mm 0; display: flex; align-items: flex-start; justify-content: space-between; }
+.cover-logo { display: flex; align-items: center; gap: 6px; }
+.cover-logo-circle {
+  width: 52px; height: 52px; background: white; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
 }
-.cover-logo { display: flex; align-items: center; gap: 8px; }
-.cover-bw-badge {
-  width: 52px; height: 52px; background: white; border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-}
-.cover-bw-badge svg { width: 44px; height: 44px; }
+.cover-logo-circle svg { width: 40px; height: 40px; }
 .cover-logo-text { line-height: 1.2; }
-.cover-logo-name { font-size: 16pt; font-weight: 900; color: white; }
-.cover-logo-sub  { font-size: 7pt; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-
+.cover-logo-name { font-size: 16pt; font-weight: 900; color: white; letter-spacing: 1px; }
+.cover-logo-sub { font-size: 7pt; color: rgba(255,255,255,.85); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
 .cover-date-block { text-align: right; }
-.cover-month { font-size: 11pt; font-weight: 700; color: #94a3b8; letter-spacing: 4px; }
-.cover-year  { font-size: 52pt; font-weight: 900; color: white; line-height: 1; }
+.cover-month { font-size: 10pt; font-weight: 700; color: rgba(255,255,255,.7); letter-spacing: 6px; text-transform: uppercase; }
+.cover-year { font-size: 64pt; font-weight: 900; color: white; line-height: .9; letter-spacing: -2px; }
+.cover-title-block { padding: 6mm 12mm 4mm; flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
+.cover-main-title { font-size: 52pt; font-weight: 900; color: white; line-height: 1; text-transform: uppercase; letter-spacing: -1px; }
+.cover-date-sub { font-size: 9pt; color: rgba(255,255,255,.8); font-weight: 600; margin-top: 3mm; }
 
-.cover-title {
-  padding: 6mm 14mm 4mm;
-  flex: 1;
+/* Collage de fotos na capa */
+.cover-collage {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 60mm;
+  display: flex; flex-direction: column;
+  gap: 2px; overflow: hidden;
+  z-index: 2;
 }
-.cover-main-title {
-  font-size: 40pt; font-weight: 900; color: white;
-  line-height: 1; text-transform: uppercase;
-  letter-spacing: -1px;
+.cover-collage-photo {
+  flex: 1; overflow: hidden;
+  background: #2a3a5a;
 }
-.cover-subtitle {
-  font-size: 9pt; font-weight: 700; color: #94a3b8;
-  margin-top: 4mm;
-}
-
-.cover-photos {
-  display: grid;
-  grid-template-columns: 55mm 1fr 1fr 1fr;
-  grid-template-rows: 38mm 34mm;
-  gap: 2mm;
-  padding: 0 14mm 0;
-  margin: 4mm 0;
-}
-.cover-photo {
-  background: #1e2940;
-  border-radius: 4px;
-  overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
-}
-.cover-photo:first-child { grid-row: span 2; }
-.cover-photo img { width: 100%; height: 100%; object-fit: cover; }
-.cover-photo-placeholder {
-  width: 100%; height: 100%;
-  background: linear-gradient(135deg, #1a3060 0%, #0d1e40 100%);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18pt; opacity: .4;
-}
+.cover-collage-photo img { width: 100%; height: 100%; object-fit: cover; }
+.cover-collage-photo.placeholder { display: flex; align-items: center; justify-content: center; font-size: 20pt; opacity: .3; color: white; }
 
 .cover-contact {
-  padding: 5mm 14mm 10mm;
-  display: flex; gap: 10mm;
+  padding: 5mm 12mm 8mm;
+  display: flex; flex-direction: column; gap: 3px;
 }
-.cover-contact span {
-  font-size: 8.5pt; color: #94a3b8; display: flex; align-items: center; gap: 4px;
-}
+.cover-contact span { font-size: 8.5pt; color: white; display: flex; align-items: center; gap: 5px; font-weight: 600; }
 
 /* ============================================
    COMPANY INFO PAGE (page 2)
@@ -368,10 +339,10 @@ body {
 .diferencial-item strong { font-weight: 800; }
 
 /* ============================================
-   PRICING PAGE (dark background)
+   PRICING PAGE (white background)
    ============================================ */
 .page-pricing {
-  background: var(--navy);
+  background: white;
   width: 210mm; min-height: 297mm;
   margin: 0 auto 12mm;
   position: relative;
@@ -380,42 +351,36 @@ body {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-.pricing-header {
-  padding: 8mm 14mm 5mm;
-  border-bottom: 1px solid rgba(255,255,255,.15);
-  display: flex; align-items: center; gap: 10mm;
-  flex-shrink: 0;
-}
-.pricing-hdr-contact { text-align: right; font-size: 7pt; color: rgba(255,255,255,.6); line-height: 1.7; }
 
-.pricing-body { padding: 8mm 14mm; flex: 1; }
+.pricing-body { padding: 6mm 14mm; flex: 1; }
 
 .pricing-section-tag {
-  background: #1e3560;
+  background: var(--navy);
   color: white; font-weight: 800; font-size: 10pt;
   padding: 5px 16px; border-radius: 3px;
   display: inline-block; margin-bottom: 5mm;
   text-transform: uppercase; letter-spacing: .5px;
 }
 .pricing-label {
-  background: #1a3060; color: white;
+  background: var(--navy); color: white;
   font-size: 8.5pt; font-weight: 800;
   padding: 3px 12px; border-radius: 3px;
   display: inline-block; margin-bottom: 3mm;
   text-transform: uppercase; letter-spacing: .3px;
 }
 .pricing-value-text {
-  color: white; font-size: 11pt; font-weight: 700;
+  color: var(--text); font-size: 11pt; font-weight: 700;
   margin-bottom: 6mm; line-height: 1.6;
 }
 
 .includes-box {
-  background: rgba(255,255,255,.08);
+  background: #f4f6fa;
   border-radius: 6px; padding: 5mm 7mm; margin: 5mm 0 6mm;
+  border: 1px solid var(--border);
 }
-.includes-box p { color: rgba(255,255,255,.8); font-size: 9pt; margin-bottom: 3mm; }
+.includes-box p { color: var(--text); font-size: 9pt; margin-bottom: 3mm; }
 .includes-box ul { padding-left: 5mm; }
-.includes-box ul li { color: rgba(255,255,255,.75); font-size: 9pt; margin-bottom: 2mm; list-style: disc; }
+.includes-box ul li { color: var(--muted); font-size: 9pt; margin-bottom: 2mm; list-style: disc; }
 
 .value-box {
   background: var(--green); border-radius: 6px;
@@ -431,23 +396,18 @@ body {
 .validade-box {
   text-align: center; margin: 5mm 0;
   font-size: 12pt; font-weight: 800;
-  color: white; text-decoration: underline;
+  color: var(--navy); text-decoration: underline;
   letter-spacing: 1px;
 }
 
 .signature-box {
-  background: rgba(255,255,255,.1); border-radius: 8px;
+  border: 2px solid var(--navy); border-radius: 8px;
   padding: 8mm 10mm; text-align: center;
   margin: 6mm auto; max-width: 80mm;
+  background: white;
 }
-.signature-name { color: white; font-size: 11pt; font-weight: 900; margin-bottom: 2mm; }
-.signature-title { color: rgba(255,255,255,.8); font-size: 8pt; font-weight: 600; line-height: 1.7; }
-
-.pricing-footer {
-  padding: 5mm 14mm; border-top: 1px solid rgba(255,255,255,.1);
-  display: flex; justify-content: space-between; flex-shrink: 0;
-}
-.pricing-footer span { font-size: 6.5pt; color: rgba(255,255,255,.4); }
+.signature-name { color: var(--navy); font-size: 11pt; font-weight: 900; margin-bottom: 2mm; }
+.signature-title { color: var(--muted); font-size: 8pt; font-weight: 600; line-height: 1.7; }
 
 /* ============================================
    PRINT
@@ -458,6 +418,8 @@ body {
   .page, .page-cover, .page-pricing {
     margin: 0; box-shadow: none;
     page-break-after: always;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   @page { size: A4 portrait; margin: 0; }
 }
@@ -575,44 +537,47 @@ function stdFooter() {
 function renderCapa() {
   const { month, year } = monthYear(D.data);
   const photos = D.coverPhotos || [];
+  const bgPhoto = D.coverBgPhoto || photos[0] || '';
 
-  let photosHtml = '';
-  for (let i = 0; i < 6; i++) {
-    const url = photos[i];
-    photosHtml += `<div class="cover-photo">
-      ${url ? `<img src="${esc(url)}" alt="foto ${i+1}">` : `<div class="cover-photo-placeholder">${['🏭','⚙','🔧','📐','🏗','🔩'][i]}</div>`}
+  // Collage photos (excluindo a de fundo se usada)
+  const collagePhotos = photos.slice(bgPhoto === photos[0] ? 1 : 0).slice(0, 6);
+
+  const collageHtml = Array.from({length: 6}).map((_, i) => {
+    const url = collagePhotos[i];
+    return `<div class="cover-collage-photo${url ? '' : ' placeholder'}">
+      ${url ? `<img src="${esc(url)}" alt="">` : ['🏭','⚙','🔧','📐','🏗','🔩'][i]}
     </div>`;
-  }
+  }).join('');
+
+  // Mês formatado com espaços entre letras
+  const monthSpaced = month.split('').join(' ');
 
   return `<div class="page-cover">
-    <div class="cover-grid-bg"></div>
+    <div class="cover-bg" style="${bgPhoto ? `background-image:url('${esc(bgPhoto)}')` : 'background: linear-gradient(135deg,#1a2840,#0a1220)'}"></div>
     <div class="cover-overlay"></div>
+    <div class="cover-collage">${collageHtml}</div>
     <div class="cover-content">
       <div class="cover-top">
         <div class="cover-logo">
-          <div class="cover-bw-badge">${BW_SVG_DARK}</div>
+          <div class="cover-logo-circle">${BW_SVG_DARK}</div>
           <div class="cover-logo-text">
             <div class="cover-logo-name">BIKOWS</div>
             <div class="cover-logo-sub">SOLUÇÕES EM ENGENHARIA<br>MECÂNICA</div>
           </div>
         </div>
         <div class="cover-date-block">
-          <div class="cover-month">${month}</div>
+          <div class="cover-month">${monthSpaced}</div>
           <div class="cover-year">${year}</div>
         </div>
       </div>
-
-      <div class="cover-title">
+      <div class="cover-title-block">
         <div class="cover-main-title">PROPOSTA<br>COMERCIAL</div>
-        <div class="cover-subtitle">Data Orçamento: ${fmtDate(D.data) || ''}</div>
+        <div class="cover-date-sub">Data Orçamento: ${fmtDate(D.data) || ''}</div>
       </div>
-
-      <div class="cover-photos">${photosHtml}</div>
-
       <div class="cover-contact">
-        <span>🌐 www.bikows.com.br</span>
-        <span>📞 (43) 9 84262950</span>
-        <span>✉ engenharia@bikows.com.br</span>
+        <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> www.bikows.com.br</span>
+        <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.16 6.16l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> (43) 9 84262950</span>
+        <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> engenharia@bikows.com.br</span>
       </div>
     </div>
   </div>`;
@@ -621,12 +586,44 @@ function renderCapa() {
 // ============================================
 // PAGE 2: SOBRE BIKOWS + CLIENTES
 // ============================================
+/* Chamada pelo onerror do logo de cliente: troca a imagem quebrada pelo
+   nome da empresa em texto. */
+function trocaPorNome(img) {
+  const cel = img.parentNode;
+  if (!cel) return;
+  const nome = cel.getAttribute('data-nome') || img.getAttribute('alt') || '';
+  cel.textContent = '';
+  const s = document.createElement('span');
+  s.style.cssText = 'font-size:11pt;font-weight:800;color:#0c1e3e';
+  s.textContent = nome;
+  cel.appendChild(s);
+}
+
 function renderSobreBikows() {
   const clientes = D.clientesRef || [
-    'Continental','Elecnor','AUMOVIO','Eneva','FCM — Fábrica de Mancais','MESSER',
-    'emae','EBSERH','Icilegel','Jussara','Prosmaq','enerlab'
+    'Continental','MESSER','EBSERH','Icilegel','FCM — Fábrica de Mancais','Eletran',
+    'enerlab','DeLucca','Prosmaq','BrutusMaq','Elecnor','Jussara'
   ];
-  const clientGrid = clientes.map(c => `<div class="client-logo-cell"><span>${esc(c)}</span></div>`).join('');
+
+  const LOGO_URLS = {
+    'Continental': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Continental_AG_logo.svg/200px-Continental_AG_logo.svg.png',
+    'MESSER': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Messer_Group_logo.svg/200px-Messer_Group_logo.svg.png',
+  };
+
+  /* O logo e um extra. Se a imagem nao carregar, por estar sem internet
+     na hora de gerar o PDF ou porque a URL saiu do ar, a celula cai para o
+     nome em texto, que e o que as outras dez ja mostram. Melhor isso do
+     que celula vazia no meio da pagina de clientes. */
+  const clientGrid = clientes.map(c => {
+    const logoUrl = LOGO_URLS[c];
+    const nome = `<span style="font-size:11pt;font-weight:800;color:#0c1e3e">${esc(c)}</span>`;
+    if (!logoUrl) return `<div class="client-logo-cell">${nome}</div>`;
+    return `<div class="client-logo-cell" data-nome="${esc(c)}">
+      <img src="${esc(logoUrl)}" alt="${esc(c)}"
+           style="max-height:32px;max-width:120px;object-fit:contain;filter:grayscale(20%)"
+           onerror="trocaPorNome(this)">
+    </div>`;
+  }).join('');
 
   return `<div class="page">
     ${stdHeader()}
@@ -825,17 +822,7 @@ function renderPrecificacao() {
   const ext = D.valorPorExtenso ? `(${D.valorPorExtenso})` : '';
 
   return `<div class="page-pricing">
-    <div class="pricing-header">
-      <div class="bw-logo">
-        <div class="bw-badge" style="background:rgba(255,255,255,.12)">${BW_SVG}</div>
-        <div class="bw-text">
-          <div class="bw-name" style="color:white">BIKOWS</div>
-          <div class="bw-sub" style="color:rgba(255,255,255,.6)">SOLUÇÕES EM ENGENHARIA<br>MECÂNICA</div>
-        </div>
-      </div>
-      <div style="flex:1;text-align:center;font-style:italic;font-size:7pt;color:rgba(255,255,255,.4)">SERVIÇOS DE ENGENHARIA E SOLUÇÕES PARA VOCÊ E SUA EMPRESA</div>
-      ${contactHtml(true)}
-    </div>
+    ${stdHeader()}
 
     <div class="pricing-body">
       <div class="pricing-section-tag">Prazo, Forma de Pagamento e Valor da Proposta</div>
@@ -874,10 +861,7 @@ function renderPrecificacao() {
       </div>
     </div>
 
-    <div class="pricing-footer">
-      <span>© Bikows Engenharia. Todos os direitos reservados.</span>
-      <span>Bikows Engenharia LTDA | 47.121.646/0001-90 | CREA 83340</span>
-    </div>
+    ${stdFooter()}
   </div>`;
 }
 

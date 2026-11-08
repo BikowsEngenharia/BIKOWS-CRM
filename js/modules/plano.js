@@ -25,21 +25,37 @@ const Plano = (() => {
     'Médio':   'badge-gray',
   };
 
-  /* ---- Parâmetros financeiros do plano v3.0 ----
-     O v2 afirmava break-even de R$ 13.912, número que dividia o custo fixo
-     pelo imposto e ignorava o custo direto de executar o serviço. Os valores
-     abaixo já consideram a retenção líquida real por tipo de serviço. */
-  const CAIXA = {
-    reserva:          25000, // reserva de operação intocável
-    gatilhoAlerta:    15000, // saldo mínimo → prospecção intensiva
-    midiaProtegida:    3800, // mídia R$ 3.000 + agência R$ 800
-    custoFixo:        25683, // custo fixo mensal a partir de set/26
-    beSobrevivencia:  44000, // sem retiradas dos sócios — uso emergencial
-    breakEven:        68000, // pleno, no mix atual (retenção ~49%)
-    beAlvo:           52000, // pleno, no mix-alvo 2027 (retenção ~60%)
-    comprometimento:    0.6, // máx. da receita prevista antes de receber
-    gapSetembro:      70000, // material da Continental a bancar
+  /* ---- Conteúdo do plano ----
+     Nada de número, meta, margem ou negociação mora neste arquivo: ele é
+     servido publicamente pelo GitHub Pages. Tudo vem da configuração, que
+     fica no banco e só é lida por usuário autorizado. Sem a configuração,
+     a tela desenha vazia em vez de expor um valor de reserva no código. */
+  const PLANO_VAZIO = {
+    caixa: {}, gatilhos: [], metas: [], patamares: [], regras: [],
+    okrs: [], acoes: [], margemTexto: '', notaBreakEvenV2: '',
   };
+  function _plano() {
+    const p = (typeof DB !== 'undefined' && DB.getConfig && DB.getConfig().plano) || {};
+    return { ...PLANO_VAZIO, ...p };
+  }
+  function _caixa() { return _plano().caixa || {}; }
+  /* Sem configuracao, mostra travessao em vez de R$ NaN. */
+  function _moeda(v) { return v == null ? '—' : Utils.formatCurrency(v); }
+  /* Valor da tabela: pode ser uma chave de caixa, um texto literal marcado
+     ou o limite de comprometimento em porcentagem. */
+  function _valorTabela(v) {
+    const c = _caixa();
+    if (typeof v !== 'string') return '—';
+    if (v.startsWith('__TEXTO:')) return Utils.escHtml(v.slice(8, -2));
+    if (v === '__PCT_COMPROMETIMENTO__') {
+      return c.comprometimento != null ? Math.round(c.comprometimento * 100) + '%' : '—';
+    }
+    return c[v] != null ? Utils.formatCurrency(c[v]) : '—';
+  }
+  function _semConfig(oQue) {
+    return `<tr><td colspan="3" class="text-sm text-muted" style="text-align:center;padding:14px">
+      ${oQue} não configurado. Cadastre em Configurações para esta tela se preencher.</td></tr>`;
+  }
 
 
   /* ====================================================
@@ -124,13 +140,13 @@ const Plano = (() => {
     const recorrentes = DB.getAll('contratos').filter(c => (c.tipo||'').toLowerCase().includes('recorr')).length;
 
     // farol de caixa
-    const farol = saldo >= CAIXA.reserva
+    const farol = saldo >= _caixa().reserva
       ? { cor:'#1E7A34', bg:'#EAF4EC', lb:'VERDE',    txt:'Reserva intacta. Operação normal, pode investir no plano.' }
-      : saldo >= CAIXA.gatilhoAlerta
+      : saldo >= _caixa().gatilhoAlerta
       ? { cor:'#B26A00', bg:'#FFF4E5', lb:'AMARELO',  txt:'Atenção. Suspender gasto não contratado e priorizar cobrança.' }
       : { cor:'#C42B2B', bg:'#FBEDED', lb:'VERMELHO', txt:'Prospecção intensiva vira prioridade única da semana, para todo mundo.' };
 
-    const pctBE = Math.round((fatMes / CAIXA.breakEven) * 100);
+    const pctBE = _caixa().breakEven ? Math.round((fatMes / _caixa().breakEven) * 100) : 0;
 
     return `
       <div class="card mb-4" style="border-left:5px solid ${farol.cor};background:${farol.bg}">
@@ -141,7 +157,7 @@ const Plano = (() => {
           </div>
           <div style="flex:1;min-width:240px;font-size:13px;color:#3D4653">
             ${farol.txt}<br>
-            <span class="text-xs text-muted">Reserva intocável: ${Utils.formatCurrency(CAIXA.reserva)} · gatilho de alerta: ${Utils.formatCurrency(CAIXA.gatilhoAlerta)}</span>
+            <span class="text-xs text-muted">Reserva intocável: ${Utils.formatCurrency(_caixa().reserva)} · gatilho de alerta: ${Utils.formatCurrency(_caixa().gatilhoAlerta)}</span>
           </div>
         </div>
       </div>
@@ -149,7 +165,7 @@ const Plano = (() => {
       <div class="fin-kpi mb-4">
         <div class="fin-kpi-cell">
           <div class="fin-kpi-label">Break-even pleno</div>
-          <div class="fin-kpi-val">${Utils.formatCurrency(CAIXA.breakEven)}</div>
+          <div class="fin-kpi-val">${Utils.formatCurrency(_caixa().breakEven)}</div>
           <div class="fk-sub">por mês, no mix atual de serviços</div>
         </div>
         <div class="fin-kpi-cell">
@@ -160,7 +176,7 @@ const Plano = (() => {
         <div class="fin-kpi-cell">
           <div class="fin-kpi-label">Custo fixo mensal</div>
           <div class="fin-kpi-val">${Utils.formatCurrency(totalFix)}</div>
-          <div class="fk-sub">${fixas.length} itens · plano prevê ${Utils.formatCurrency(CAIXA.custoFixo)}</div>
+          <div class="fk-sub">${fixas.length} itens · plano prevê ${Utils.formatCurrency(_caixa().custoFixo)}</div>
         </div>
         <div class="fin-kpi-cell">
           <div class="fin-kpi-label">Dívidas provisionadas</div>
@@ -206,14 +222,13 @@ const Plano = (() => {
             <table class="tbl">
               <thead><tr><th>Se acontecer isto</th><th>Faça isto, sem discussão</th></tr></thead>
               <tbody>
-                <tr><td class="text-sm font-semibold">Até 25/ago sem R$ 40.000 contratados para setembro</td>
-                    <td class="text-sm">Acionar o empréstimo com credor. Checar antes se é o mesmo credor do cheque em aberto.</td></tr>
-                <tr><td class="text-sm font-semibold">Saldo abaixo de ${Utils.formatCurrency(CAIXA.gatilhoAlerta)}</td>
-                    <td class="text-sm">Prospecção intensiva vira prioridade única. Suspender investimento não contratado.</td></tr>
-                <tr><td class="text-sm font-semibold">Custo por lead acima de R$ 350 por 2 semanas</td>
-                    <td class="text-sm">Pausar a campanha e revisar palavras-chave e página de destino com a agência.</td></tr>
-                <tr><td class="text-sm font-semibold">Proposta parada há mais de 7 dias</td>
-                    <td class="text-sm">Ligação direta ao decisor. Em 15 dias sem retorno, perdido com motivo registrado.</td></tr>
+                ${_plano().gatilhos.length ? _plano().gatilhos.map(([se, faca]) => {
+                  const cond = se === '__SALDO_ABAIXO__'
+                    ? 'Saldo abaixo de ' + (_caixa().gatilhoAlerta != null ? Utils.formatCurrency(_caixa().gatilhoAlerta) : '—')
+                    : Utils.escHtml(se);
+                  return `<tr><td class="text-sm font-semibold">${cond}</td>
+                    <td class="text-sm">${Utils.escHtml(faca)}</td></tr>`;
+                }).join('') : `<tr><td colspan="2" class="text-sm text-muted" style="text-align:center;padding:14px">Gatilhos não configurados.</td></tr>`}
               </tbody>
             </table>
           </div>
@@ -225,12 +240,10 @@ const Plano = (() => {
             <table class="tbl">
               <thead><tr><th>Horizonte</th><th>Meta</th><th>Marco</th></tr></thead>
               <tbody>
-                <tr><td class="text-sm font-semibold">Curto · 90 dias</td><td class="font-bold">R$ 70k/mês</td>
-                    <td class="text-sm">Gap coberto, habilitado a licitar, 42 artigos publicados</td></tr>
-                <tr><td class="text-sm font-semibold">Médio · 12 meses</td><td class="font-bold">R$ 1,05 M</td>
-                    <td class="text-sm">1º contrato público, 6 contratos de recorrência, fiscal quitado</td></tr>
-                <tr><td class="text-sm font-semibold">Longo · 3 anos</td><td class="font-bold">R$ 3,0 M</td>
-                    <td class="text-sm">2º responsável técnico e recorrência acima de 20% da receita</td></tr>
+                ${_plano().metas.map(([horizonte, meta, marco]) => `
+                  <tr><td class="text-sm font-semibold">${Utils.escHtml(horizonte)}</td>
+                      <td class="font-bold">${Utils.escHtml(meta)}</td>
+                      <td class="text-sm">${Utils.escHtml(marco)}</td></tr>`).join('')}
                 <tr><td class="text-sm font-semibold">Recorrência hoje</td><td class="font-bold ${recorrentes>0?'text-success':'text-danger'}">${recorrentes}</td>
                     <td class="text-sm">Meta: 3 contratos até dez/26. Maior ponto cego da empresa.</td></tr>
               </tbody>
@@ -243,12 +256,7 @@ const Plano = (() => {
         <div class="card-header"><div class="card-title">📚 A descoberta que muda a estratégia</div></div>
         <div class="card-body">
           <div class="text-sm" style="line-height:1.6">
-            Faturamento e resultado não são a mesma coisa. O contrato de <strong>R$ 167 mil</strong> com a Continental deixa
-            cerca de <strong>R$ 40 mil</strong> na Bikows depois do material e da divisão com o parceiro. Um serviço de
-            R$ 60 mil executado diretamente rende mais que isso.
-            <br><br>
-            Por isso a meta de 2027 não é apenas crescer faturamento, é <strong>mudar o mix</strong>: aumentar a participação
-            de serviço executado pela própria Bikows de cerca de 40% para 70% do total. Faturar mais em parceria não resolve o caixa.
+            ${_plano().margemTexto || '<span class="text-muted">Texto não configurado.</span>'}
           </div>
           <div class="text-xs text-muted" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
             Documento completo: Plano de Negócios v3.0 (Word), Manual de Execução Setorial, apresentação e dashboard navegável,
@@ -325,24 +333,7 @@ const Plano = (() => {
      ABA: OKRs
      ==================================================== */
   function _renderOKRs() {
-    const OKRS = [
-      { o: 'O1 — Sair da zona de risco de caixa e atingir o break-even pleno', cor: '#C42B2B',
-        krs: ['Fechar o gap de caixa de setembro (R$ 50 a 70 mil) sem comprometer a reserva',
-              'Faturamento de dez/26 igual ou acima de R$ 70.000, com média móvel de 3 meses acima de R$ 60.000',
-              'Parcelamento fiscal aderido até 30/set/26, liberando as certidões negativas'] },
-      { o: 'O2 — Deixar de ser uma empresa de um operador só', cor: '#1D4F8C',
-        krs: ['Rotina semanal fixa cumprida em pelo menos 80% das semanas do trimestre',
-              'Sócia-Gestora assumindo 100% do CRM, do follow-up e dos recebíveis até out/26',
-              'Caldeireiro-Comercial gerando pelo menos 4 propostas por mês por outbound até nov/26'] },
-      { o: 'O3 — Reduzir a dependência do tráfego pago', cor: '#2E6FBF',
-        krs: ['Participação do tráfego pago na originação caindo de 95% para 60% até dez/26',
-              '42 artigos em rascunho publicados até out/26 e 3 leads orgânicos por mês até dez/26',
-              'Canal de licitações habilitado até out/26 e primeira proposta submetida até nov/26'] },
-      { o: 'O4 — Criar a primeira receita previsível da história da empresa', cor: '#1E7A34',
-        krs: ['3 contratos de Manutenção de Conformidade assinados até dez/26',
-              'Base de clientes NR-13 mapeada com data de vencimento de inspeção até set/26',
-              '3 SKUs de produto fabricado definidos, precificados e com primeira venda até nov/26'] },
-    ];
+    const OKRS = _plano().okrs;
 
     const RITUAIS = [
       ['Reunião semanal da equipe',    'Segunda, início do dia',      '30 min', 'Resultado da semana, pipeline e ações vencidas, metas de cada posição'],
@@ -400,17 +391,17 @@ const Plano = (() => {
     const mes = Utils.todayStr().substring(0, 7);
     const fatMes = lanc.filter(l => l.tipo === 'receita' && l.status === 'recebido' && (l.data||'').startsWith(mes))
                        .reduce((s,l) => s + (l.valor||0), 0);
-    const pctBE = Math.round((fatMes / CAIXA.breakEven) * 100);
+    const pctBE = _caixa().breakEven ? Math.round((fatMes / _caixa().breakEven) * 100) : 0;
 
-    const alerta = saldo < CAIXA.gatilhoAlerta;
-    const temReserva = saldo >= CAIXA.reserva;
+    const alerta = saldo < _caixa().gatilhoAlerta;
+    const temReserva = saldo >= _caixa().reserva;
 
     return `
       ${alerta ? `
       <div class="card mb-4" style="border-left:4px solid var(--danger);background:var(--danger-light)">
         <div class="card-body">
           <div class="font-bold" style="color:var(--danger);margin-bottom:4px">🚨 Gatilho de alerta acionado</div>
-          <div class="text-sm">O saldo está abaixo de ${Utils.formatCurrency(CAIXA.gatilhoAlerta)}, o piso definido no plano de contingência.
+          <div class="text-sm">O saldo está abaixo de ${Utils.formatCurrency(_caixa().gatilhoAlerta)}, o piso definido no plano de contingência.
           Ação prevista: <strong>prospecção intensiva</strong> e revisão dos compromissos do mês.</div>
         </div>
       </div>` : ''}
@@ -418,22 +409,22 @@ const Plano = (() => {
       <div class="fin-kpi" style="grid-template-columns:repeat(2,1fr)">
         <div class="fin-kpi-cell">
           <div class="fin-kpi-label">Saldo estimado</div>
-          <div class="fin-kpi-val ${saldo>=CAIXA.gatilhoAlerta?'text-success':'text-danger'}">${Utils.formatCurrency(saldo)}</div>
+          <div class="fin-kpi-val ${saldo>=_caixa().gatilhoAlerta?'text-success':'text-danger'}">${Utils.formatCurrency(saldo)}</div>
           <div class="fk-sub">Receitas recebidas − despesas pagas</div>
         </div>
         <div class="fin-kpi-cell">
           <div class="fin-kpi-label">Faturamento do mês</div>
           <div class="fin-kpi-val ${pctBE>=100?'text-success':'text-warning'}">${Utils.formatCurrency(fatMes)}</div>
-          <div class="fk-sub">${pctBE}% do break-even (${Utils.formatCurrency(CAIXA.breakEven)})</div>
+          <div class="fk-sub">${pctBE}% do break-even (${Utils.formatCurrency(_caixa().breakEven)})</div>
         </div>
         <div class="fin-kpi-cell">
           <div class="fin-kpi-label">Reserva de operação</div>
-          <div class="fin-kpi-val ${temReserva?'text-success':'text-warning'}">${Utils.formatCurrency(CAIXA.reserva)}</div>
+          <div class="fin-kpi-val ${temReserva?'text-success':'text-warning'}">${Utils.formatCurrency(_caixa().reserva)}</div>
           <div class="fk-sub">${temReserva ? '✓ Saldo cobre a reserva' : 'Meta a constituir — conta separada'}</div>
         </div>
         <div class="fin-kpi-cell">
           <div class="fin-kpi-label">Custos fixos mensais</div>
-          <div class="fin-kpi-val">${Utils.formatCurrency(CAIXA.custoFixo)}</div>
+          <div class="fin-kpi-val">${Utils.formatCurrency(_caixa().custoFixo)}</div>
           <div class="fk-sub">Cadastrados em Financeiro → Despesas Fixas</div>
         </div>
       </div>
@@ -441,21 +432,19 @@ const Plano = (() => {
       <div class="card mb-4">
         <div class="card-header"><div>
           <div class="card-title">⚖️ Os três patamares de equilíbrio</div>
-          <div class="text-xs text-muted">O plano v2 afirmava R$ 13.912, número que ignorava o custo direto de executar o serviço</div>
+          <div class="text-xs text-muted">${Utils.escHtml(_plano().notaBreakEvenV2 || '')}</div>
         </div></div>
         <div class="table-wrap">
           <table class="tbl">
             <thead><tr><th>Patamar</th><th>Faturamento necessário</th><th>Significado</th></tr></thead>
             <tbody>
-              <tr><td class="font-semibold text-sm">Sobrevivência</td>
-                  <td class="font-bold" style="color:#B26A00">${Utils.formatCurrency(CAIXA.beSobrevivencia)}</td>
-                  <td class="text-sm">Sem retiradas dos sócios. Cobre estrutura, equipe, mídia e dívida. Uso apenas emergencial.</td></tr>
-              <tr><td class="font-semibold text-sm">Pleno, no mix atual</td>
-                  <td class="font-bold text-danger">${Utils.formatCurrency(CAIXA.breakEven)}</td>
-                  <td class="text-sm">Cobre tudo, inclusive as retiradas. É o número real de hoje (retenção líquida ~49%).</td></tr>
-              <tr><td class="font-semibold text-sm">Pleno, no mix-alvo 2027</td>
-                  <td class="font-bold text-success">${Utils.formatCurrency(CAIXA.beAlvo)}</td>
-                  <td class="text-sm">Mesmo custo fixo, com menos dependência de parceria e material repassado (retenção ~60%).</td></tr>
+              ${_plano().patamares.length ? _plano().patamares.map(([rotulo, chave, cls, desc]) => {
+                const estilo = cls.startsWith('#') ? ` style="color:${cls}"` : '';
+                const classe = cls.startsWith('#') ? '' : ' ' + cls;
+                return `<tr><td class="font-semibold text-sm">${Utils.escHtml(rotulo)}</td>
+                  <td class="font-bold${classe}"${estilo}>${_valorTabela(chave)}</td>
+                  <td class="text-sm">${Utils.escHtml(desc)}</td></tr>`;
+              }).join('') : _semConfig('Patamares de equilíbrio')}
             </tbody>
           </table>
         </div>
@@ -467,24 +456,10 @@ const Plano = (() => {
           <table class="tbl">
             <thead><tr><th>Regra</th><th>Parâmetro</th><th>O que significa</th></tr></thead>
             <tbody>
-              <tr><td class="font-semibold text-sm">Reserva de operação</td>
-                  <td class="font-bold">${Utils.formatCurrency(CAIXA.reserva)}</td>
-                  <td class="text-sm">Intocável, mantida em conta separada</td></tr>
-              <tr><td class="font-semibold text-sm">Gatilho de alerta</td>
-                  <td class="font-bold text-danger">${Utils.formatCurrency(CAIXA.gatilhoAlerta)}</td>
-                  <td class="text-sm">Saldo mínimo — abaixo disso, prospecção intensiva</td></tr>
-              <tr><td class="font-semibold text-sm">Verba de mídia protegida</td>
-                  <td class="font-bold">${Utils.formatCurrency(CAIXA.midiaProtegida)}</td>
-                  <td class="text-sm">Mídia R$ 3.000 + agência R$ 800. Intocável enquanto o custo por lead estiver na meta</td></tr>
-              <tr><td class="font-semibold text-sm">Limite de comprometimento</td>
-                  <td class="font-bold">${Math.round(CAIXA.comprometimento*100)}%</td>
-                  <td class="text-sm">Máximo da receita prevista que pode ser comprometido antes de receber</td></tr>
-              <tr><td class="font-semibold text-sm">Sinal em contratos grandes</td>
-                  <td class="font-bold">30% a 40%</td>
-                  <td class="text-sm">Obrigatório acima de R$ 30.000. Contratos sem entrada foram a origem do aperto atual</td></tr>
-              <tr><td class="font-semibold text-sm">Gap de setembro (Continental)</td>
-                  <td class="font-bold text-danger">${Utils.formatCurrency(CAIXA.gapSetembro)}</td>
-                  <td class="text-sm">Material a bancar até o início de setembro, com retorno só em out/nov</td></tr>
+              ${_plano().regras.length ? _plano().regras.map(([rotulo, chave, cls, desc]) => `
+                <tr><td class="font-semibold text-sm">${Utils.escHtml(rotulo)}</td>
+                    <td class="font-bold${cls ? ' ' + cls : ''}">${_valorTabela(chave)}</td>
+                    <td class="text-sm">${Utils.escHtml(desc)}</td></tr>`).join('') : _semConfig('Regras de contingência')}
             </tbody>
           </table>
         </div>
@@ -504,31 +479,7 @@ const Plano = (() => {
     const prazoDe = (dias) => { const d = new Date(); d.setDate(d.getDate() + dias); return Utils.localDateStr(d); };
 
     // [fase, área, ação, responsável, criticidade, resultado esperado]
-    const ACOES = [
-      // ---- Fase 1: dias 1–30 (ago–set/26) — Estancar o risco ----
-      [1, 'Financeiro', 'Fechar o gap de caixa da Continental (venda extra e, se necessário, credor)', 'Marcos', 'Crítico', 'Material de setembro coberto sem tocar na reserva de R$ 25.000'],
-      [1, 'Financeiro', 'Aderir ao parcelamento fiscal (entrada de R$ 6.000)', 'Marcos', 'Crítico', 'Certidões negativas liberadas e canal de licitações destravado'],
-      [1, 'Financeiro', 'Negociar prazo estendido do cheque com o credor', 'Marcos', 'Alto', 'Vencimento alinhado ao recebimento da Continental, sem juros novos'],
-      [1, 'Marketing',  'Subir as 3 campanhas e aportar a verba de 2 meses', 'Sócia-Gestora', 'Crítico', 'NR-12 PR, NR-12 SP e NR-13 PR/SP rodando com 60 dias garantidos'],
-      [1, 'Equipe',     'Implantar a rotina semanal fixa e a reunião de segunda', 'Marcos', 'Alto', 'Agenda previsível e reunião de 30 min recorrente no calendário'],
-      [1, 'Equipe',     'Escrever e acordar as metas semanais do Caldeireiro-Comercial', 'Marcos', 'Alto', '40 contatos, 8 conversas e 3 reuniões por semana acordados por escrito'],
-      [1, 'Comercial',  'Reativar o pipeline e fechar o serviço de R$ 54.000 em negociação', 'Marcos', 'Crítico', 'Contrato assinado, de preferência parcelado para gerar renda fixa'],
-      [1, 'Comercial',  'Mapear a base NR-13 com vencimentos de inspeção', 'Sócia-Gestora', 'Alto', 'Planilha com todos os clientes e a data da próxima inspeção obrigatória'],
-      // ---- Fase 2: dias 31–60 (out/26) — Construir os canais ----
-      [2, 'Marca',      'Aplicar a identidade v1.0 em proposta, laudo, e-mail e redes', 'Sócia-Gestora', 'Alto', 'Todo material que o cliente vê com a marca oficial aplicada'],
-      [2, 'Conteúdo',   'Publicar os 42 artigos em rascunho', 'Sócia-Gestora', 'Alto', 'Estoque editorial zerado, no ritmo de 4 publicações por semana'],
-      [2, 'Licitação',  'Emitir todas as certidões e cadastrar nos portais', 'Marcos', 'Crítico', 'Habilitação completa: SICAF, BLL, BNC e portais municipais'],
-      [2, 'Automação',  'Subir os fluxos n8n de captura de lead e régua de follow-up', 'Marcos', 'Médio', 'Lead respondido em até 5 min e alerta de proposta parada em 3 dias'],
-      [2, 'Produto',    'Definir e precificar 3 SKUs de proteção NR-12', 'Caldeireiro-Comercial', 'Médio', 'Catálogo inicial precificado com margem acima de 35% já com frete'],
-      [2, 'Comercial',  'Apresentar a primeira proposta de Contrato de Manutenção de Conformidade', 'Marcos', 'Alto', '10 clientes com vencimento mais próximo abordados'],
-      // ---- Fase 3: dias 61–90 (nov/26) — Acelerar e medir ----
-      [3, 'Licitação',  'Submeter a primeira proposta em processo licitatório', 'Marcos e Arquiteto', 'Alto', 'Primeira disputa pública da história da empresa'],
-      [3, 'Marketing',  'Avaliar o CPL das 3 campanhas e decidir a quarta (NR-12 SC)', 'Sócia-Gestora', 'Médio', 'Decisão de expansão baseada em custo por lead abaixo de R$ 250'],
-      [3, 'Produto',    'Realizar a primeira venda online de produto fabricado', 'Caldeireiro-Comercial', 'Médio', 'Primeira receita vinda de produto, e não de serviço'],
-      [3, 'Recorrência','Fechar os 2 primeiros contratos de recorrência', 'Marcos', 'Alto', 'Primeira receita previsível contratada da história da empresa'],
-      [3, 'Gestão',     'Revisão trimestral e decisão sobre renovar o contrato do Caldeireiro-Comercial', 'Marcos', 'Crítico', 'Decisão por número: 40 reuniões, 12 propostas, R$ 30.000 fechados e 20 peças'],
-      [3, 'Financeiro', 'Preparar a posição para o acordo judicial de dezembro', 'Marcos', 'Alto', 'Provisão de cerca de R$ 40.000 e estratégia definida antes do julgamento'],
-    ];
+    const ACOES = _plano().acoes;
 
     ACOES.forEach(([fase, area, acao, apoio, criticidade, resultado], i) => {
       DB.create('plano_acoes', {

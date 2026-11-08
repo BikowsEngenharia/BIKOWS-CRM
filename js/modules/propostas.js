@@ -137,6 +137,16 @@ const Propostas = (() => {
         <div class="kpi-card" style="--kpi-color:#8b5cf6;cursor:pointer" title="Clique para ver propostas reprovadas" onclick="Propostas.drillDown('reprovadas')"><div class="kpi-label">Total das Propostas <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(Utils.sum(propostas,'valor'))}</div><div class="kpi-icon">💼</div></div>
       </div>
 
+      ${(() => {
+        const faltando = _leadsSemProposta();
+        if (!faltando.length) return '';
+        const total = faltando.reduce((s, l) => s + (Number(l.valorEstimado) || 0), 0);
+        return `<div class="propostas-alerta">
+          <span>📄 <strong>${faltando.length}</strong> negócio(s) em etapa de proposta sem proposta registrada${total > 0 ? `, somando ${Utils.formatCurrency(total)}` : ''}.</span>
+          <button class="btn btn-xs btn-secondary" onclick="Propostas.listarSemProposta()">Ver e registrar</button>
+        </div>`;
+      })()}
+
       <div class="card">
         <div class="card-header">
           <div class="filters">
@@ -1360,6 +1370,46 @@ const Propostas = (() => {
   let _templateSelecionado = null;
 
   /* ---------- Proposta Rápida ---------- */
+  /* Negocios que estao em etapa de proposta sem proposta registrada.
+     E a diferenca entre o que o funil diz e o que esta nesta tela. */
+  const ETAPAS_DE_PROPOSTA = ['proposta_elaboracao', 'proposta_enviada', 'negociacao'];
+  function _leadsSemProposta() {
+    const comProposta = new Set(DB.getAll('propostas').map(p => p.leadId).filter(Boolean));
+    return DB.getAll('leads')
+      .filter(l => ETAPAS_DE_PROPOSTA.includes(l.status) && !comProposta.has(l.id))
+      .sort((a, b) => (Number(b.valorEstimado) || 0) - (Number(a.valorEstimado) || 0));
+  }
+
+  function listarSemProposta() {
+    const leads = _leadsSemProposta();
+    if (!leads.length) { Toast.success('Todo negocio em etapa de proposta ja tem proposta registrada.'); return; }
+    const ETAPA = { proposta_elaboracao: 'Em elaboração', proposta_enviada: 'Enviada', negociacao: 'Em negociação' };
+    Modal.open({
+      title: `📄 ${leads.length} negócio(s) sem proposta registrada`,
+      size: 'modal-lg', saveLabel: null,
+      body: `
+        <p class="text-sm text-muted" style="margin-bottom:12px">
+          O funil diz que estes negócios estão em etapa de proposta, mas não existe
+          proposta registrada para eles. Sem isso, esta tela não consegue dizer o que
+          está na rua esperando resposta, e o valor não entra na conta de proposta aberta.
+        </p>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead><tr><th>Negócio</th><th>Etapa no funil</th><th>Valor</th><th>Ação</th></tr></thead>
+            <tbody>
+              ${leads.map(l => `<tr>
+                <td><div style="min-width:200px;font-size:13px;font-weight:600">${Utils.escHtml(l.titulo || '—')}</div>
+                    <div class="text-xs text-muted">${Utils.escHtml(l.empresa || '')}</div></td>
+                <td class="text-sm">${ETAPA[l.status] || l.status}</td>
+                <td class="font-bold text-sm">${l.valorEstimado ? Utils.formatCurrency(l.valorEstimado) : '—'}</td>
+                <td><button class="btn btn-xs btn-primary" onclick="Modal.close();Propostas.propostaRapida('${l.id}')">⚡ Registrar</button></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`,
+    });
+  }
+
   function propostaRapida(leadId) {
     const lead = leadId ? DB.get('leads', leadId) : null;
     const cliente = lead ? DB.get('clientes', lead.clienteId) : null;
@@ -1528,7 +1578,7 @@ const Propostas = (() => {
     _addEtapaContrato, _renderEtapasContrato, _setEtapaCampo, _removeEtapaContrato,
     nextNumeroProposta: _nextNumeroProposta,
     setPeriodo, drillDown, duplicar, imprimirProposta, _aplicarTemplate,
-    propostaRapida, _selecionarTemplate, _gerarPropostaRapida,
+    propostaRapida, _selecionarTemplate, _gerarPropostaRapida, listarSemProposta,
     TEMPLATES_SERVICOS,   // importados para o catálogo do Orçamento Rápido
     enviarWhatsApp, enviarEmail,
   };

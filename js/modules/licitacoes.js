@@ -708,7 +708,7 @@ const Licitacoes = (() => {
                     <div class="font-bold text-sm" style="color:var(--primary)">${Utils.escHtml(l.numero || '—')}</div>
                     <div class="text-xs text-muted">${Utils.escHtml(l.portal || '')}</div>
                   </td>
-                  <td><div style="max-width:200px;font-size:13px">${Utils.escHtml(Utils.truncate(l.objeto || '', 70))}</div></td>
+                  <td><div style="min-width:210px;max-width:280px;font-size:13px" title="${Utils.escHtml(l.objeto || '')}">${Utils.escHtml(Utils.truncate(l.objeto || '', 70))}</div></td>
                   <td class="text-sm">${Utils.escHtml(l.orgao || '—')}<br><span class="text-xs text-muted">${Utils.escHtml(l.uasg ? 'UASG '+l.uasg : '')}</span></td>
                   <td class="text-xs">${Utils.escHtml(l.modalidade || '—')}</td>
                   <td class="text-sm">

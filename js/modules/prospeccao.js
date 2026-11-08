@@ -143,12 +143,16 @@ const Prospeccao = (() => {
           <div class="form-row" style="align-items:flex-end;gap:12px;flex-wrap:wrap">
             <div class="form-group" style="flex:2;min-width:180px">
               <label class="form-label">Palavra-chave / Segmento</label>
-              <div style="display:flex;gap:6px">
-                <select class="form-control" id="pKeyword" onchange="Prospeccao._onKeywordChange(this.value)">
+              <!-- O select nao tinha limite de largura e espremia o campo livre
+                   para 26px: dava para ver o cursor, nao para digitar. Os dois
+                   agora dividem a linha e quebram quando nao couberem. -->
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <select class="form-control" id="pKeyword" style="flex:1 1 150px;min-width:0"
+                  onchange="Prospeccao._onKeywordChange(this.value)">
                   ${kwOpts}
                 </select>
                 <input class="form-control" id="pKeywordCustom" placeholder="ou digite aqui..."
-                  style="flex:1" value="${Utils.escHtml(_config.keywordSelecionada)}"
+                  style="flex:1 1 150px;min-width:0" value="${Utils.escHtml(_config.keywordSelecionada)}"
                   oninput="Prospeccao._onKeywordCustom(this.value)"
                   onkeydown="if(event.key==='Enter') Prospeccao.buscar()">
               </div>

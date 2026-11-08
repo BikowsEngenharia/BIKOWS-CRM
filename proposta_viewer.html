@@ -600,15 +600,17 @@ function trocaPorNome(img) {
 }
 
 function renderSobreBikows() {
-  const clientes = D.clientesRef || [
-    'Continental','MESSER','EBSERH','Icilegel','FCM — Fábrica de Mancais','Eletran',
-    'enerlab','DeLucca','Prosmaq','BrutusMaq','Elecnor','Jussara'
-  ];
+  /* Sem lista fixa aqui: este arquivo e servido publicamente, e nome de
+     cliente e informacao da empresa. A lista vem no payload, que o gerador
+     monta a partir da configuracao. */
+  const clientes = Array.isArray(D.clientesRef) ? D.clientesRef : [];
 
-  const LOGO_URLS = {
-    'Continental': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Continental_AG_logo.svg/200px-Continental_AG_logo.svg.png',
-    'MESSER': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Messer_Group_logo.svg/200px-Messer_Group_logo.svg.png',
-  };
+  /* Mapa { nome do cliente: url do logo }, tambem vindo da configuracao.
+     As duas URLs que ficavam aqui apontavam para a Wikimedia e respondiam
+     400, alem de trazerem nome de cliente para um arquivo publico. Quando
+     os logos estiverem hospedados, basta preencher 'logosClientes' na
+     configuracao; enquanto estiver vazio, aparece o nome em texto. */
+  const LOGO_URLS = (D.logosClientes && typeof D.logosClientes === 'object') ? D.logosClientes : {};
 
   /* O logo e um extra. Se a imagem nao carregar, por estar sem internet
      na hora de gerar o PDF ou porque a URL saiu do ar, a celula cai para o

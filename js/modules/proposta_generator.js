@@ -332,18 +332,9 @@ Restante faturado em 30 / 60 DDL.</textarea>
 
       <div style="margin-top:12px">
         <label class="form-label">Clientes de Referência (um por linha, para a página de clientes)</label>
-        <textarea class="form-control" id="gpClientesRef" rows="6">Continental
-Elecnor
-AUMOVIO
-Eneva
-FCM — Fábrica de Mancais
-MESSER Cutting Systems
-emae
-EBSERH
-Icilegel
-Jussara
-Prosmaq
-enerlab</textarea>
+        <!-- Os nomes dos clientes nao ficam no codigo: este repositorio e
+             publico. Vem da configuracao, que so usuario autorizado le. -->
+        <textarea class="form-control" id="gpClientesRef" rows="6">${(DB.getConfig().clientesRef || []).join('\n')}</textarea>
       </div>
     </div>
     `;

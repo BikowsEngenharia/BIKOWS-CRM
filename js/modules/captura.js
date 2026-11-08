@@ -2,8 +2,8 @@
    CAPTURA.js — Captura em um campo
 
    Transforma uma linha digitada em registro pronto:
-     "Ligar para Continental amanhã 9h"
-       → atividade · tipo ligação · 31/10 · 09:00 · cliente Continental
+     "Ligar para Metalúrgica Aurora amanhã 9h"
+       → atividade · tipo ligação · 31/10 · 09:00 · cliente Metalúrgica Aurora
 
    Interpreta data, hora, prioridade, tipo e cliente a partir do texto,
    mostra o que entendeu antes de salvar (nada é gravado às cegas) e
@@ -193,7 +193,7 @@ const Captura = (() => {
     if (r.hora) r.lidos.push({ rotulo: 'hora', valor: r.hora });
 
     /* 6. tipo de atividade pelo verbo. Não é removido do título: "Ligar para
-          a Continental" faz sentido como título do jeito que está. */
+          a Metalúrgica Aurora" faz sentido como título do jeito que está. */
     const minusculo = plano.toLowerCase();
     for (const t of TIPOS) {
       if (t.re.test(minusculo)) { r.tipo = t.tipo; break; }
@@ -213,7 +213,7 @@ const Captura = (() => {
         if (!melhor || nome.length > melhor.len) melhor = { c, len: nome.length };
         return;
       }
-      // primeira palavra significativa ("Continental Alimentos" → "continental")
+      // primeira palavra significativa ("Metalúrgica Aurora" → "metalurgica")
       const prim = nome.split(/[\s.,/-]+/).find(p => p.length >= 5);
       if (prim && new RegExp('\\b' + prim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(minusculo)) {
         if (!melhor || prim.length > melhor.len) melhor = { c, len: prim.length };
@@ -243,7 +243,7 @@ const Captura = (() => {
         <label class="form-label" style="margin-bottom:6px;display:block">Escreva em uma linha</label>
         <div style="display:flex;gap:6px">
           <input class="form-control" id="capLinha" autocomplete="off"
-            placeholder="Ex: Ligar para Continental amanhã 9h"
+            placeholder="Ex: Ligar para Metalúrgica Aurora amanhã 9h"
             oninput="Captura.previa()" onkeydown="if(event.key==='Enter'){event.preventDefault();Captura.criar()}">
           <button class="btn btn-primary" onclick="Captura.criar()" style="white-space:nowrap">Criar</button>
         </div>

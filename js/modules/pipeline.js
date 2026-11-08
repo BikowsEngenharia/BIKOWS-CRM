@@ -270,6 +270,16 @@ const Pipeline = (() => {
     render();
   }
 
+  /* Reabre tudo que esta recolhido no agrupamento atual. */
+  function expandirTodas() {
+    const mapa = _colapsadas();
+    Object.keys(mapa)
+      .filter(k => k.startsWith(_agrupamento + ':'))
+      .forEach(k => delete mapa[k]);
+    try { localStorage.setItem('crm_funil_colapsadas', JSON.stringify(mapa)); } catch (e) { /* cota */ }
+    render();
+  }
+
   function setAgrupamento(v) {
     if (!AGRUPAMENTOS[v]) return;
     _agrupamento = v; _gravarPref('agrupar', v); render();
@@ -439,22 +449,27 @@ const Pipeline = (() => {
     document.getElementById('pageContent').innerHTML = `
       <div class="sec-header">
         <h2 class="sec-title">Pipeline CRM</h2>
-        <div class="sec-actions">
-          <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;border:1px solid var(--border)">
-            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<button onclick="Pipeline.setPeriodo('${p}')" style="padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--t);${_periodo===p?'background:var(--primary);color:#fff;':'background:transparent;color:var(--text-muted);'}">${periodoLabels[p]}</button>`).join('')}
-          </div>
-          <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Ver somente licitações">🏛 Licitações</button>
-          <button class="btn btn-secondary" onclick="Pipeline.listaLeadsFrios()" title="Ver leads frios">🧊 ${frios} Frios</button>
-          ${_semProximaAcao().length ? `<button class="btn btn-secondary" onclick="Pipeline.drillDown('sem_proxima_acao')" title="Leads ativos sem próxima ação marcada — ninguém é lembrado deles">⚠ ${_semProximaAcao().length} sem ação</button>` : ''}
-          <button class="btn btn-secondary" onclick="Pipeline.reativarLeadsPerdidos()" title="Reativar leads perdidos">♻️ Reativar</button>
-          <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()">📡 Por Canal</button>
-          <button class="btn btn-secondary" onclick="Pipeline.downloadCSVTemplate()" title="Baixar modelo CSV de leads">📋 Modelo CSV</button>
-          <label class="btn btn-secondary" title="Importar leads via CSV">
-            📥 CSV
+        <div class="sec-actions" data-keep="0">
+          <button class="btn btn-secondary" onclick="Pipeline.filtrarLicitacoes()" title="Mostrar somente leads vindos de licitação pública">🏛 Só licitações</button>
+          <button class="btn btn-secondary" onclick="Pipeline.reativarLeadsPerdidos()" title="Reabrir leads perdidos há mais de 90 dias">♻️ Reativar perdidos</button>
+          <button class="btn btn-secondary" onclick="Pipeline.relatorioOrigem()" title="Desempenho por canal de origem">📡 Relatório por canal</button>
+          <button class="btn btn-secondary" onclick="Pipeline.downloadCSVTemplate()" title="Baixar o modelo de planilha para importar leads">📋 Modelo CSV</button>
+          <label class="btn btn-secondary" title="Importar leads de uma planilha CSV">
+            📥 Importar CSV
             <input type="file" accept=".csv" style="display:none" onchange="Pipeline.importCSV(event)">
           </label>
           <button class="btn btn-primary" onclick="Pipeline.openForm()">+ Novo Lead</button>
         </div>
+      </div>
+
+      <!-- O período muda só os dois cartões de fechamento, nunca o quadro.
+           Por isso ele fica aqui, colado neles, e não solto no cabeçalho. -->
+      <div class="kpi-periodo">
+        <label for="funilPeriodo">Fechamento e conversão em</label>
+        <select id="funilPeriodo" class="filter-select" onchange="Pipeline.setPeriodo(this.value)">
+          ${['mes','trimestre','semestre','ano','tudo'].map(p => `<option value="${p}" ${_periodo===p?'selected':''}>${periodoLabels[p]}</option>`).join('')}
+        </select>
+        <span class="kpi-periodo-nota">o quadro mostra sempre tudo que está em aberto</span>
       </div>
 
       <div class="pipeline-summary mb-4">
@@ -570,23 +585,45 @@ const Pipeline = (() => {
         </div>`;
       })()}
 
+      <!-- O que pede atenção: contagem, não botão. Saiu do cabeçalho e veio
+           para onde se olha de verdade, encostado no quadro. -->
+      ${(() => {
+        const semAcao = _semProximaAcao().length;
+        const chips = [];
+        if (semAcao) chips.push(`<button class="funil-alerta" style="--c:#C42B2B;--cbg:#C42B2B14;--cbd:#C42B2B40"
+          onclick="Pipeline.drillDown('sem_proxima_acao')"
+          title="Leads em aberto sem próxima ação marcada: ninguém é lembrado deles">⚠ ${semAcao} sem próxima ação</button>`);
+        if (frios) chips.push(`<button class="funil-alerta" style="--c:#d97706;--cbg:#d9770614;--cbd:#d9770640"
+          onclick="Pipeline.listaLeadsFrios()"
+          title="Leads em aberto parados há muito tempo">🧊 ${frios} frios</button>`);
+        return chips.length ? `<div class="funil-alertas">${chips.join('')}</div>` : '';
+      })()}
+
       ${_pipelineTab === 'ativo' && _vistaAtual() === 'kanban' && _agrupamento === 'etapa' ? _renderProbabilidadeLegend() : ''}
 
-      ${_vistaAtual() === 'foco' ? renderFoco(leads) : `
-      <div class="kanban-wrap">
-        <div class="kanban-board" id="kanbanBoard">
-          ${(() => {
-            const grupos = _montarGrupos(_aplicarFiltros(leads));
-            if (!grupos.some(g => g.leads.length)) {
-              return `<div class="kanban-sem-nada">
-                Nenhum lead neste recorte.<br>
-                <span class="text-xs">Troque o agrupamento ou limpe os filtros.</span>
-              </div>`;
-            }
-            return grupos.map(renderColuna).join('');
-          })()}
-        </div>
-      </div>`}
+      ${_vistaAtual() === 'foco' ? renderFoco(leads) : (() => {
+        const grupos = _montarGrupos(_aplicarFiltros(leads));
+        const quadro = corpo => `<div class="kanban-wrap"><div class="kanban-board" id="kanbanBoard">${corpo}</div></div>`;
+
+        if (!grupos.some(g => g.leads.length)) {
+          return quadro(`<div class="kanban-sem-nada">
+            Nenhum lead neste recorte.<br>
+            <span class="text-xs">Troque o agrupamento ou limpe os filtros.</span>
+          </div>`);
+        }
+
+        /* Se tudo que sobrou está em coluna recolhida, o quadro parece vazio
+           mesmo tendo resultado. A contagem continua na faixa da coluna, mas
+           é fácil não ver: avisa antes do quadro e oferece abrir. */
+        const escondidos = grupos.filter(g => _estaColapsada(g.key)).reduce((s, g) => s + g.leads.length, 0);
+        const temAMostra = grupos.some(g => !_estaColapsada(g.key) && g.leads.length);
+        const aviso = (escondidos && !temAMostra) ? `<div class="kanban-tudo-recolhido">
+            <span>🫥 ${escondidos} lead(s) estão em colunas recolhidas, por isso o quadro parece vazio.</span>
+            <button class="btn btn-xs btn-secondary" onclick="Pipeline.expandirTodas()">Abrir todas as colunas</button>
+          </div>` : '';
+
+        return aviso + quadro(grupos.map(renderColuna).join(''));
+      })()}
     `;
     // Note: kanban board shows all leads regardless of period (period only affects KPI summary)
 
@@ -2323,7 +2360,7 @@ const Pipeline = (() => {
     criarPropostaLead, abrirContratoLead, _fecharSemProposta, _garantirCliente,
     relatorioOrigem, filtrarLicitacoes,
     setFilter, clearFilters, setPeriodo, setPipelineTab, setVista, _vistaAtual,
-    setAgrupamento, setOrdenacao, setDensidade, toggleFiltros, toggleColuna,
+    setAgrupamento, setOrdenacao, setDensidade, toggleFiltros, toggleColuna, expandirTodas,
     drillDown,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
     importCSV, downloadCSVTemplate,

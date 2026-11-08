@@ -363,16 +363,20 @@ const Utils = (() => {
     // Desktop: mantém os 2 primeiros secundários visíveis e recolhe o resto
     // quando há 4+ (o Pipeline tinha 7 botões e o título quebrava linha).
     // Celular/tablet: todos os secundários vão para o menu.
-    const keep = window.innerWidth > 900 ? 2 : 0;
+    /* Quantos secundarios ficam visiveis fora do menu. O padrao serve para
+       a maioria das telas; data-keep no proprio .sec-actions manda nele,
+       para um cabecalho que precisa ficar em uma linha so. */
+    const keepPadrao = window.innerWidth > 900 ? 2 : 0;
     scope.querySelectorAll('.sec-header .sec-actions').forEach(sa => {
       if (sa.dataset.collapsed === '1') return;
+      const keep = sa.dataset.keep != null ? Math.max(0, +sa.dataset.keep || 0) : keepPadrao;
       const kids = [...sa.children];
       const isPeriodo = el => el.tagName === 'DIV' && el.querySelector('[onclick*="setPeriodo"], [onclick*="Periodo"]');
       const isPrimary = el => el.classList.contains('btn-primary') || el.classList.contains('btn-danger') || el.classList.contains('btn-success');
       const isTab = el => el.id && /^btnTab/i.test(el.id) || el.classList.contains('tabs');
       const all = kids.filter(el => !isPeriodo(el) && !isPrimary(el) && !isTab(el) && (el.tagName === 'BUTTON' || el.tagName === 'LABEL' || el.tagName === 'A'));
       sa.dataset.collapsed = '1';
-      const others = all.length >= keep + 2 ? all.slice(keep) : [];
+      const others = all.length >= Math.max(keep + 2, 2) ? all.slice(keep) : [];
       if (others.length < 2) return;
       const btn = document.createElement('button');
       btn.type = 'button';

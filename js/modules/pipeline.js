@@ -191,6 +191,105 @@ const Pipeline = (() => {
   let _pipelineTab = 'ativo'; // 'ativo' | 'historico'
   let _vista = null;          // null = decide pela largura da tela · 'kanban' | 'foco'
 
+  /* ================================================================
+     AGRUPAR, ORDENAR, COLAPSAR
+
+     O quadro antes gastava 415px dos 720px da tela antes do primeiro
+     cartão aparecer, e o cartão trazia 8 linhas e 6 botões em 258px de
+     largura — boa parte delas vazia, porque metade dos campos quase nunca
+     é preenchida. Aqui o quadro passa a ser configurável: escolhe-se por
+     onde agrupar, como ordenar e o que fica recolhido, e a escolha é
+     lembrada.
+
+     Os critérios foram escolhidos medindo o preenchimento real nos 37
+     leads ativos: segmento 37/37, origem 36/37, prazo 35/37,
+     responsável 0/37 (entra para quando a equipe registrar) e cliente
+     7/37 — este último ficou de fora de propósito, viraria uma coluna
+     gigante de "sem cliente".
+     ================================================================ */
+  const AGRUPAMENTOS = {
+    etapa:       { label: '🎯 Etapa' },
+    segmento:    { label: '🏭 Segmento' },
+    origem:      { label: '📡 Canal' },
+    prazo:       { label: '⏰ Prazo da ação' },
+    responsavel: { label: '👤 Responsável' },
+  };
+
+  const ORDENACOES = {
+    acao:    { label: '⏰ Ação mais urgente',
+               fn: (a, b) => (a.dataProximaAcao || '9999-12-31').localeCompare(b.dataProximaAcao || '9999-12-31') },
+    valor:   { label: '💰 Maior valor',
+               fn: (a, b) => (Number(b.valorEstimado) || 0) - (Number(a.valorEstimado) || 0) },
+    parado:  { label: '🧊 Parado há mais tempo',
+               fn: (a, b) => (a.updatedAt || a.createdAt || '').localeCompare(b.updatedAt || b.createdAt || '') },
+    recente: { label: '🆕 Mais recente',
+               fn: (a, b) => (b.createdAt || '').localeCompare(a.createdAt || '') },
+  };
+
+  /* Faixas de prazo: é o agrupamento mais acionável, porque responde
+     "o que está me esperando" em vez de "onde o negócio está". */
+  const FAIXAS_PRAZO = [
+    { key: 'atrasado', label: '⚠ Atrasado',    cor: '#C42B2B', teste: d => d !== null && d < 0 },
+    { key: 'hoje',     label: '📍 Hoje',        cor: '#ea580c', teste: d => d === 0 },
+    { key: 'semana',   label: '📅 Próximos 7 dias', cor: '#d97706', teste: d => d !== null && d > 0 && d <= 7 },
+    { key: 'depois',   label: '🗓 Depois',      cor: '#1D4F8C', teste: d => d !== null && d > 7 },
+    { key: 'sem_data', label: '— Sem data',     cor: '#94a3b8', teste: d => d === null },
+  ];
+
+  const PALETA_GRUPO = ['#1D4F8C', '#0891b2', '#8b5cf6', '#059669', '#d97706', '#C42B2B', '#0f766e', '#6366f1', '#ec4899', '#64748b'];
+
+  /* Etapas que encerram o negócio: separam o quadro Ativo do Histórico. */
+  const TERMINAIS = ['fechado_ganho', 'executado', 'fechado_perdido'];
+  const SEM_VALOR = '— não informado';
+
+  function _lerPref(chave, padrao) {
+    try { return localStorage.getItem('crm_funil_' + chave) || padrao; } catch (e) { return padrao; }
+  }
+  function _gravarPref(chave, valor) {
+    try { localStorage.setItem('crm_funil_' + chave, valor); } catch (e) { /* cota */ }
+  }
+
+  let _agrupamento = AGRUPAMENTOS[_lerPref('agrupar', 'etapa')] ? _lerPref('agrupar', 'etapa') : 'etapa';
+  let _ordenacao   = ORDENACOES[_lerPref('ordenar', 'acao')] ? _lerPref('ordenar', 'acao') : 'acao';
+  let _densidade   = _lerPref('densidade', 'compacto');
+  let _filtrosAbertos = false;
+
+  /* Colunas recolhidas, guardadas por agrupamento: recolher "Qualificação"
+     não some com "Alimentos" quando se troca de critério. */
+  function _colapsadas() {
+    try { return JSON.parse(localStorage.getItem('crm_funil_colapsadas') || '{}'); } catch (e) { return {}; }
+  }
+  function _estaColapsada(key) {
+    return !!_colapsadas()[_agrupamento + ':' + key];
+  }
+  function toggleColuna(key) {
+    const mapa = _colapsadas();
+    const chave = _agrupamento + ':' + key;
+    if (mapa[chave]) delete mapa[chave]; else mapa[chave] = true;
+    try { localStorage.setItem('crm_funil_colapsadas', JSON.stringify(mapa)); } catch (e) { /* cota */ }
+    render();
+  }
+
+  function setAgrupamento(v) {
+    if (!AGRUPAMENTOS[v]) return;
+    _agrupamento = v; _gravarPref('agrupar', v); render();
+  }
+  function setOrdenacao(v) {
+    if (!ORDENACOES[v]) return;
+    _ordenacao = v; _gravarPref('ordenar', v); render();
+  }
+  function setDensidade(v) {
+    _densidade = v === 'completo' ? 'completo' : 'compacto';
+    _gravarPref('densidade', _densidade); render();
+  }
+  function toggleFiltros() { _filtrosAbertos = !_filtrosAbertos; render(); }
+
+  /* Arrastar só faz sentido agrupado por etapa: arrastar um cartão entre
+     colunas de Canal reescreveria de onde o lead veio, corrompendo em
+     silêncio o painel dos 6 canais. Nos outros agrupamentos o cartão
+     continua com "Avançar", que move a etapa sem tocar no critério. */
+  function _podeArrastar() { return _agrupamento === 'etapa'; }
+
   function _filtrarPorPeriodo(lista, campo) {
     if (_periodo === 'tudo') return lista;
     const hoje = new Date();
@@ -358,8 +457,67 @@ const Pipeline = (() => {
         </div>
       </div>
 
+      <div class="pipeline-summary mb-4">
+        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads ativos" onclick="Pipeline.drillDown('pipeline_total')">
+          <div class="ps-label">Total em Pipeline <span style="font-size:10px;opacity:.7">(em aberto agora)</span></div>
+          <div class="ps-value">${Utils.formatCurrency(totalPipeline)}</div>
+          <div class="ps-count">${ativos.length} oportunidades abertas</div>
+        </div>
+        <div class="pipeline-stage" title="Receita esperada = valor × probabilidade por etapa; clique para ver propostas abertas" style="cursor:pointer" onclick="Pipeline.drillDown('propostas_abertas')">
+          <div class="ps-label">Receita Esperada 🎯</div>
+          <div class="ps-value" style="color:var(--success)">${Utils.formatCurrency(receitaPond)}</div>
+          <div class="ps-count">previsão realista ponderada</div>
+        </div>
+        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver receita fechada" onclick="Pipeline.drillDown('receita_fechada')">
+          <div class="ps-label">Fechado / Ganho <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
+          <div class="ps-value">${Utils.formatCurrency(ganhos.reduce((a,l)=>a+_valorGanho(l),0))}</div>
+          <div class="ps-count">${ganhos.length} negócios</div>
+        </div>
+        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads frios" onclick="Pipeline.drillDown('leads_frios')">
+          <div class="ps-label">Taxa de Conversão <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
+          <div class="ps-value">${taxa}%</div>
+          <div class="ps-count">${perdidosPeriodo.length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
+        <button onclick="Pipeline.setPipelineTab('ativo')" style="padding:8px 20px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='ativo'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">📋 Pipeline Ativo</button>
+        <button onclick="Pipeline.setPipelineTab('historico')" style="padding:8px 20px;border:none;border-left:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='historico'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">🗂 Histórico <span style="font-size:11px;opacity:.85">(${leads.filter(l=>['fechado_ganho','executado','fechado_perdido'].includes(l.status)).length})</span></button>
+      </div>
+        <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
+          <button onclick="Pipeline.setVista('kanban')" title="Quadro com colunas (arrastar e soltar)" style="padding:8px 14px;border:none;font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='kanban'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">▦ Quadro</button>
+          <button onclick="Pipeline.setVista('foco')" title="Lista vertical com ação direta (indicado para celular)" style="padding:8px 14px;border:none;border-left:1px solid var(--border);font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='foco'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">☰ Foco</button>
+        </div>
+      </div>
+
+      <!-- BARRA DE CONTROLE DO QUADRO -->
+      <div class="funil-barra">
+        ${_vistaAtual() !== 'kanban' ? '' : `
+        <label class="funil-ctl">
+          <span>Agrupar</span>
+          <select class="filter-select" onchange="Pipeline.setAgrupamento(this.value)">
+            ${Object.entries(AGRUPAMENTOS).map(([k, g]) => `<option value="${k}" ${_agrupamento === k ? 'selected' : ''}>${g.label}</option>`).join('')}
+          </select>
+        </label>
+        <label class="funil-ctl">
+          <span>Ordenar</span>
+          <select class="filter-select" onchange="Pipeline.setOrdenacao(this.value)">
+            ${Object.entries(ORDENACOES).map(([k, o]) => `<option value="${k}" ${_ordenacao === k ? 'selected' : ''}>${o.label}</option>`).join('')}
+          </select>
+        </label>
+        <span style="flex:1"></span>
+        <div style="display:flex;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <button onclick="Pipeline.setDensidade('compacto')" class="funil-dens${_densidade === 'compacto' ? ' ativo' : ''}" title="Cartão enxuto">Compacto</button>
+          <button onclick="Pipeline.setDensidade('completo')" class="funil-dens${_densidade === 'completo' ? ' ativo' : ''}" title="Cartão com todos os detalhes">Completo</button>
+        </div>`}
+        <button class="btn btn-sm btn-secondary" onclick="Pipeline.toggleFiltros()">
+          ⚙ Filtros${(() => { const n = Object.values(_filter).filter(Boolean).length; return n ? ` <span class="badge badge-blue">${n}</span>` : ''; })()}
+        </button>
+      </div>
+
       <!-- FILTROS AVANÇADOS -->
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;flex-wrap:wrap;gap:8px;align-items:center;display:${_filtrosAbertos ? 'flex' : 'none'}">
         <select class="filter-select" onchange="Pipeline.setFilter('responsavel',this.value)">
           <option value="">Todos os responsáveis</option>
           ${[...new Set(DB.getAll('leads').map(l => l.responsavel).filter(Boolean))].map(r => `<option value="${r}" ${_filter.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('')}
@@ -412,51 +570,20 @@ const Pipeline = (() => {
         </div>`;
       })()}
 
-      <div class="pipeline-summary mb-4">
-        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads ativos" onclick="Pipeline.drillDown('pipeline_total')">
-          <div class="ps-label">Total em Pipeline <span style="font-size:10px;opacity:.7">(em aberto agora)</span></div>
-          <div class="ps-value">${Utils.formatCurrency(totalPipeline)}</div>
-          <div class="ps-count">${ativos.length} oportunidades abertas</div>
-        </div>
-        <div class="pipeline-stage" title="Receita esperada = valor × probabilidade por etapa; clique para ver propostas abertas" style="cursor:pointer" onclick="Pipeline.drillDown('propostas_abertas')">
-          <div class="ps-label">Receita Esperada 🎯</div>
-          <div class="ps-value" style="color:var(--success)">${Utils.formatCurrency(receitaPond)}</div>
-          <div class="ps-count">previsão realista ponderada</div>
-        </div>
-        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver receita fechada" onclick="Pipeline.drillDown('receita_fechada')">
-          <div class="ps-label">Fechado / Ganho <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
-          <div class="ps-value">${Utils.formatCurrency(ganhos.reduce((a,l)=>a+_valorGanho(l),0))}</div>
-          <div class="ps-count">${ganhos.length} negócios</div>
-        </div>
-        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads frios" onclick="Pipeline.drillDown('leads_frios')">
-          <div class="ps-label">Taxa de Conversão <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
-          <div class="ps-value">${taxa}%</div>
-          <div class="ps-count">${perdidosPeriodo.length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
-        <button onclick="Pipeline.setPipelineTab('ativo')" style="padding:8px 20px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='ativo'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">📋 Pipeline Ativo</button>
-        <button onclick="Pipeline.setPipelineTab('historico')" style="padding:8px 20px;border:none;border-left:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:var(--t);${_pipelineTab==='historico'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">🗂 Histórico <span style="font-size:11px;opacity:.85">(${leads.filter(l=>['fechado_ganho','executado','fechado_perdido'].includes(l.status)).length})</span></button>
-      </div>
-        <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
-          <button onclick="Pipeline.setVista('kanban')" title="Quadro com colunas (arrastar e soltar)" style="padding:8px 14px;border:none;font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='kanban'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">▦ Quadro</button>
-          <button onclick="Pipeline.setVista('foco')" title="Lista vertical com ação direta (indicado para celular)" style="padding:8px 14px;border:none;border-left:1px solid var(--border);font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='foco'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">☰ Foco</button>
-        </div>
-      </div>
-
-      ${_pipelineTab === 'ativo' && _vistaAtual() === 'kanban' ? _renderProbabilidadeLegend() : ''}
+      ${_pipelineTab === 'ativo' && _vistaAtual() === 'kanban' && _agrupamento === 'etapa' ? _renderProbabilidadeLegend() : ''}
 
       ${_vistaAtual() === 'foco' ? renderFoco(leads) : `
       <div class="kanban-wrap">
         <div class="kanban-board" id="kanbanBoard">
           ${(() => {
-            const TERMINAL = ['fechado_ganho','executado','fechado_perdido'];
-            const stagesToShow = _pipelineTab === 'ativo'
-              ? STAGES.filter(s => !TERMINAL.includes(s.key))
-              : STAGES.filter(s => TERMINAL.includes(s.key));
-            return stagesToShow.map(s => renderColumn(s, leads)).join('');
+            const grupos = _montarGrupos(_aplicarFiltros(leads));
+            if (!grupos.some(g => g.leads.length)) {
+              return `<div class="kanban-sem-nada">
+                Nenhum lead neste recorte.<br>
+                <span class="text-xs">Troque o agrupamento ou limpe os filtros.</span>
+              </div>`;
+            }
+            return grupos.map(renderColuna).join('');
           })()}
         </div>
       </div>`}
@@ -583,32 +710,133 @@ const Pipeline = (() => {
       </div>`;
   }
 
-  function renderColumn(stage, allLeads) {
-    let leads = _aplicarFiltros(allLeads.filter(l => l.status === stage.key));
-    const total = Utils.sum(leads, 'valorEstimado');
-    const ponderado = leads.reduce((s,l) => s + (l.valorEstimado||0) * (stage.prob/100), 0);
+  /* Antes a coluna era a etapa, sempre. Agora o quadro pergunta ao
+     critério escolhido quais colunas desenhar; todo o resto do desenho
+     continua igual, porque o formato devolvido é sempre o mesmo:
+     { key, label, cor, prob?, leads }. */
+  function _montarGrupos(leads) {
+    if (_agrupamento === 'etapa') {
+      const stages = _pipelineTab === 'ativo'
+        ? STAGES.filter(s => !TERMINAIS.includes(s.key))
+        : STAGES.filter(s => TERMINAIS.includes(s.key));
+      return stages.map(s => ({
+        key: s.key, label: s.label, cor: s.color, prob: s.prob,
+        leads: leads.filter(l => l.status === s.key),
+      }));
+    }
 
-    return `<div class="kanban-col" data-stage="${stage.key}">
-      <div class="kanban-col-header">
-        <div class="kanban-col-title" style="color:${stage.color}">${stage.label}</div>
+    // Nos outros critérios o recorte Ativo/Histórico continua valendo.
+    const base = _pipelineTab === 'ativo'
+      ? leads.filter(l => !TERMINAIS.includes(l.status))
+      : leads.filter(l => TERMINAIS.includes(l.status));
+
+    if (_agrupamento === 'prazo') {
+      return FAIXAS_PRAZO.map(f => ({
+        key: f.key, label: f.label, cor: f.cor,
+        leads: base.filter(l => f.teste(Utils.daysUntil(l.dataProximaAcao))),
+      }));
+    }
+
+    const campo = { segmento: 'segmento', origem: 'origemLead', responsavel: 'responsavel' }[_agrupamento];
+    const mapa = new Map();
+    base.forEach(l => {
+      const v = String(l[campo] || '').trim() || SEM_VALOR;
+      if (!mapa.has(v)) mapa.set(v, []);
+      mapa.get(v).push(l);
+    });
+    /* Coluna mais cheia primeiro, e "não informado" sempre por último:
+       ali é pendência de cadastro, não categoria de negócio. */
+    return [...mapa.entries()]
+      .sort((a, b) => (a[0] === SEM_VALOR ? 1 : b[0] === SEM_VALOR ? -1 : b[1].length - a[1].length))
+      .map(([nome, ls], i) => ({
+        key: nome,
+        label: (_agrupamento === 'origem' ? (_origemIcon(nome) + ' ') : '') + nome,
+        cor: nome === SEM_VALOR ? '#94a3b8'
+          : ((_agrupamento === 'origem' && _ORIGENS_MAP[nome] && _ORIGENS_MAP[nome].color) || PALETA_GRUPO[i % PALETA_GRUPO.length]),
+        leads: ls,
+      }));
+  }
+
+  /* Coluna recolhida: faixa estreita com nome e contagem, clicável para abrir.
+     É o que resolve o quadro poluído sem esconder informação: a coluna
+     continua ali, só não ocupa 260px da tela. */
+  function _colunaColapsada(g) {
+    const total = Utils.sum(g.leads, 'valorEstimado');
+    const resumo = `${g.leads.length} lead(s)${total > 0 ? ' · ' + Utils.formatCurrency(total) : ''}`;
+    return `<div class="kanban-col colapsada" data-stage="${Utils.escHtml(g.key)}"
+      onclick="Pipeline.toggleColuna('${Utils.escJs(g.key)}')"
+      title="${Utils.escHtml(g.label)} — ${resumo}. Clique para abrir.">
+      <span class="col-fechada-num" style="background:${g.cor}">${g.leads.length}</span>
+      <span class="col-fechada-nome" style="color:${g.cor}">${Utils.escHtml(g.label)}</span>
+      <span class="col-fechada-abrir">›</span>
+    </div>`;
+  }
+
+  function renderColuna(g) {
+    if (_estaColapsada(g.key)) return _colunaColapsada(g);
+    const leads = [...g.leads].sort(ORDENACOES[_ordenacao].fn);
+    const total = Utils.sum(leads, 'valorEstimado');
+    const ponderado = g.prob != null ? leads.reduce((s, l) => s + (l.valorEstimado || 0) * (g.prob / 100), 0) : 0;
+    const arrasta = _podeArrastar();
+
+    return `<div class="kanban-col" data-stage="${Utils.escHtml(g.key)}">
+      <div class="kanban-col-header" style="cursor:pointer" title="Clique para recolher esta coluna"
+        onclick="Pipeline.toggleColuna('${Utils.escJs(g.key)}')">
+        <div class="kanban-col-title" style="color:${g.cor}">${g.label}</div>
         <div style="display:flex;align-items:center;gap:4px">
-          <span class="text-xs text-muted">${stage.prob}%</span>
+          ${g.prob != null ? `<span class="text-xs text-muted">${g.prob}%</span>` : ''}
           <div class="kanban-col-count">${leads.length}</div>
+          <span class="col-recolher">▾</span>
         </div>
       </div>
-      ${total > 0 ? `<div class="text-xs text-muted mb-1 text-center">${Utils.formatCurrency(total)}</div>` : ''}
-      ${ponderado > 0 && stage.prob < 100 && stage.prob > 0 ? `<div class="text-xs mb-2 text-center" style="color:var(--success)">↳ ${Utils.formatCurrency(ponderado)} esperado</div>` : ''}
-      <div class="kanban-cards" id="col-${stage.key}"
-        ondragover="Pipeline.dragOver(event)"
-        ondrop="Pipeline.drop(event,'${stage.key}')"
-        ondragleave="Pipeline.dragLeave(event)">
-        ${leads.map(l => renderCard(l, stage.color)).join('')}
+      ${total > 0 ? `<div class="kanban-col-total">${Utils.formatCurrency(total)}${ponderado > 0 && g.prob < 100 && g.prob > 0 ? ` <span style="color:var(--success)">↳ ${Utils.formatCurrency(ponderado)} esperado</span>` : ''}</div>` : ''}
+      <div class="kanban-cards"
+        ${arrasta ? `ondragover="Pipeline.dragOver(event)" ondrop="Pipeline.drop(event,'${Utils.escJs(g.key)}')" ondragleave="Pipeline.dragLeave(event)"` : ''}>
+        ${leads.length
+          ? leads.map(l => renderCard(l, g.cor)).join('')
+          : `<div class="kanban-vazia">nenhum lead aqui</div>`}
       </div>
-      <button class="kanban-add" onclick="Pipeline.openForm(null,'${stage.key}')">+ Adicionar lead</button>
+      ${_agrupamento === 'etapa' ? `<button class="kanban-add" onclick="Pipeline.openForm(null,'${g.key}')">+ Adicionar lead</button>` : ''}
+    </div>`;
+  }
+
+  /* Cartão enxuto: título, valor, prazo e as duas ações que são usadas de
+     verdade. O cartão completo continua a um clique de distância, no botão
+     Completo da barra, e também em Abrir. */
+  function _cardCompacto(lead, color) {
+    const frio = _isLeadFrio(lead);
+    const dias = Utils.daysUntil(lead.dataProximaAcao);
+    const sla = _slaBadge(lead);
+    const cli = DB.get('clientes', lead.clienteId);
+    const empresa = (cli && (cli.razaoSocial || cli.nome)) || lead.empresa || '';
+    const valor = Number(lead.valorEstimado) || 0;
+    const valColor = valor >= 20000 ? '#10b981' : valor >= 5000 ? '#3b82f6' : '#94a3b8';
+    const prazo = !lead.dataProximaAcao
+      ? `<span style="color:var(--text-muted);opacity:.65">sem data</span>`
+      : dias < 0 ? `<span style="color:#C42B2B;font-weight:700">⚠ ${Math.abs(dias)}d atrasado</span>`
+      : dias === 0 ? `<span style="color:#ea580c;font-weight:700">📍 hoje</span>`
+      : dias <= 7 ? `<span style="color:#d97706;font-weight:600">em ${dias}d</span>`
+      : `<span style="color:var(--text-muted)">${Utils.formatDate(lead.dataProximaAcao)}</span>`;
+
+    return `<div class="kanban-card compacto${frio ? ' lead-frio' : ''}" data-id="${lead.id}"
+      style="--card-color:${color}${sla.borderColor ? `;border-left:3px solid ${sla.borderColor}` : ''}"
+      ${_podeArrastar() ? `draggable="true" ondragstart="Pipeline.dragStart(event,'${lead.id}')" ondragend="Pipeline.dragEnd(event)"` : ''}>
+      <div class="kc-compacto-titulo">${frio ? '🧊 ' : ''}${Utils.escHtml(lead.titulo || lead.empresa || '')}</div>
+      <div class="kc-compacto-linha">
+        <span style="font-weight:700;color:${valColor}">${valor > 0 ? Utils.formatCurrency(valor) : '—'}</span>
+        <span>${prazo}</span>
+      </div>
+      ${empresa ? `<div class="kc-compacto-sub">🏢 ${Utils.escHtml(empresa)}</div>` : ''}
+      <div class="kc-compacto-acoes">
+        <button class="btn btn-xs btn-secondary" onclick="Pipeline.moverEtapa('${lead.id}',1)" title="Avançar para a próxima etapa">▶ Avançar</button>
+        <button class="btn btn-xs btn-secondary" onclick="Pipeline.viewLead('${lead.id}')">Abrir</button>
+        ${lead.contato ? `<button class="btn btn-xs" style="background:#25D366;border-color:#25D366;color:#fff" onclick="Utils.openWhatsApp('${Utils.escJs(lead.contato)}')" title="WhatsApp">💬</button>` : ''}
+      </div>
     </div>`;
   }
 
   function renderCard(lead, color) {
+    if (_densidade === 'compacto') return _cardCompacto(lead, color);
     const client = DB.get('clientes', lead.clienteId);
     const empresa = client ? (client.razaoSocial || client.nome || lead.empresa || '—') : (lead.empresa || '—');
     const alert = Utils.dateAlert(lead.dataProximaAcao, '');
@@ -639,10 +867,9 @@ const Pipeline = (() => {
     const scoreEl = _scoreBadge(lead);
     const valColor = (lead.valorEstimado||0) >= 20000 ? '#10b981' : (lead.valorEstimado||0) >= 5000 ? '#3b82f6' : '#94a3b8';
     const borderStyle = sla.borderColor ? `border-left:3px solid ${sla.borderColor}` : '';
-    return `<div class="kanban-card ${frio ? 'lead-frio' : ''}" draggable="true" data-id="${lead.id}"
+    return `<div class="kanban-card ${frio ? 'lead-frio' : ''}" data-id="${lead.id}"
       style="--card-color:${color};${borderStyle}"
-      ondragstart="Pipeline.dragStart(event,'${lead.id}')"
-      ondragend="Pipeline.dragEnd(event)">
+      ${_podeArrastar() ? `draggable="true" ondragstart="Pipeline.dragStart(event,'${lead.id}')" ondragend="Pipeline.dragEnd(event)"` : ''}>
       <div class="kc-name" style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">
         <span>${frio ? `<span title="Lead frio: ${diasSemAtualizar}d sem atualização" style="cursor:help">🧊</span> ` : ''}${Utils.escHtml(lead.titulo || lead.empresa || "")}</span>
         ${scoreEl}
@@ -2096,6 +2323,7 @@ const Pipeline = (() => {
     criarPropostaLead, abrirContratoLead, _fecharSemProposta, _garantirCliente,
     relatorioOrigem, filtrarLicitacoes,
     setFilter, clearFilters, setPeriodo, setPipelineTab, setVista, _vistaAtual,
+    setAgrupamento, setOrdenacao, setDensidade, toggleFiltros, toggleColuna,
     drillDown,
     _previewOrigem, _toggleLicitacaoSection, _toggleCampanhaSection,
     importCSV, downloadCSVTemplate,

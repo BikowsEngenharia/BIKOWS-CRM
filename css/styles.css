@@ -2320,3 +2320,106 @@ body.modal-aberto .quick-capture-btn { display: none; }
   .subnav { padding: 0 12px; }
   .subnav-btn { padding: 10px 11px; font-size: 12.5px; min-height: 40px; }
 }
+
+/* ==========================================
+   FUNIL — BARRA DE CONTROLE, COLUNA RECOLHIDA, CARTAO COMPACTO
+   O quadro gastava 415px de tela antes do primeiro cartao e o corpo da
+   coluna (.kanban-cards) nao tinha regra nenhuma: os cartoes ficavam
+   colados um no outro. Aqui entra o que faltava.
+   ========================================== */
+.funil-barra {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 9px 13px; margin-bottom: 10px;
+}
+.funil-ctl { display: flex; align-items: center; gap: 6px; }
+.funil-ctl > span {
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  color: var(--text-muted); text-transform: uppercase; white-space: nowrap;
+}
+.funil-ctl .filter-select { min-width: 152px; }
+.funil-dens {
+  border: none; background: var(--surface-2); color: var(--text-muted);
+  font-size: 12px; font-weight: 600; padding: 7px 13px; cursor: pointer;
+  transition: var(--t); min-height: 36px;
+}
+.funil-dens + .funil-dens { border-left: 1px solid var(--border); }
+.funil-dens.ativo { background: var(--primary); color: #fff; }
+
+/* Corpo da coluna */
+.kanban-cards {
+  padding: 8px; display: flex; flex-direction: column; gap: 7px;
+  min-height: 54px;
+}
+.kanban-cards.drag-over {
+  background: var(--primary-50);
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+.kanban-col-total {
+  font-size: 11px; text-align: center; color: var(--text-muted);
+  padding: 6px 8px 0;
+}
+.kanban-vazia {
+  font-size: 11px; color: var(--text-muted); opacity: .6;
+  text-align: center; padding: 10px 4px;
+}
+.kanban-add {
+  border: none; border-top: 1px dashed var(--border);
+  background: transparent; color: var(--text-muted);
+  font-size: 11.5px; font-weight: 600; padding: 9px; cursor: pointer;
+  transition: var(--t); min-height: 38px;
+}
+.kanban-add:hover { background: var(--surface); color: var(--primary); }
+.col-recolher { font-size: 10px; color: var(--text-muted); }
+.kanban-sem-nada {
+  width: 100%; padding: 34px 20px; text-align: center;
+  color: var(--text-muted); font-size: 13px; line-height: 1.7;
+}
+
+/* Coluna recolhida: continua no quadro, deixa de ocupar 260px */
+.kanban-col.colapsada {
+  min-width: 48px; max-width: 48px; width: 48px; flex: 0 0 48px;
+  min-height: 150px; align-items: center; justify-content: flex-start;
+  padding: 12px 0; gap: 10px; cursor: pointer; background: var(--surface);
+}
+.kanban-col.colapsada:hover { border-color: var(--border-strong); }
+.col-fechada-num {
+  color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 4px 7px; border-radius: var(--radius-full); flex-shrink: 0;
+}
+.col-fechada-nome {
+  writing-mode: vertical-rl; font-size: 11.5px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-height: 220px;
+}
+.col-fechada-abrir { font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
+
+/* Cartao compacto: 4 linhas e 2 acoes, contra 8 linhas e 6 botoes */
+.kanban-card.compacto { padding: 9px 10px; }
+.kc-compacto-titulo {
+  font-size: 12.5px; font-weight: 700; color: var(--text);
+  line-height: 1.35; margin-bottom: 5px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.kc-compacto-linha {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 6px; font-size: 11px; margin-bottom: 3px;
+}
+.kc-compacto-sub {
+  font-size: 10.5px; color: var(--text-muted); margin-bottom: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kc-compacto-acoes { display: flex; gap: 4px; flex-wrap: wrap; }
+.kc-compacto-acoes .btn { flex: 1 1 auto; min-height: 30px; }
+.kc-compacto-acoes .btn:last-child:not(:only-child) { flex: 0 0 auto; }
+
+@media (max-width: 760px) {
+  .funil-barra { padding: 9px 11px; gap: 8px; }
+  .funil-ctl { flex: 1 1 100%; }
+  .funil-ctl .filter-select { flex: 1; min-width: 0; }
+  /* vence o flex 0 0 85vw que a coluna normal recebe no celular */
+  .kanban-col.colapsada {
+    min-width: 46px; max-width: 46px; width: 46px; flex: 0 0 46px;
+  }
+}

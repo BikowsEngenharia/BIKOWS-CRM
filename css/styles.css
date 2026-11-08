@@ -683,26 +683,6 @@ select.form-control { cursor: pointer; }
 /* ==========================================
    PIPELINE / KANBAN
    ========================================== */
-.pipeline-summary {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px; margin-bottom: 20px;
-}
-/* Resumo do Pipeline (Total, Receita esperada, Fechado, Conversão) —
-   antes era texto solto; agora cards no mesmo padrão dos KPIs */
-.pipeline-stage {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 14px 16px 12px;
-  box-shadow: var(--shadow-sm);
-  min-width: 0;
-  position: relative;
-  transition: box-shadow var(--t), transform var(--t);
-}
-.pipeline-stage[onclick]:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-.ps-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); margin-bottom: 6px; }
-.ps-value { font-family: var(--font-display); font-size: 21px; font-weight: 800; color: var(--text); letter-spacing: -.4px; line-height: 1.1; font-feature-settings: "tnum"; overflow-wrap: anywhere; }
-.ps-count { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
 .summary-col {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-md); padding: 10px;
@@ -1029,7 +1009,6 @@ select.form-control { cursor: pointer; }
 /* === TABLET LARGO (≤1100px) === */
 @media (max-width: 1100px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  .pipeline-summary { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* === TABLET (≤900px) === */
@@ -1067,7 +1046,6 @@ select.form-control { cursor: pointer; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 12px; }
   .col-span-2, .col-span-3 { grid-column: span 1; }
-  .pipeline-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .page-content { padding: 14px; }
   .sec-header { flex-wrap: wrap; gap: 10px; }
   .sec-actions { flex-wrap: wrap; }
@@ -1126,8 +1104,6 @@ select.form-control { cursor: pointer; }
 
   /* Grids */
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 10px; }
-  .pipeline-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .ps-value { font-size: 17px; }
 
   /* Top bar */
   .top-bar { padding: 0 12px; height: 52px; }
@@ -1315,7 +1291,6 @@ select.form-control { cursor: pointer; }
   .kpi-grid { grid-template-columns: 1fr !important; }
   .kpi-value { font-size: 18px; }
   .sec-title { font-size: 16px; }
-  .pipeline-summary { grid-template-columns: repeat(2, 1fr); }
   .tab-btn { padding: 5px 8px; font-size: 11px; }
   .page-content { padding: 8px; }
   /* Calendário: chips viram barras coloridas (texto ilegível nesse tamanho) */
@@ -2424,17 +2399,52 @@ body.modal-aberto .quick-capture-btn { display: none; }
   }
 }
 
-/* Periodo colado aos KPIs que ele muda, em vez de solto no cabecalho */
-.kpi-periodo {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-bottom: 8px;
+/* Os quatro numeros do funil em uma faixa unica, com o seletor de
+   periodo dentro dela. Eram 4 cartoes em grade com 203px de altura. */
+.funil-kpis {
+  display: flex; flex-wrap: wrap; align-items: stretch;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  margin-bottom: 10px;
 }
-.kpi-periodo label {
-  font-size: 11px; font-weight: 700; letter-spacing: .02em;
-  color: var(--text-muted); text-transform: uppercase; margin: 0;
+.funil-kpis .kpi {
+  flex: 1 1 145px; min-width: 0;
+  display: flex; flex-direction: column; gap: 1px;
+  align-items: flex-start; justify-content: center;
+  padding: 9px 14px; min-height: 58px;
+  border: none; border-left: 1px solid var(--border);
+  background: transparent; text-align: left;
+  font-family: inherit; transition: var(--t);
 }
-.kpi-periodo .filter-select { min-width: 140px; }
-.kpi-periodo-nota { font-size: 11px; color: var(--text-muted); opacity: .8; }
+.funil-kpis .kpi:first-child { border-left: none; }
+.funil-kpis button.kpi { cursor: pointer; }
+.funil-kpis button.kpi:hover { background: var(--surface-2); }
+.funil-kpis button.kpi:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.kpi-rot {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--text-muted);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kpi-val {
+  font-family: var(--font-display); font-size: 17px; font-weight: 800;
+  color: var(--text); line-height: 1.2; letter-spacing: -.3px;
+  font-feature-settings: "tnum";
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kpi-sub {
+  font-size: 10.5px; color: var(--text-muted);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.funil-kpis .kpi-periodo { flex: 0 1 165px; gap: 3px; }
+.funil-kpis .kpi-periodo .filter-select { width: 100%; min-height: 30px; }
+
+@media (max-width: 900px) {
+  /* 2 por linha: a borda da esquerda vira borda de cima na segunda fila */
+  .funil-kpis .kpi { flex: 1 1 46%; }
+  .funil-kpis .kpi:nth-child(odd) { border-left: none; }
+  .funil-kpis .kpi:nth-child(n+3) { border-top: 1px solid var(--border); }
+  .funil-kpis .kpi-periodo { flex: 1 1 100%; border-left: none; border-top: 1px solid var(--border); }
+}
 
 /* Faixa do que pede atencao, encostada no quadro */
 .funil-alertas {

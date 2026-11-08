@@ -464,35 +464,40 @@ const Pipeline = (() => {
 
       <!-- O período muda só os dois cartões de fechamento, nunca o quadro.
            Por isso ele fica aqui, colado neles, e não solto no cabeçalho. -->
-      <div class="kpi-periodo">
-        <label for="funilPeriodo">Fechamento e conversão em</label>
-        <select id="funilPeriodo" class="filter-select" onchange="Pipeline.setPeriodo(this.value)">
-          ${['mes','trimestre','semestre','ano','tudo'].map(p => `<option value="${p}" ${_periodo===p?'selected':''}>${periodoLabels[p]}</option>`).join('')}
-        </select>
-        <span class="kpi-periodo-nota">o quadro mostra sempre tudo que está em aberto</span>
-      </div>
-
-      <div class="pipeline-summary mb-4">
-        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads ativos" onclick="Pipeline.drillDown('pipeline_total')">
-          <div class="ps-label">Total em Pipeline <span style="font-size:10px;opacity:.7">(em aberto agora)</span></div>
-          <div class="ps-value">${Utils.formatCurrency(totalPipeline)}</div>
-          <div class="ps-count">${ativos.length} oportunidades abertas</div>
-        </div>
-        <div class="pipeline-stage" title="Receita esperada = valor × probabilidade por etapa; clique para ver propostas abertas" style="cursor:pointer" onclick="Pipeline.drillDown('propostas_abertas')">
-          <div class="ps-label">Receita Esperada 🎯</div>
-          <div class="ps-value" style="color:var(--success)">${Utils.formatCurrency(receitaPond)}</div>
-          <div class="ps-count">previsão realista ponderada</div>
-        </div>
-        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver receita fechada" onclick="Pipeline.drillDown('receita_fechada')">
-          <div class="ps-label">Fechado / Ganho <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
-          <div class="ps-value">${Utils.formatCurrency(ganhos.reduce((a,l)=>a+_valorGanho(l),0))}</div>
-          <div class="ps-count">${ganhos.length} negócios</div>
-        </div>
-        <div class="pipeline-stage" style="cursor:pointer" title="Clique para ver leads frios" onclick="Pipeline.drillDown('leads_frios')">
-          <div class="ps-label">Taxa de Conversão <span style="font-size:10px;opacity:.7">(${periodoLabels[_periodo]})</span></div>
-          <div class="ps-value">${taxa}%</div>
-          <div class="ps-count">${perdidosPeriodo.length} perdidos ${frios > 0 ? `· <span style="color:#f59e0b">🧊 ${frios} frios</span>` : ''}</div>
-        </div>
+      <!-- Os quatro números em uma faixa só, com o seletor de período na
+           própria faixa: ele muda os dois últimos, e só eles. -->
+      <div class="funil-kpis">
+        <button class="kpi" onclick="Pipeline.drillDown('pipeline_total')"
+          title="Soma de tudo que está em aberto agora, sem olhar período. Clique para ver os leads.">
+          <span class="kpi-rot">Em aberto agora</span>
+          <span class="kpi-val">${Utils.formatCurrency(totalPipeline)}</span>
+          <span class="kpi-sub">${ativos.length} oportunidade${ativos.length === 1 ? '' : 's'}</span>
+        </button>
+        <button class="kpi" onclick="Pipeline.drillDown('propostas_abertas')"
+          title="Valor × probabilidade da etapa de cada lead em aberto. Clique para ver as propostas abertas.">
+          <span class="kpi-rot">Esperado 🎯</span>
+          <span class="kpi-val" style="color:var(--success)">${Utils.formatCurrency(receitaPond)}</span>
+          <span class="kpi-sub">ponderado pela etapa</span>
+        </button>
+        <button class="kpi" onclick="Pipeline.drillDown('receita_fechada')"
+          title="Negócios ganhos ou executados no período escolhido. Clique para ver a receita fechada.">
+          <span class="kpi-rot">Ganho · ${periodoLabels[_periodo]}</span>
+          <span class="kpi-val">${Utils.formatCurrency(ganhos.reduce((a,l)=>a+_valorGanho(l),0))}</span>
+          <span class="kpi-sub">${ganhos.length} negócio${ganhos.length === 1 ? '' : 's'}</span>
+        </button>
+        <button class="kpi" onclick="Pipeline.drillDown('leads_frios')"
+          title="Ganhos sobre o total decidido no período. Clique para ver os leads parados.">
+          <span class="kpi-rot">Conversão · ${periodoLabels[_periodo]}</span>
+          <span class="kpi-val">${taxa}%</span>
+          <span class="kpi-sub">${perdidosPeriodo.length} perdido${perdidosPeriodo.length === 1 ? '' : 's'}</span>
+        </button>
+        <label class="kpi kpi-periodo"
+          title="Muda só Ganho e Conversão. O quadro mostra sempre tudo que está em aberto.">
+          <span class="kpi-rot">Período</span>
+          <select id="funilPeriodo" class="filter-select" onchange="Pipeline.setPeriodo(this.value)">
+            ${['mes','trimestre','semestre','ano','tudo'].map(p => `<option value="${p}" ${_periodo===p?'selected':''}>${periodoLabels[p]}</option>`).join('')}
+          </select>
+        </label>
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">

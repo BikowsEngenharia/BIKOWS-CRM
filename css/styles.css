@@ -2542,3 +2542,186 @@ body.modal-aberto .quick-capture-btn { display: none; }
 html[data-theme="dark"] .propostas-alerta {
   background: #3b2f12; border-color: #7c5c17; color: #fcd34d;
 }
+
+/* ==========================================
+   FICHA DO CLIENTE
+   A janela de 10 abas que existia no lugar deixava 40% da largura sem uso
+   e nao cabia o financeiro do servico. Aqui e tela inteira.
+   ========================================== */
+
+/* cor de destaque de cada numero da faixa; o funil continua colorindo
+   pelo style inline, que vence a classe */
+:root { --ok-txt: #1E7A34; --ruim-txt: #C42B2B; --info-txt: #1D4F8C; }
+:root[data-theme="dark"], html[data-theme="dark"], body.dark-mode {
+  --ok-txt: #4ADE80; --ruim-txt: #F87171; --info-txt: #8FBCF0;
+}
+.funil-kpis .kpi { --kc: var(--text); }
+.funil-kpis .kpi .kpi-val { color: var(--kc); }
+
+.ficha-topo {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ficha-ident { display: flex; align-items: center; gap: 12px; flex: 1 1 320px; min-width: 0; }
+.ficha-nome {
+  font-family: var(--font-display); font-size: 20px; font-weight: 800;
+  letter-spacing: -.4px; line-height: 1.15;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.ficha-cod {
+  font-size: 10.5px; font-weight: 700; background: var(--primary); color: #fff;
+  padding: 2px 8px; border-radius: 99px; letter-spacing: .3px;
+}
+.ficha-acoes { flex: 0 0 auto; margin-left: auto; }
+
+.ficha-obs {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius); padding: 9px 12px; margin-bottom: 10px;
+  font-size: 12.5px; color: var(--text); white-space: pre-wrap;
+}
+.ficha-obs-rot {
+  display: block; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--text-muted); margin-bottom: 3px;
+}
+
+/* ---- veredito ---- */
+.ficha-veredito {
+  /* o JS manda as duas cores (--vcl e --vcd); quem escolhe e o tema */
+  --vc: var(--vcl); --vcbg: var(--vcbgl);
+  display: flex; align-items: stretch; gap: 0; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--vc); border-radius: var(--radius-lg);
+  overflow: hidden; margin-bottom: 10px;
+}
+.vrd-selo {
+  flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center;
+  padding: 11px 16px; background: var(--vcbg);
+  min-width: 160px;
+}
+.vrd-label {
+  font-family: var(--font-display); font-size: 15px; font-weight: 800;
+  color: var(--vc); line-height: 1.15; letter-spacing: -.2px;
+}
+.vrd-sub {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--text-muted); margin-top: 2px;
+}
+.vrd-sinais {
+  flex: 1 1 340px; min-width: 0; display: flex; flex-wrap: wrap; gap: 0;
+  padding: 8px 4px;
+}
+.vrd-col { flex: 1 1 210px; min-width: 0; padding: 2px 12px; }
+.vrd-col-tit {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 3px;
+}
+.vrd-bom  { color: var(--ok-txt); }
+.vrd-ruim { color: var(--ruim-txt); }
+.vrd-nota { color: var(--text-muted); }
+
+/* pastilha do veredito na lista de clientes */
+.badge-veredito {
+  --vc: var(--vcl);
+  background: color-mix(in srgb, var(--vc) 11%, transparent);
+  color: var(--vc); border: 1px solid var(--vc);
+}
+.vrd-item { font-size: 11.5px; color: var(--text); line-height: 1.45; }
+
+/* ---- abas ---- */
+.ficha-abas {
+  display: flex; gap: 2px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); margin-bottom: 14px;
+}
+.ficha-aba {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 14px; border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--text-muted); border-bottom: 2px solid transparent;
+  margin-bottom: -1px; transition: var(--t); white-space: nowrap;
+}
+.ficha-aba:hover { color: var(--text); background: var(--surface-2); }
+.ficha-aba.ativa { color: var(--primary); border-bottom-color: var(--primary); }
+.ficha-aba-n {
+  font-size: 10px; font-weight: 700; background: var(--surface-2);
+  border: 1px solid var(--border); color: var(--text-muted);
+  padding: 0 5px; border-radius: 99px; min-width: 17px; text-align: center;
+}
+.ficha-aba.ativa .ficha-aba-n {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+
+/* ---- aviso dentro da ficha ---- */
+.ficha-aviso {
+  display: flex; align-items: flex-start; gap: 7px; flex-wrap: wrap;
+  background: #fffbeb; border: 1px solid #fcd34d; color: #92400e;
+  border-radius: var(--radius); padding: 9px 12px; margin-bottom: 12px;
+  font-size: 12px; line-height: 1.45;
+}
+
+/* ---- barra de pagamento na linha do servico ---- */
+.barrinha {
+  height: 4px; background: var(--surface-2); border-radius: 99px;
+  overflow: hidden; margin: 3px 0 2px;
+}
+.barrinha > span { display: block; height: 100%; border-radius: 99px; }
+
+/* ---- oportunidades ---- */
+.op-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 10px; padding: 12px;
+}
+.op-card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 12px; background: var(--surface);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.op-card.op-prio { border-color: var(--info-txt); border-left: 3px solid var(--info-txt); }
+.op-nome { font-size: 13px; font-weight: 700; line-height: 1.25; }
+.op-cat { font-size: 10.5px; color: var(--text-muted); }
+.op-motivo { font-size: 11px; color: var(--info-txt); line-height: 1.4; }
+.op-motivo-fraco { color: var(--text-muted); }
+.op-acao { margin-top: 4px; }
+
+/* ---- linha de tempo simples ---- */
+.tl-item {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px;
+}
+.tl-item:last-child { border-bottom: none; }
+.tl-data {
+  flex: 0 0 78px; font-size: 11px; color: var(--text-muted);
+  font-feature-settings: "tnum";
+}
+.tl-txt { flex: 1 1 200px; min-width: 0; }
+
+/* ---- concentracao da carteira, na lista de clientes ---- */
+.clientes-carteira {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--cc); border-radius: var(--radius);
+  padding: 9px 13px; margin-bottom: 12px; font-size: 12px;
+  color: var(--text);
+}
+.clientes-carteira button { margin-left: auto; }
+
+@media (max-width: 900px) {
+  .ficha-acoes { margin-left: 0; width: 100%; }
+  .ficha-nome { font-size: 17px; }
+  .vrd-selo { min-width: 100%; }
+  .clientes-carteira button { margin-left: 0; }
+  .tl-data { flex: 0 0 100%; }
+}
+
+/* No fundo marinho os tons escuros da marca somem: o veredito troca para a
+   variante clara que o JS manda junto. */
+[data-theme="dark"] .ficha-veredito, body.dark-mode .ficha-veredito {
+  --vc: var(--vcd); --vcbg: var(--vcbgd);
+}
+[data-theme="dark"] .badge-veredito, body.dark-mode .badge-veredito { --vc: var(--vcd); }
+
+/* tema escuro: o aviso amarelo claro fica ilegivel */
+:root[data-theme="dark"] .ficha-aviso,
+html[data-theme="dark"] .ficha-aviso {
+  background: #3b2f12; border-color: #7c5c17; color: #fcd34d;
+}

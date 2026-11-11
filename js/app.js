@@ -315,6 +315,11 @@ const App = (() => {
     } catch(e) { /* silencioso */ }
     _currentPage = page;
 
+    /* A ficha do cliente ocupa a área de conteúdo. Trocar de tela pelo menu
+       encerra a ficha: sem isso um save em outro módulo a redesenharia por
+       cima da tela nova. */
+    if (typeof ClienteFicha !== 'undefined') ClienteFicha.fechar();
+
     const grupo = _grupoDe(page);
 
     // Destaca no menu: a tela solta por data-page, a do grupo por data-grupo

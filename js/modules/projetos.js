@@ -677,6 +677,7 @@ const Projetos = (() => {
           <button ${tabStyle('horas')} onclick="Projetos._switchViewTab('${id}','horas')">⏱ Horas ${tsHoras > 0 ? `<span style="background:var(--primary);color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${tsHoras.toFixed(0)}h</span>` : ''}</button>
           <button ${tabStyle('tarefas')} onclick="Projetos._switchViewTab('${id}','tarefas')">✅ Atividades ${(() => { const at = DB.getAll('atividades').filter(a => a.projetoId === id && a.status === 'pendente').length; return at > 0 ? `<span style="background:#f59e0b;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${at}</span>` : ''; })()}</button>
           <button ${tabStyle('arts')} onclick="Projetos._switchViewTab('${id}','arts')">📜 ARTs ${artsEntity.length > 0 ? `<span style="background:#10b981;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${artsEntity.length}</span>` : ''}</button>
+          <button ${tabStyle('financeiro')} onclick="Projetos._switchViewTab('${id}','financeiro')">💰 Financeiro${rent.custoTotal > 0 ? ` <span style="background:${margemColor};color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${rent.margemPct}%</span>` : ''}</button>
           <button ${tabStyle('docs')} onclick="Projetos._switchViewTab('${id}','docs')">📎 Arquivos ${(() => { const nd = typeof Anexos !== 'undefined' ? Anexos.contar('projetos', id) : 0; return nd > 0 ? `<span style="background:#8b5cf6;color:#fff;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">${nd}</span>` : ''; })()}</button>
         </div>
 
@@ -686,7 +687,7 @@ const Projetos = (() => {
 
         <div class="mt-4 flex gap-2" style="border-top:1px solid var(--border);padding-top:12px">
           <button class="btn btn-primary btn-sm" onclick="Modal.close();Projetos.openForm('${id}')">✏ Editar</button>
-          <button class="btn btn-secondary btn-sm" onclick="Modal.close();ProjetoFinanceiro.open('${id}')">💰 Financeiro</button>
+          <button class="btn btn-secondary btn-sm" onclick="Projetos._switchViewTab('${id}','financeiro')">💰 Financeiro e pagamentos</button>
           ${p.status !== 'concluido' && p.status !== 'cancelado' ? `<button class="btn btn-sm btn-success" onclick="Projetos.encerrarProjeto('${id}')" title="Concluir, registrar inspeção e pedir indicação">🏁 Encerrar</button>` : ''}
           ${typeof Anexos !== 'undefined' ? Anexos.botao('projetos', id, p.titulo) : ''}
           <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
@@ -735,6 +736,14 @@ const Projetos = (() => {
       _renderTarefasTab(projetoId);
     } else if (aba === 'docs') {
       _renderDocsTab(projetoId);
+    } else if (aba === 'financeiro') {
+      /* DRE, recebimentos, custos e parceiros do serviço, dentro da própria
+         ficha. Antes isso fechava a ficha e abria outra janela. */
+      const el = document.getElementById('viewProjetoTabContent');
+      if (!el) return;
+      el.innerHTML = (typeof ProjetoFinanceiro !== 'undefined')
+        ? ProjetoFinanceiro.buildEmbutido(projetoId)
+        : '<div class="text-sm text-muted p-3">Módulo financeiro do serviço não carregado.</div>';
     }
   }
 
@@ -995,7 +1004,7 @@ const Projetos = (() => {
     if (reagendados) partes.push(reagendados + ' inspeção(ões) reagendada(s)');
     if (querIndicacao) partes.push('lembrete de indicação criado');
     Toast.success(partes.join(' · '));
-    render();
+    Utils.voltarAposSalvar(render);
     if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('projetos'); }
   }
 
@@ -1120,13 +1129,16 @@ const Projetos = (() => {
     `;
   }
 
-  function openForm(id = null) {
+  function openForm(id = null, preset = {}) {
     const cfg = DB.getConfig();
     const clientes = DB.getAll('clientes').filter(c => c.ativo !== false);
     const p = id ? DB.get('projetos', id) : null;
     const etapas = p?.etapas || [{ nome: '', inicio: '', fim: '', pct: 0, status: 'pendente' }];
 
-    const clientOpts = clientes.map(c => `<option value="${c.id}" ${p?.clienteId===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
+    /* Lançando o serviço de dentro da ficha de um cliente, ele já vem
+       escolhido: antes era preciso procurar o cliente na lista outra vez. */
+    const clienteSel = p?.clienteId || preset.clienteId || '';
+    const clientOpts = clientes.map(c => `<option value="${c.id}" ${clienteSel===c.id?'selected':''}>${Utils.escHtml(c.nome)}</option>`).join('');
     const respOpts = cfg.responsaveis.map(r => `<option value="${Utils.escHtml(r)}" ${p?.responsavel===r?'selected':''}>${Utils.escHtml(r)}</option>`).join('');
     const statusOpts = Object.entries(Utils.PROJ_STATUS).map(([k,v]) => `<option value="${k}" ${p?.status===k?'selected':''}>${v.label}</option>`).join('');
 
@@ -1499,7 +1511,7 @@ const Projetos = (() => {
       }
     }
     Modal.close();
-    render();
+    Utils.voltarAposSalvar(render);
   }
 
   /* Excluir projeto deixava para trás atividades e contratos apontando para um
@@ -1533,7 +1545,7 @@ const Projetos = (() => {
       recebiveis.forEach(r => DB.update('recebiveis', r.id, { projetoId: '' }));
       DB.remove('projetos', id);
       Toast.success('Projeto removido' + (avisos.length ? ' — vínculos ajustados' : ''));
-      render();
+      Utils.voltarAposSalvar(render);
       if (typeof App !== 'undefined') App.updateNotifBadge();
     });
   }

@@ -313,13 +313,13 @@ const Equipamentos = (() => {
     if (!data.proximaInspecao) data.proximaInspecao = _proxima(data);
     if (id) { DB.update('equipamentos', id, data); Toast.success('Equipamento atualizado'); }
     else { DB.create('equipamentos', data); Toast.success('Equipamento cadastrado'); }
-    Modal.close(); render();
+    Modal.close(); Utils.voltarAposSalvar(render);
     if (typeof App !== 'undefined') App.updateNotifBadge();
   }
 
   function deleteEq(id) {
     const eq = DB.get('equipamentos', id);
-    Utils.confirmDelete(eq?.tag || 'este equipamento', () => { DB.remove('equipamentos', id); render(); });
+    Utils.confirmDelete(eq?.tag || 'este equipamento', () => { DB.remove('equipamentos', id); Utils.voltarAposSalvar(render); });
   }
 
   /* ── registrar inspeção realizada ────────────────────────────────────── */
@@ -363,7 +363,7 @@ const Equipamentos = (() => {
         if (obs) novo.observacoes = ((eq.observacoes ? eq.observacoes + '\n' : '') + Utils.formatDate(dataInsp) + ': ' + obs);
         DB.update('equipamentos', id, novo);
         Toast.success(`Inspeção registrada. Próxima: ${Utils.formatDate(novo.proximaInspecao)}`);
-        Modal.close(); render();
+        Modal.close(); Utils.voltarAposSalvar(render);
         if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('leads'); }
       },
     });
@@ -407,7 +407,7 @@ const Equipamentos = (() => {
     if (existente && !['fechado_ganho', 'executado', 'fechado_perdido'].includes(existente.status)) { Toast.warning('Já existe uma oportunidade aberta para este equipamento'); return; }
     const lead = _criarLead(eq);
     Toast.success(`Oportunidade criada no Pipeline: ${Utils.truncate(lead.titulo, 50)}`);
-    render();
+    Utils.voltarAposSalvar(render);
     if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('leads'); }
   }
   /* Renovação automática: equipamento com inspeção vencida ou vencendo em até
@@ -451,7 +451,7 @@ const Equipamentos = (() => {
     Confirm.show('Gerar renovações', `Criar ${alvo.length} oportunidade(s) de renovação no Pipeline comercial (origem Recorrência)?`, () => {
       alvo.forEach(_criarLead);
       Toast.success(`${alvo.length} oportunidade(s) criada(s) no Pipeline`);
-      render();
+      Utils.voltarAposSalvar(render);
       if (typeof App !== 'undefined') { App.updateNotifBadge(); App.refreshIfNeeded('leads'); }
     });
   }

@@ -142,7 +142,7 @@ const Contatos = (() => {
     if (id) { DB.update('contatos', id, data); Toast.success('Contato atualizado'); }
     else { DB.create('contatos', data); Toast.success('Contato cadastrado'); }
     Modal.close();
-    render();
+    Utils.voltarAposSalvar(render);
   }
 
   function deleteContato(id) {
@@ -150,7 +150,7 @@ const Contatos = (() => {
     Utils.confirmDelete(c?.nome || 'este contato', () => {
       DB.remove('contatos', id);
       Toast.success('Contato removido');
-      render();
+      Utils.voltarAposSalvar(render);
     });
   }
 

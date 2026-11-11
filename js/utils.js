@@ -453,6 +453,18 @@ const Utils = (() => {
     return `<button class="btn btn-xs btn-success ${cls}" style="background:#25D366;border-color:#25D366" onclick="Utils.openWhatsApp('${escJs(phone)}')" title="Abrir WhatsApp">💬</button>`;
   }
 
+  /* Depois de salvar ou excluir, um modulo chamava render() e desenhava a
+     propria lista. Como servico, equipamento e contato passaram a ser
+     criados de dentro da ficha do cliente, isso tirava o usuario do lugar
+     onde ele estava. Aqui a ficha tem a chance de se redesenhar; quando ela
+     nao esta aberta, cai no render() de sempre. */
+  function voltarAposSalvar(renderDaLista) {
+    try {
+      if (typeof ClienteFicha !== 'undefined' && ClienteFicha.recarregarSeAberta()) return;
+    } catch (e) { /* se a ficha falhar, a lista ainda tem de aparecer */ }
+    if (typeof renderDaLista === 'function') renderDaLista();
+  }
+
   return {
     formatCurrency, formatDate, formatDateTime, formatCNPJ, formatPhone,
     timeAgo, daysUntil, isOverdue, isToday, todayStr, localDateStr, parseDate, truncate, escHtml, escJs,
@@ -463,6 +475,7 @@ const Utils = (() => {
     parcelaAberta, recebivelAtivo,
     validateCNPJ, autoFormatCNPJ, autoFormatPhone, openWhatsApp, waBtn, labelTables, collapseActions,
     proximoNumero, numeroEmUso, SERIE_PROPOSTA, SERIE_PROJETO, FONTES_CTR, FONTES_PRJ,
+    voltarAposSalvar,
   };
 })();
 

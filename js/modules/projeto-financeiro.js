@@ -12,6 +12,12 @@ const ProjetoFinanceiro = (() => {
     return p.financeiro || { recebimentos: [], custos: [], parceiros: [] };
   }
 
+  /* Onde este corpo esta desenhado: 'janela' quando veio de open(), 'ficha'
+     quando esta embutido como aba da ficha do servico. O Modal e unico, e
+     abrir o formulario de um recebimento substitui o corpo dele; depois de
+     salvar e preciso saber para onde voltar. */
+  let _ondeEstou = 'janela';
+
   function _save(projetoId, financeiro) {
     DB.update('projetos', projetoId, { financeiro });
   }
@@ -77,13 +83,24 @@ const ProjetoFinanceiro = (() => {
     const p = _get(projetoId);
     if (!p) return;
 
+    _ondeEstou = 'janela';
     Modal.open({
       title: `💰 Financeiro — ${Utils.escHtml(p.titulo)}`,
       size: 'modal-xl',
-      body: _buildBody(p),
+      body: `<div id="pfHost">${_buildBody(p)}</div>`,
       saveLabel: null,
       cancelLabel: 'Fechar',
     });
+  }
+
+  /* Corpo embutido na ficha do servico. Mesmo conteudo da janela, so que
+     desenhado dentro da aba Financeiro em vez de abrir outra tela: as
+     informacoes principais e o dinheiro do servico ficam no mesmo lugar. */
+  function buildEmbutido(projetoId) {
+    const p = _get(projetoId);
+    if (!p) return '<div class="text-sm text-muted p-3">Serviço não encontrado.</div>';
+    _ondeEstou = 'ficha';
+    return `<div id="pfHost">${_buildBody(p)}</div>`;
   }
 
   function _buildBody(p) {
@@ -494,7 +511,7 @@ const ProjetoFinanceiro = (() => {
 
     Modal.close();
     Toast.success('Parcela adicionada!');
-    setTimeout(() => open(projetoId), 200);
+    _voltarAoFinanceiro(projetoId);
   }
 
   function marcarRecebido(projetoId, recId) {
@@ -571,7 +588,7 @@ const ProjetoFinanceiro = (() => {
         _save(projetoId, fin);
         Modal.close();
         Toast.success('Recebimento registrado!');
-        setTimeout(() => open(projetoId), 200);
+        _voltarAoFinanceiro(projetoId);
       },
     });
   }
@@ -698,7 +715,7 @@ const ProjetoFinanceiro = (() => {
 
     Modal.close();
     Toast.success('Custo lançado!');
-    setTimeout(() => open(projetoId), 200);
+    _voltarAoFinanceiro(projetoId);
   }
 
   function lancarCustoFinanceiro(projetoId, custoId) {
@@ -849,7 +866,7 @@ const ProjetoFinanceiro = (() => {
 
     Modal.close();
     Toast.success('Parceiro adicionado!');
-    setTimeout(() => open(projetoId), 200);
+    _voltarAoFinanceiro(projetoId);
   }
 
   function marcarParceiroPago(projetoId, parceiroId) {
@@ -913,7 +930,7 @@ const ProjetoFinanceiro = (() => {
         _save(projetoId, fin);
         Modal.close();
         Toast.success('Pagamento ao parceiro registrado!');
-        setTimeout(() => open(projetoId), 200);
+        _voltarAoFinanceiro(projetoId);
       },
     });
   }
@@ -995,14 +1012,38 @@ const ProjetoFinanceiro = (() => {
     rec.lancadoFinanceiro = true;
   }
 
+  /* Depois de um formulario que ocupou o modal inteiro, volta para onde o
+     financeiro estava: a aba dentro da ficha do servico, ou a janela
+     separada. Antes era sempre a janela, o que tirava o usuario da ficha
+     do servico toda vez que ele lancava um recebimento ou um custo. */
+  function _voltarAoFinanceiro(projetoId) {
+    setTimeout(() => {
+      if (_ondeEstou === 'ficha' && typeof Projetos !== 'undefined') {
+        Projetos.view(projetoId, 'financeiro');
+      } else {
+        open(projetoId);
+      }
+    }, 200);
+  }
+
   function _refresh(projetoId) {
-    // Re-renderiza o corpo do modal sem fechar
     const p = _get(projetoId);
     if (!p) return;
-    const body = document.querySelector('.modal-body');
-    if (body) {
-      body.innerHTML = _buildBody(p);
+
+    // Caso normal: o container segue na tela, só o conteúdo muda.
+    const host = document.getElementById('pfHost');
+    if (host) { host.innerHTML = _buildBody(p); return; }
+
+    /* O container não está mais lá porque um formulário ocupou o mesmo
+       modal. Volta para a aba Financeiro da ficha do serviço, que foi de
+       onde o usuário partiu. */
+    if (_ondeEstou === 'ficha' && typeof Projetos !== 'undefined') {
+      Projetos.view(projetoId, 'financeiro');
+      return;
     }
+
+    const body = document.querySelector('.modal-body');
+    if (body) body.innerHTML = `<div id="pfHost">${_buildBody(p)}</div>`;
   }
 
   /* ====================================================
@@ -1010,6 +1051,7 @@ const ProjetoFinanceiro = (() => {
      ==================================================== */
   return {
     open,
+    buildEmbutido,
     calcDRE,
     // Recebimentos
     openAddRecebimento,

@@ -310,6 +310,18 @@ const FinNucleo = (() => {
   /* Custo de pessoal de um mês (YYYY-MM): folha gerada + lançamentos do mês.
      Quando a folha do mês ainda não foi gerada, usa a estimativa do cadastro,
      para o DRE não mostrar pessoal zerado num mês que obviamente teve pessoal. */
+  /* Um custo só existe num mês se ele já existia naquele mês. Sem isto, uma
+     despesa fixa cadastrada hoje aparece em janeiro, e um funcionário que
+     entra em 2027 pesa no resultado de 2026 — o sistema inventaria história.
+     Sem data de referência, assume que sempre existiu: é o comportamento
+     antigo, e mudá-lo faria sumir dado de quem nunca preencheu a data. */
+  function existiaEm(registro, mes) {
+    if (!registro) return false;
+    const ref = registro.dataAdmissao || registro.inicio || registro.createdAt || '';
+    if (!ref) return true;
+    return String(ref).substring(0, 7) <= mes;
+  }
+
   function custoPessoalMes(mes) {
     const folha = DB.getAll('folha').filter(f => (f.mes || f.competencia || '') === mes);
     const porFunc = [];
@@ -328,7 +340,9 @@ const FinNucleo = (() => {
       });
     } else {
       estimado = true;
-      DB.getAll('funcionarios').filter(f => f.ativo !== false).forEach(f => {
+      DB.getAll('funcionarios')
+        .filter(f => f.ativo !== false && existiaEm(f, mes))
+        .forEach(f => {
         /* `totalSemExtras` e nao `total`: os custos lancados na ficha entram
            logo abaixo pelo valor cheio do mes. Usar `total` traria tambem a
            versao diluida em 12 meses, contando o mesmo gasto duas vezes. */
@@ -406,7 +420,9 @@ const FinNucleo = (() => {
     const mult = { Mensal: 1, Bimestral: 1 / 2, Trimestral: 1 / 3, Semestral: 1 / 6, Anual: 1 / 12 };
     const contas = DB.getAll('contaspagar');
     let total = 0, n = 0, jaLancado = 0;
-    DB.getAll('despesas_fixas').filter(d => d.ativo !== false).forEach(d => {
+    DB.getAll('despesas_fixas')
+      .filter(d => d.ativo !== false && existiaEm(d, mes))
+      .forEach(d => {
       const v = (Number(d.valor) || 0) * (mult[d.periodicidade] || 1);
       /* Fixa mensal já transformada em conta deste mês: a conta (e o lançamento
          que nasce dela) é o dado real. A estimativa sai de cena. */
@@ -922,6 +938,7 @@ const FinNucleo = (() => {
     linhaServico, servicos, margemMediaCarteira, corDaMargem,
     lancamentosFunc, custoPessoalMes, TIPOS_FUNC, CATEGORIAS_CUSTO_FUNC,
     orcamentoDe, avancoDe, comparativo, corDoAlerta, rotuloDoAlerta,
+    existiaEm,
     despesasGerais, receitasGerais, despesasFixasMes,
     consolidado, pontoEquilibrio, consistencia,
   };

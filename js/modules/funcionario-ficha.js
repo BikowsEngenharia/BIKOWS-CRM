@@ -713,8 +713,11 @@ const FuncionarioFicha = (() => {
     if (!desc) { Toast.error('Descrição obrigatória.'); return; }
     if (!valor || valor <= 0) { Toast.error('Informe um valor maior que zero.'); return; }
 
+    const dataLanc = document.getElementById('flData').value;
+    if (typeof Fechamento !== 'undefined' && !Fechamento.permite(dataLanc, 'Este lançamento')) return;
+
     const dados = {
-      funcionarioId: _id, tipo, valor, data: document.getElementById('flData').value,
+      funcionarioId: _id, tipo, valor, data: dataLanc,
       descricao: desc,
       categoria: document.getElementById('flCat').value,
       projetoId: document.getElementById('flProj').value,

@@ -2873,3 +2873,13 @@ html[data-theme="dark"] .ficha-aviso {
   .orc-barra-linha { grid-template-columns: 1fr 48px; }
   .orc-barra { display: none; }
 }
+
+/* ---- Fechamento mensal ---- */
+/* Lista de pendencias antes de fechar: cada uma com o que e e o que fazer,
+   porque "3 pendencias" sem dizer quais nao ajuda ninguem a decidir. */
+.fech-pend { border-top: 1px solid var(--border); }
+.fech-pend-item {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.fech-pend-item:last-child { border-bottom: none; }

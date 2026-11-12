@@ -25,7 +25,7 @@ const Financeiro = (() => {
         </div>
       </div>
       <div class="tabs mb-4">
-        ${[['visao_geral','📊 Visão Geral'],['servicos','🔧 Serviços'],['lancamentos','📋 Lançamentos'],['receber','💰 Contas a Receber'],['pagar','📤 Contas a Pagar'],['dre','📈 DRE'],['fluxo','🔄 Fluxo de Caixa'],['despesas_fixas','📌 Despesas Fixas'],['dividas','💳 Dívidas'],['ativos','🏭 Ativos'],['consistencia','🧭 Consistência']].map(([id,lb])=>`<button class="tab-btn ${_tab===id?'active':''}" onclick="Financeiro.setTab('${id}')">${lb}</button>`).join('')}
+        ${[['visao_geral','📊 Visão Geral'],['servicos','🔧 Serviços'],['lancamentos','📋 Lançamentos'],['receber','💰 Contas a Receber'],['pagar','📤 Contas a Pagar'],['dre','📈 DRE'],['fluxo','🔄 Fluxo de Caixa'],['despesas_fixas','📌 Despesas Fixas'],['dividas','💳 Dívidas'],['ativos','🏭 Ativos'],['consistencia','🧭 Consistência'],['fechamento','🔒 Fechamento']].map(([id,lb])=>`<button class="tab-btn ${_tab===id?'active':''}" onclick="Financeiro.setTab('${id}')">${lb}</button>`).join('')}
       </div>
       <div id="finContent"></div>`;
     renderTab();
@@ -38,7 +38,8 @@ const Financeiro = (() => {
     switch (_tab) {
       case 'visao_geral': el.innerHTML=buildVisaoGeral(); setTimeout(renderCharts,50); break;
       case 'servicos':    el.innerHTML=buildServicos(); break;
-      case 'consistencia':el.innerHTML=buildConsistencia(); break;
+      case 'consistencia':el.innerHTML=buildConsistencia(); break;
+      case 'fechamento': el.innerHTML=(typeof Fechamento!=='undefined')?Fechamento.build():'<div class="card"><div class="card-body text-muted">Módulo de fechamento não carregado.</div></div>'; break;
       case 'lancamentos': el.innerHTML=buildLancamentos(); break;
       case 'receber':     el.innerHTML=buildReceber(); break;
       case 'pagar':       el.innerHTML=buildPagar(); break;
@@ -955,12 +956,25 @@ const Financeiro = (() => {
   function saveLanc(id){
     const desc=document.getElementById('flDesc').value.trim();if(!desc){Toast.error('Descrição obrigatória');return;}
     const valor=Utils.parseMoney(document.getElementById('flValor').value);if(!valor){Toast.error('Valor inválido — use o formato 1500,00');return;}
-    const data={tipo:document.getElementById('flTipo').value,categoria:document.getElementById('flCat').value,descricao:desc,valor,data:document.getElementById('flData').value,status:document.getElementById('flStatus').value,clienteId:document.getElementById('flCliente')?.value||'',observacoes:document.getElementById('flObs').value};
+    const dt=document.getElementById('flData').value;
+    /* Trava de mes fechado: o passado so muda se alguem reabrir o mes e
+       assumir a mudanca. Editar um lancamento antigo tambem passa por aqui,
+       porque mexer no valor de agosto muda o resultado de agosto. */
+    if(typeof Fechamento!=='undefined' && !Fechamento.permite(dt,'Este lançamento')) return;
+    if(id){
+      const antigo=DB.get('lancamentos',id);
+      if(antigo && typeof Fechamento!=='undefined' && !Fechamento.permite(antigo.data,'O lançamento que você está editando')) return;
+    }
+    const data={tipo:document.getElementById('flTipo').value,categoria:document.getElementById('flCat').value,descricao:desc,valor,data:dt,status:document.getElementById('flStatus').value,clienteId:document.getElementById('flCliente')?.value||'',observacoes:document.getElementById('flObs').value};
     if(id){DB.update('lancamentos',id,data);Toast.success('Atualizado');}else{DB.create('lancamentos',data);Toast.success('Lançamento criado');}
     Modal.close();renderTab();
   }
   function marcarPago(id){const l=DB.get('lancamentos',id);if(!l)return;DB.update('lancamentos',id,{status:l.tipo==='receita'?'recebido':'pago'});Toast.success('Marcado');renderTab();}
-  function deleteLanc(id){Utils.confirmDelete('este lançamento',()=>{DB.remove('lancamentos',id);Toast.success('Removido');renderTab();});}
+  function deleteLanc(id){
+    const l=DB.get('lancamentos',id);
+    if(l && typeof Fechamento!=='undefined' && !Fechamento.permite(l.data,'O lançamento que você quer excluir')) return;
+    Utils.confirmDelete('este lançamento',()=>{DB.remove('lancamentos',id);Toast.success('Removido');renderTab();});
+  }
 
   /* ---- CRUD CONTAS A PAGAR ---- */
   function novaContaPagar(){openFormPagar(null);}
@@ -1051,6 +1065,9 @@ const Financeiro = (() => {
   function _quitarContaCore(id, obsExtra, dataReal){
     const p=DB.get('contaspagar',id);if(!p||p.status==='pago')return false;
     const dtPag=dataReal||Utils.todayStr();
+    /* A baixa cria um lancamento de despesa com esta data: se o mes esta
+       fechado, o resultado dele mudaria sem ninguem assumir. */
+    if(typeof Fechamento!=='undefined' && !Fechamento.permite(dtPag,'Este pagamento')) return false;
     DB.update('contaspagar',id,{status:'pago',dataPagamento:dtPag,observacoes:obsExtra?(p.observacoes?p.observacoes+' · ':'')+obsExtra:p.observacoes});
     // Cria lançamento de despesa para alimentar KPIs, DRE e relatórios
     DB.create('lancamentos',{
@@ -1200,6 +1217,7 @@ const Financeiro = (() => {
     }
 
     _pedirData('💰 Receber: '+Utils.truncate(r.descricao||'parcela',35), (dt)=>{
+      if(typeof Fechamento!=='undefined' && !Fechamento.permite(dt,'Este recebimento')) return;
       _confirmarSeDuplicata('receita', valorParcela, dt, ()=>{
         DB.update('recebiveis',rId,{parcelas:(r.parcelas||[]).map(p=>p.id===pId?{...p,status:'recebido',dataPagamento:dt}:p)});
         // Cria lançamento de receita para alimentar KPIs, DRE e relatórios

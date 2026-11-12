@@ -571,6 +571,7 @@ const ProjetoFinanceiro = (() => {
       `,
       saveCb: () => {
         const dataRecebimento = document.getElementById('pfDataReceb').value;
+        if (typeof Fechamento !== 'undefined' && !Fechamento.permite(dataRecebimento, 'Este recebimento')) return;
         const forma = document.getElementById('pfFormaReceb').value;
         const lancarCaixa = document.getElementById('pfLancarCaixa').checked;
 
@@ -706,6 +707,10 @@ const ProjetoFinanceiro = (() => {
     const desc = document.getElementById('pfCustoDesc').value.trim();
     const valor = Utils.parseMoney(document.getElementById('pfCustoValor').value);
     if (!desc || !valor) { Toast.error('Descrição e valor obrigatórios'); return; }
+    /* Custo lancado com data em mes fechado mudaria o resultado daquele mes:
+       o custo do servico entra no DRE pela data do proprio custo. */
+    const dataCusto = document.getElementById('pfCustoData').value;
+    if (typeof Fechamento !== 'undefined' && !Fechamento.permite(dataCusto, 'Este custo')) return;
 
     const p = _get(projetoId);
     const fin = _fin(p);
@@ -933,6 +938,7 @@ const ProjetoFinanceiro = (() => {
       `,
       saveCb: () => {
         const data = document.getElementById('pfParDataPgto').value;
+        if (typeof Fechamento !== 'undefined' && !Fechamento.permite(data, 'Este pagamento de comissão')) return;
         const forma = document.getElementById('pfParFormaPgto').value;
         const lancar = document.getElementById('pfParLancarPgto').checked;
 

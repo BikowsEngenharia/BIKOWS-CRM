@@ -785,6 +785,10 @@ const Folha = (() => {
     const jaExiste = DB.getAll('folha').some(r => r.mes === _mesFolha);
     if (jaExiste) { Toast.error('Folha já gerada para este mês'); return; }
 
+    /* Gerar folha de mes fechado mudaria o custo de pessoal daquele mes, que
+       ja foi congelado. */
+    if (typeof Fechamento !== 'undefined' && !Fechamento.permite(_mesFolha + '-01', 'A folha deste mês')) return;
+
     funcs.forEach(f => {
       const calc = calcFolhaFuncionario(f);
       DB.create('folha', {

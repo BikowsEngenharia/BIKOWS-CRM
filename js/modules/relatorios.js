@@ -181,8 +181,15 @@ const Relatorios = (() => {
 
   function renderFinanceiro() {
     const recebiveis = DB.getAll('recebiveis');
+    /* Mesma fonte do Financeiro. A soma propria que existia aqui ignorava o
+       recebimento registrado dentro do servico e contava parcela cancelada. */
+    const _c = (typeof FinNucleo !== 'undefined') ? FinNucleo.carteira() : null;
     let totalRecebido = 0, totalPendente = 0, totalVencido = 0;
-    recebiveis.forEach(r => {
+    if (_c) {
+      totalRecebido = _c.recebido;
+      totalVencido  = _c.vencido;
+      totalPendente = _c.aReceber - _c.vencido;
+    } else recebiveis.forEach(r => {
       (r.parcelas||[]).forEach(p => {
         if (p.status==='recebido') totalRecebido += p.valor;
         else if (Utils.isOverdue(p.vencimento)) totalVencido += p.valor;

@@ -125,9 +125,11 @@ const Metas = (() => {
     const fim    = Utils.localDateStr(new Date(ano, meses[2]+1, 0));
     const inP    = d => d && d >= inicio && d <= fim;
 
-    const receita = DB.getAll('lancamentos')
-      .filter(l => l.tipo==='receita' && l.status==='recebido' && inP(l.data))
-      .reduce((s,l) => s+(l.valor||0), 0);
+    /* Receita pelo nucleo: e a mesma conta do DRE. Antes esta tela somava
+       `lancamentos`, entao a meta era medida com uma regua e o Financeiro
+       mostrava outra. */
+    const receita = (typeof FinNucleo !== 'undefined')
+      ? FinNucleo.receitaPeriodo(inicio, fim) : 0;
     const novosClientes   = DB.getAll('clientes').filter(c => inP((c.createdAt||'').split('T')[0])).length;
     const novosLeads      = DB.getAll('leads').filter(l => inP((l.createdAt||'').split('T')[0])).length;
     const propostas       = DB.getAll('propostas').filter(p => ['enviada','negociacao','aprovada'].includes(p.status) && inP((p.createdAt||'').split('T')[0])).length;

@@ -304,6 +304,56 @@ const FinNucleo = (() => {
     return linhas.sort((a, b) => b.contratada - a.contratada);
   }
 
+  /* ====================================================
+     CARTEIRA E RECEITA — o que as outras telas consomem
+
+     Resumo, Relatórios, Metas e Hoje somavam dinheiro por conta própria, cada
+     um com a sua regra. Era assim que o mesmo mês aparecia com números
+     diferentes em telas diferentes. Agora todas chamam daqui.
+     ==================================================== */
+
+  /* Toda a carteira: recebido, a receber e vencido, sem contar nada duas
+     vezes. Percorre os serviços (que já resolvem recebível × registro interno)
+     e soma à parte os recebíveis que não pertencem a serviço nenhum. */
+  function carteira() {
+    const idsProj = new Set(DB.getAll('projetos').map(p => p.id));
+    const parcelas = [];
+    DB.getAll('projetos').forEach(p => {
+      parcelasDoServico(p).forEach(pc => parcelas.push(pc));
+    });
+    DB.getAll('recebiveis').filter(r => Utils.recebivelAtivo(r)).forEach(r => {
+      if (r.projetoId && idsProj.has(r.projetoId)) return;   // já veio pelo serviço
+      (r.parcelas || []).forEach(pc => parcelas.push({
+        valor: pc.valor, status: pc.status, vencimento: pc.vencimento,
+        dataPagamento: pc.dataPagamento, fonte: 'recebivel', recebivelId: r.id,
+      }));
+    });
+    return somarLista(parcelas);
+  }
+
+  /* Receita bruta efetivamente recebida num período, pela mesma conta do DRE
+     em regime de caixa. É o número que o Resumo, os Relatórios e as Metas
+     precisam mostrar para não divergirem do Financeiro. */
+  function receitaPeriodo(de, ate) {
+    const c = consolidado({ de, ate, regime: 'caixa' });
+    return c.receitaBruta;
+  }
+
+  /* Parcelas em aberto de serviços cujo recebimento vive só dentro do serviço.
+     A tela Hoje precisa delas para a cobrança não esquecer esse dinheiro, e
+     elas carregam o id do serviço porque não têm recebível para abrir. */
+  function aCobrarSemRecebivel() {
+    const out = [];
+    DB.getAll('projetos').filter(p => p.status !== 'cancelado').forEach(p => {
+      parcelasDoServico(p).forEach(pc => {
+        if (pc.fonte !== 'servico') return;
+        if (pc.status === 'recebido' || pc.status === 'cancelado') return;
+        out.push({ ...pc, projetoId: p.id, titulo: p.titulo || '', clienteId: p.clienteId || '' });
+      });
+    });
+    return out.sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''));
+  }
+
   /* Margem média realizada da carteira — a régua com que tudo se compara.
      Só entram serviços que têm custo lançado; sem custo a margem seria 100%
      e a régua ficaria mentirosa. */
@@ -1035,6 +1085,7 @@ const FinNucleo = (() => {
     custoServico, horasServico, recebiveisServico, somarParcelas,
     linhaServico, servicos, margemMediaCarteira, corDaMargem,
     parcelasDoServico, somarLista,
+    carteira, receitaPeriodo, aCobrarSemRecebivel,
     lancamentosFunc, custoPessoalMes, TIPOS_FUNC, CATEGORIAS_CUSTO_FUNC,
     orcamentoDe, avancoDe, comparativo, corDoAlerta, rotuloDoAlerta,
     existiaEm,

@@ -128,9 +128,17 @@ const Dashboard = (() => {
     const atrasadas = pendentes.filter(a => Utils.isOverdue(a.data));
     const projetosAtivos = projetosFiltrados.filter(p => p.status === 'em_andamento');
 
-    // Calcular recebíveis: a vencer e vencidos
+    /* A carteira vem do nucleo financeiro, nao de uma soma propria. Antes
+       esta tela varria `recebiveis` por conta propria e perdia o dinheiro dos
+       servicos cujo recebimento foi registrado so por dentro, mostrando um
+       total diferente do Financeiro para o mesmo periodo. */
+    const _cart = (typeof FinNucleo !== 'undefined') ? FinNucleo.carteira() : null;
     let totalReceberAVencer = 0, totalReceberVencido = 0, totalRecebido = 0;
-    recebiveis.forEach(r => {
+    if (_cart) {
+      totalRecebido = _cart.recebido;
+      totalReceberVencido = _cart.vencido;
+      totalReceberAVencer = _cart.aReceber - _cart.vencido;
+    } else recebiveis.forEach(r => {
       (r.parcelas || []).forEach(p => {
         if (p.status === 'recebido') totalRecebido += p.valor;
         else if (p.status === 'a_vencer') {
@@ -396,16 +404,15 @@ const Dashboard = (() => {
       size: 160,
     });
 
-    // Receita últimos 6 meses — usa lançamentos reais (receitas recebidas)
-    const lancamentos = DB.getAll('lancamentos');
-    const lancamentosFiltrados = _filtrarPorPeriodo(lancamentos, 'data');
+    /* Receita dos ultimos 6 meses pelo nucleo, mesma conta do DRE em regime
+       de caixa. Somar `lancamentos` direto contava espelho e ignorava o
+       recebimento que mora dentro do servico. */
     const monthData = [];
     for (let i = 5; i >= 0; i--) {
       const dt = new Date(); dt.setMonth(dt.getMonth() - i);
-      const mesStr = dt.toISOString().substring(0, 7);
-      const val = lancamentosFiltrados
-        .filter(l => l.tipo === 'receita' && l.status === 'recebido' && l.data?.startsWith(mesStr))
-        .reduce((s, l) => s + (l.valor || 0), 0);
+      const mesStr = Utils.localDateStr(dt).substring(0, 7);
+      const val = (typeof FinNucleo !== 'undefined')
+        ? FinNucleo.receitaPeriodo(mesStr + '-01', mesStr + '-31') : 0;
       monthData.push({ value: val, label: Utils.monthLabel(-i), color: '#1a56db' });
     }
     Charts.bar({ containerId: 'chartReceita', data: monthData, height: 180, showValues: false });
@@ -860,13 +867,11 @@ const Dashboard = (() => {
     const meta = DB.getAll('metas').find(m => m.ano === ano && m.trimestre === qi);
     if (!meta || !meta.receita) { el.innerHTML = ''; return; }
 
-    const lancamentos = DB.getAll('lancamentos');
     const meses = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]][qi];
     const inicio = Utils.localDateStr(new Date(ano, meses[0], 1));
     const fim = Utils.localDateStr(new Date(ano, meses[2] + 1, 0));
-    const receitaReal = lancamentos
-      .filter(l => l.tipo==='receita' && l.status==='recebido' && l.data >= inicio && l.data <= fim)
-      .reduce((s,l) => s + (l.valor||0), 0);
+    const receitaReal = (typeof FinNucleo !== 'undefined')
+      ? FinNucleo.receitaPeriodo(inicio, fim) : 0;
     const pct = Math.min(Math.round((receitaReal / meta.receita) * 100), 100);
     const color = pct >= 100 ? 'var(--success)' : pct >= 70 ? 'var(--warning)' : 'var(--primary)';
 

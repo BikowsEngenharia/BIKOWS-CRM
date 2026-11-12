@@ -65,6 +65,18 @@ const Hoje = (() => {
         out.push({ ...p, _recebivelId: r.id, _clienteId: r.clienteId });
       });
     });
+    /* Serviço cujo recebimento foi registrado só por dentro não tem parcela em
+       Contas a Receber, então sumia da cobrança. Entra aqui com o id do
+       serviço, que é o lugar onde ele pode ser baixado. */
+    if (typeof FinNucleo !== 'undefined') {
+      FinNucleo.aCobrarSemRecebivel().forEach(pc => {
+        if (!_dentro(pc.vencimento, -365)) return;
+        out.push({
+          valor: pc.valor, vencimento: pc.vencimento, descricao: pc.titulo,
+          _clienteId: pc.clienteId, _projetoId: pc.projetoId,
+        });
+      });
+    }
     return out.sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''));
   }
 
@@ -391,7 +403,9 @@ const Hoje = (() => {
     return _linha(
       `${Utils.formatCurrency(p.valor)} ${_prazoLabel(p.vencimento, 'vencida', 'vence em')}`,
       [cli && cli !== '—' ? '🏢 ' + Utils.escHtml(cli) : '', p.descricao ? Utils.escHtml(p.descricao) : ''].filter(Boolean).join(' · '),
-      `<button class="btn btn-xs btn-secondary" onclick="App.navigate('financeiro')" title="Abrir financeiro">Abrir</button>`
+      p._projetoId
+        ? `<button class="btn btn-xs btn-secondary" onclick="App.navigate('projetos');setTimeout(()=>Projetos.view('${p._projetoId}','financeiro'),150)" title="Abrir o financeiro do serviço">Abrir</button>`
+        : `<button class="btn btn-xs btn-secondary" onclick="App.navigate('financeiro')" title="Abrir financeiro">Abrir</button>`
     );
   }
 

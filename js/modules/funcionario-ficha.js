@@ -43,9 +43,36 @@ const FuncionarioFicha = (() => {
   }
 
   /* Vale em aberto: adiantamento que a empresa entregou e ainda não descontou
-     em folha. É dinheiro que a pessoa já recebeu e a empresa ainda vai acertar. */
+     em folha. É dinheiro que a pessoa já recebeu e a empresa ainda vai acertar.
+     A conta de quem está aberto é do núcleo, para a ficha, a folha e o
+     holerite nunca discordarem sobre o que já foi acertado. */
   function _valesAbertos(id) {
-    return _lancs(id).filter(l => l.tipo === 'vale' && l.status !== 'descontado' && l.status !== 'cancelado');
+    if (typeof FinNucleo !== 'undefined' && FinNucleo.descontosEmAberto) {
+      return FinNucleo.descontosEmAberto(id);
+    }
+    return _lancs(id).filter(l => l.tipo === 'vale'
+      && l.status !== 'descontado' && l.status !== 'acertado' && l.status !== 'cancelado');
+  }
+
+  function _mesAtual() { return Utils.todayStr().substring(0, 7); }
+
+  function _mesLabel(m) {
+    if (!m) return VAZIO;
+    const d = new Date(m + '-02');
+    return isNaN(d) ? m : d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+  }
+
+  /* Opções de competência: três meses para trás e três para a frente. */
+  function _opcoesCompetencia(sel) {
+    const base = _mesAtual().split('-').map(Number);
+    const out = [];
+    for (let i = -3; i <= 3; i++) {
+      const d = new Date(base[0], (base[1] - 1) + i, 1);
+      const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      out.push(m);
+    }
+    if (sel && !out.includes(sel)) out.unshift(sel);
+    return out;
   }
 
   function _apontamentos(id) {
@@ -213,7 +240,8 @@ const FuncionarioFicha = (() => {
           </div>
         </div>
         <div class="ficha-acoes">
-          <button class="btn btn-sm btn-primary" onclick="FuncionarioFicha.novoLancamento()">+ Lançamento</button>
+          <button class="btn btn-sm btn-primary" onclick="FuncionarioFicha.novoVale()" title="Adiantamento que será descontado no pagamento">💵 Lançar vale</button>
+          <button class="btn btn-sm btn-secondary" onclick="FuncionarioFicha.novoLancamento()">+ Lançamento</button>
           <button class="btn btn-sm btn-secondary" onclick="FuncionarioFicha.editar()">✏ Editar cadastro</button>
           <button class="btn btn-sm btn-ghost" onclick="FuncionarioFicha.voltar()">← Equipe</button>
         </div>
@@ -398,7 +426,8 @@ const FuncionarioFicha = (() => {
           <div class="empty-title">Nenhum lançamento</div>
           <div class="empty-sub">É aqui que entram vale, adiantamento, bônus, comissão, reembolso e custo com a pessoa
             (EPI, curso, exame, ferramenta). O que é custo soma no custo/hora dela; vale e desconto mexem no líquido a pagar.</div>
-          <button class="btn btn-primary btn-sm mt-2" onclick="FuncionarioFicha.novoLancamento()">+ Primeiro lançamento</button>
+          <button class="btn btn-primary btn-sm mt-2" onclick="FuncionarioFicha.novoVale()">💵 Lançar vale</button>
+          <button class="btn btn-secondary btn-sm mt-2" onclick="FuncionarioFicha.novoLancamento()">+ Outro lançamento</button>
         </div>
       </div></div>`;
     }
@@ -416,29 +445,39 @@ const FuncionarioFicha = (() => {
       <div class="card">
         <div class="card-header">
           <div class="card-title">Lançamentos da pessoa</div>
-          <button class="btn btn-xs btn-primary" onclick="FuncionarioFicha.novoLancamento()">+ Lançamento</button>
+          <div class="flex gap-2">
+            <button class="btn btn-xs btn-primary" onclick="FuncionarioFicha.novoVale()">💵 Vale</button>
+            <button class="btn btn-xs btn-secondary" onclick="FuncionarioFicha.novoLancamento()">+ Lançamento</button>
+          </div>
         </div>
+        ${_avisoAcerto(m)}
         <div class="table-wrap"><table class="tbl">
-          <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Serviço</th><th>Valor</th><th>Situação</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th title="Em qual folha este lançamento é acertado">Acerta na folha</th><th>Serviço</th><th>Valor</th><th>Situação</th><th>Ações</th></tr></thead>
           <tbody>${m.lancs.map(l => {
             const def = tipos[l.tipo] || { label: l.tipo, icone: '•', sinalCusto: 0, descontaLiq: false };
             const proj = l.projetoId ? DB.get('projetos', l.projetoId) : null;
+            const comp = (typeof FinNucleo !== 'undefined') ? FinNucleo.competenciaDe(l) : (l.data || '').substring(0, 7);
+            const foraDaFolha = l.naFolha === false;
+            const acertado = l.status === 'descontado' || l.status === 'acertado';
+            const atrasado = !acertado && !foraDaFolha && def.descontaLiq && comp < _mesAtual();
             const sit = l.status === 'cancelado' ? '<span class="badge badge-gray">Cancelado</span>'
-              : l.status === 'descontado' ? '<span class="badge badge-green">Descontado</span>'
-              : def.descontaLiq ? '<span class="badge badge-yellow">A descontar</span>'
+              : acertado ? `<span class="badge badge-green" title="Acertado na folha de ${Utils.escHtml(l.folhaMes || comp)}">${def.descontaLiq ? 'Descontado' : 'Pago'} em ${Utils.escHtml(_mesLabel(l.folhaMes || comp))}</span>`
+              : foraDaFolha ? '<span class="badge badge-gray" title="Marcado para ser acertado por fora da folha">Fora da folha</span>'
+              : def.descontaLiq ? `<span class="badge ${atrasado ? 'badge-red' : 'badge-yellow'}">${atrasado ? 'Atrasado' : 'A descontar'}</span>`
+              : def.pagaNaFolha ? '<span class="badge badge-blue">A pagar na folha</span>'
               : '<span class="badge badge-blue">Registrado</span>';
             return `<tr ${l.status === 'cancelado' ? 'style="opacity:.55"' : ''}>
               <td class="text-sm">${Utils.formatDate(l.data)}</td>
               <td class="text-sm">${def.icone} ${Utils.escHtml(def.label)}</td>
               <td class="font-semibold text-sm">${Utils.escHtml(Utils.truncate(l.descricao || VAZIO, 34))}</td>
-              <td class="text-xs text-muted">${Utils.escHtml(l.categoria || VAZIO)}</td>
+              <td class="text-xs ${atrasado ? 'text-danger' : 'text-muted'}">${(foraDaFolha || (!def.descontaLiq && !def.pagaNaFolha)) ? VAZIO : Utils.escHtml(_mesLabel(l.folhaMes || comp))}</td>
               <td class="text-xs">${proj ? Utils.escHtml(Utils.truncate(proj.titulo, 22)) : VAZIO}</td>
               <td class="font-bold ${def.sinalCusto > 0 ? 'text-danger' : ''}">${Utils.formatCurrency(l.valor)}</td>
               <td>${sit}</td>
               <td><div class="tbl-actions">
                 <button class="btn btn-xs btn-secondary" onclick="FuncionarioFicha.editarLancamento('${l.id}')" title="Editar">✏</button>
-                ${def.descontaLiq && l.status !== 'descontado' && l.status !== 'cancelado'
-                  ? `<button class="btn btn-xs btn-success" onclick="FuncionarioFicha.marcarDescontado('${l.id}')" title="Marcar como descontado em folha">✓</button>` : ''}
+                ${def.descontaLiq && !acertado && l.status !== 'cancelado'
+                  ? `<button class="btn btn-xs btn-success" onclick="FuncionarioFicha.marcarDescontado('${l.id}')" title="Já foi acertado por fora da folha — marcar como quitado">✓</button>` : ''}
                 ${l.status !== 'cancelado'
                   ? `<button class="btn btn-xs btn-danger" onclick="FuncionarioFicha.cancelarLancamento('${l.id}')" title="Cancelar (mantém no histórico)">✕</button>` : ''}
               </div></td>
@@ -446,6 +485,25 @@ const FuncionarioFicha = (() => {
           }).join('')}</tbody>
         </table></div>
       </div>`;
+  }
+
+  /* O que ainda vai bater no próximo pagamento desta pessoa, dito antes da
+     tabela: é a pergunta que se faz ao abrir a ficha. */
+  function _avisoAcerto(m) {
+    if (typeof FinNucleo === 'undefined' || !FinNucleo.efeitoNaFolha) return '';
+    const mes = FinNucleo.proximaCompetenciaAberta(m.f.id);
+    const ef = FinNucleo.efeitoNaFolha(m.f.id, mes);
+    if (!ef.itens.length) return '';
+    const calc = (typeof Folha !== 'undefined' && Folha.calcFolhaFuncionario)
+      ? Folha.calcFolhaFuncionario(m.f, mes) : null;
+    const partes = [];
+    if (ef.totalProventos) partes.push(`<strong style="color:var(--ok-txt)">+${Utils.formatCurrency(ef.totalProventos)}</strong> de extras`);
+    if (ef.totalDescontos) partes.push(`<strong style="color:var(--ruim-txt)">−${Utils.formatCurrency(ef.totalDescontos)}</strong> de vale/desconto`);
+    return `<div class="ficha-aviso"><div>
+      Na folha de <strong>${Utils.escHtml(_mesLabel(mes))}</strong>: ${partes.join(' e ')}.
+      ${calc ? `O líquido dela sai <strong>${Utils.formatCurrency(calc.liquido)}</strong>.` : ''}
+      ${ef.nAtrasados ? ` ${ef.nAtrasados} desconto(s) ficaram de meses anteriores e são cobrados aqui.` : ''}
+    </div></div>`;
   }
 
   /* ---- ABA: alocação ---- */
@@ -519,11 +577,16 @@ const FuncionarioFicha = (() => {
       <div class="card">
         <div class="card-header"><div class="card-title">Histórico de folha</div></div>
         <div class="table-wrap"><table class="tbl">
-          <thead><tr><th>Mês</th><th>Bruto</th><th>Descontos</th><th>Líquido</th><th>FGTS</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Mês</th><th>Bruto</th><th>Descontos</th><th title="Vale, desconto, bônus e comissão lançados na ficha">Da ficha</th><th>Líquido</th><th>FGTS</th><th>Status</th><th></th></tr></thead>
           <tbody>${ord.map(r => `<tr>
-            <td class="font-semibold text-sm">${Utils.escHtml(r.mes || VAZIO)}</td>
+            <td class="font-semibold text-sm">${Utils.escHtml(_mesLabel(r.mes))}</td>
             <td>${Utils.formatCurrency(r.bruto)}</td>
             <td class="text-danger">${Utils.formatCurrency((Number(r.inss) || 0) + (Number(r.irrf) || 0) + (Number(r.planoSaude) || 0))}</td>
+            <td class="text-sm" title="${Utils.escHtml((r.itensLanc || []).map(i => (i.desconta ? '- ' : '+ ') + i.descricao + ' ' + Utils.formatCurrency(i.valor)).join(' | '))}">
+              ${(Number(r.proventosLanc) || 0) ? `<span style="color:var(--ok-txt)">+${Utils.formatCurrency(r.proventosLanc)}</span>` : ''}
+              ${(Number(r.descontosLanc) || 0) ? `<span style="color:var(--ruim-txt)">−${Utils.formatCurrency(r.descontosLanc)}</span>` : ''}
+              ${(!(Number(r.proventosLanc) || 0) && !(Number(r.descontosLanc) || 0)) ? `<span class="text-muted">${VAZIO}</span>` : ''}
+            </td>
             <td class="font-bold">${Utils.formatCurrency(r.liquido)}</td>
             <td class="text-sm">${Utils.formatCurrency(r.fgts)}</td>
             <td><span class="badge ${r.status === 'pago' ? 'badge-green' : 'badge-yellow'}">${Utils.escHtml(r.status || 'pendente')}</span></td>
@@ -536,8 +599,12 @@ const FuncionarioFicha = (() => {
   /* ---- ABA: cadastro ---- */
   function _abaCadastro(f, m) {
     const campo = (lb, v) => `<div class="detail-field"><div class="detail-label">${lb}</div><div class="detail-value">${v || VAZIO}</div></div>`;
+    /* A folha do próximo mês que ainda dá para mexer, não a do cadastro: o
+       número que interessa é o que a pessoa vai receber, já com o vale. */
+    const mesRef = (typeof FinNucleo !== 'undefined' && FinNucleo.proximaCompetenciaAberta)
+      ? FinNucleo.proximaCompetenciaAberta(f.id) : _mesAtual();
     const calc = (typeof Folha !== 'undefined' && Folha.calcFolhaFuncionario)
-      ? Folha.calcFolhaFuncionario(f) : null;
+      ? Folha.calcFolhaFuncionario(f, mesRef) : null;
     return `
       <div class="card">
         <div class="card-header"><div class="card-title">Dados cadastrais</div>
@@ -559,17 +626,22 @@ const FuncionarioFicha = (() => {
           </div>
           ${calc ? `
           <div class="mt-4">
-            <div class="text-sm font-bold mb-2">Folha estimada do mês</div>
+            <div class="text-sm font-bold mb-2">Folha de ${Utils.escHtml(_mesLabel(mesRef))}</div>
             <div class="detail-grid">
               ${campo('Bruto', Utils.formatCurrency(calc.bruto))}
               ${campo('INSS', Utils.formatCurrency(calc.inss))}
               ${campo('IRRF', Utils.formatCurrency(calc.irrf))}
               ${campo('FGTS (encargo)', Utils.formatCurrency(calc.fgts))}
-              ${campo('Líquido', `<span class="font-bold text-success">${Utils.formatCurrency(calc.liquido)}</span>`)}
-              ${campo('Líquido menos vales em aberto', m.valeAberto
-                  ? `<span class="font-bold">${Utils.formatCurrency(calc.liquido - m.valeAberto)}</span>`
-                  : Utils.formatCurrency(calc.liquido))}
+              ${campo('Extras da ficha', calc.proventosLanc
+                  ? `<span class="font-bold" style="color:var(--ok-txt)">+${Utils.formatCurrency(calc.proventosLanc)}</span>`
+                  : '<span class="text-muted">nada lançado</span>')}
+              ${campo('Vale e desconto da ficha', calc.descontosLanc
+                  ? `<span class="font-bold" style="color:var(--ruim-txt)">−${Utils.formatCurrency(calc.descontosLanc)}</span>`
+                  : '<span class="text-muted">nada lançado</span>')}
+              ${campo('Líquido a pagar', `<span class="font-bold text-success">${Utils.formatCurrency(calc.liquido)}</span>`)}
             </div>
+            <div class="text-xs text-muted mt-2">Cálculo do cadastro mais o que está lançado na ficha.
+              Vale e desconto saem daqui automaticamente quando a folha deste mês for gerada.</div>
           </div>` : ''}
           ${f.observacoes ? `<div class="ficha-obs mt-4">${Utils.escHtml(f.observacoes)}</div>` : ''}
         </div>
@@ -629,12 +701,21 @@ const FuncionarioFicha = (() => {
   }
 
   function novoLancamento() { _formLancamento(null); }
+  function novoVale() { _formLancamento(null, 'vale'); }
   function editarLancamento(id) { _formLancamento(id); }
 
-  function _formLancamento(id) {
+  function _formLancamento(id, tipoInicial) {
     const f = _func(_id);
     if (!f) return;
     const l = id ? DB.get('func_lancamentos', id) : null;
+    const tipoSel = l?.tipo || tipoInicial || 'vale';
+    /* Competência padrão: a primeira folha que ainda dá para mexer. Se a folha
+       do mês corrente já foi paga, o acerto é na próxima, e o formulário diz
+       isso antes de a pessoa salvar e estranhar depois. */
+    const compPadrao = (typeof FinNucleo !== 'undefined' && FinNucleo.proximaCompetenciaAberta)
+      ? FinNucleo.proximaCompetenciaAberta(_id) : _mesAtual();
+    const compSel = l?.competencia || (l ? (l.data || '').substring(0, 7) : compPadrao);
+    const folhaDaComp = DB.getAll('folha').find(r => r.mes === compSel && r.funcionarioId === _id);
     const tipos = (typeof FinNucleo !== 'undefined') ? FinNucleo.TIPOS_FUNC : {};
     const cats = (typeof FinNucleo !== 'undefined') ? FinNucleo.CATEGORIAS_CUSTO_FUNC : [];
     const projs = DB.getAll('projetos')
@@ -650,7 +731,7 @@ const FuncionarioFicha = (() => {
             <label class="form-label">Tipo *</label>
             <select class="form-control" id="flTipo" onchange="FuncionarioFicha._explicarTipo(this.value)">
               ${Object.entries(tipos).map(([k, d]) =>
-                `<option value="${k}" ${(l?.tipo || 'vale') === k ? 'selected' : ''}>${d.icone} ${Utils.escHtml(d.label)}</option>`).join('')}
+                `<option value="${k}" ${tipoSel === k ? 'selected' : ''}>${d.icone} ${Utils.escHtml(d.label)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
@@ -663,6 +744,29 @@ const FuncionarioFicha = (() => {
           </div>
         </div>
         <div id="flExplica" class="text-xs text-muted mb-2"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Acerta na folha de *</label>
+            <select class="form-control" id="flComp">
+              ${_opcoesCompetencia(compSel).map(m =>
+                `<option value="${m}" ${m === compSel ? 'selected' : ''}>${Utils.escHtml(_mesLabel(m))}</option>`).join('')}
+            </select>
+            <div class="form-hint">${folhaDaComp
+              ? (folhaDaComp.pago
+                  ? 'A folha deste mês já foi paga. Escolha a próxima para o acerto valer.'
+                  : 'A folha deste mês já foi gerada e será atualizada ao salvar.')
+              : 'A folha deste mês ainda não foi gerada: ao gerar, isto entra automaticamente.'}</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Forma de acerto</label>
+            <label class="flex items-center gap-2 text-sm" style="padding-top:8px">
+              <input type="checkbox" id="flNaFolha" ${l && l.naFolha === false ? '' : 'checked'}>
+              <span>Acertar junto com a folha</span>
+            </label>
+            <div class="form-hint">Desmarque se o acerto já foi feito por fora (dinheiro devolvido, pagamento avulso).
+              O lançamento continua no histórico, só não mexe no pagamento.</div>
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">Descrição *</label>
           <input class="form-control" id="flDesc" value="${Utils.escHtml(l?.descricao || '')}" placeholder="Ex: Vale de novembro, Botina de segurança, Curso NR-10">
@@ -690,7 +794,7 @@ const FuncionarioFicha = (() => {
         </div>`,
       saveCb: () => _salvarLancamento(id),
     });
-    setTimeout(() => _explicarTipo(l?.tipo || 'vale'), 30);
+    setTimeout(() => _explicarTipo(tipoSel), 30);
   }
 
   function _explicarTipo(tipo) {
@@ -702,7 +806,9 @@ const FuncionarioFicha = (() => {
     partes.push(d.sinalCusto > 0
       ? 'Soma ao custo da pessoa e ao custo da empresa.'
       : 'Não é custo novo: o custo é a remuneração, que já está contada.');
-    if (d.descontaLiq) partes.push('Desconta do líquido a pagar até ser marcado como descontado.');
+    if (d.descontaLiq) partes.push('Desconta do líquido da folha escolhida abaixo, automaticamente.');
+    else if (d.pagaNaFolha) partes.push('É pago à pessoa junto com a folha da competência escolhida abaixo.');
+    else partes.push('Não entra no pagamento da pessoa: quem recebe é o fornecedor.');
     el.textContent = partes.join(' ');
   }
 
@@ -716,30 +822,62 @@ const FuncionarioFicha = (() => {
     const dataLanc = document.getElementById('flData').value;
     if (typeof Fechamento !== 'undefined' && !Fechamento.permite(dataLanc, 'Este lançamento')) return;
 
+    const competencia = document.getElementById('flComp').value || dataLanc.substring(0, 7);
+    const naFolha = !!document.getElementById('flNaFolha').checked;
+
     const dados = {
       funcionarioId: _id, tipo, valor, data: dataLanc,
+      competencia, naFolha,
       descricao: desc,
       categoria: document.getElementById('flCat').value,
       projetoId: document.getElementById('flProj').value,
       observacoes: document.getElementById('flObs').value.trim(),
     };
-    if (id) {
-      DB.update('func_lancamentos', id, dados);
-      Toast.success('Lançamento atualizado');
-    } else {
-      DB.create('func_lancamentos', { ...dados, status: 'aberto' });
-      Toast.success('Lançamento registrado');
-    }
+    const anterior = id ? DB.get('func_lancamentos', id) : null;
+    if (id) DB.update('func_lancamentos', id, dados);
+    else DB.create('func_lancamentos', { ...dados, status: 'aberto' });
+
+    /* ISTO é o que o usuário pediu: lançou na ficha, o pagamento do mês já sai
+       acertado, sem ninguém refazer a folha na mão. Mês já pago não se mexe —
+       o dinheiro saiu — e o lançamento é cobrado na folha seguinte. */
+    const nota = _acertarNaFolha(competencia, naFolha)
+      + (anterior && anterior.competencia && anterior.competencia !== competencia
+          ? _acertarNaFolha(anterior.competencia, true) : '');
+
+    Toast.success((id ? 'Lançamento atualizado.' : 'Lançamento registrado.') + nota);
     Modal.close();
     _aba = 'lancamentos';
     _render();
   }
 
+  /* Refaz a folha daquela competência quando ela existe e ainda é mexível.
+     Devolve o texto que o aviso mostra, ou o motivo de não ter mexido. */
+  function _acertarNaFolha(competencia, naFolha) {
+    if (!competencia) return '';
+    const rec = DB.getAll('folha').find(r => r.mes === competencia && r.funcionarioId === _id);
+    if (!rec) return ' A folha de ' + _mesLabel(competencia) + ' ainda não foi gerada: isto entra quando ela for.';
+    if (rec.pago) return ' A folha de ' + _mesLabel(competencia) + ' já foi paga, então ela não muda. O acerto cai na próxima.';
+    if (!naFolha) return '';
+    if (typeof Folha === 'undefined' || !Folha.recalcularFuncionario) return '';
+    const calc = Folha.recalcularFuncionario(competencia, _id, true);
+    return calc
+      ? ' Folha de ' + _mesLabel(competencia) + ' atualizada: líquido ' + Utils.formatCurrency(calc.liquido) + '.'
+      : '';
+  }
+
+  /* Quitar por fora: o acerto aconteceu sem passar pela folha (a pessoa
+     devolveu em dinheiro, foi descontado de outra coisa). Fica registrado com
+     a data, e o lançamento sai da fila do próximo pagamento. */
   function marcarDescontado(id) {
     const l = DB.get('func_lancamentos', id);
     if (!l) return;
-    DB.update('func_lancamentos', id, { status: 'descontado', dataDesconto: Utils.todayStr() });
-    Toast.success('Marcado como descontado em folha');
+    const comp = (typeof FinNucleo !== 'undefined') ? FinNucleo.competenciaDe(l) : '';
+    DB.update('func_lancamentos', id, {
+      status: 'descontado', dataDesconto: Utils.todayStr(),
+      folhaMes: l.folhaMes || comp,
+    });
+    const nota = _acertarNaFolha(comp, true);
+    Toast.success('Marcado como acertado.' + nota);
     _render();
   }
 
@@ -750,13 +888,19 @@ const FuncionarioFicha = (() => {
     if (!l) return;
     /* O dialogo de confirmacao escreve a mensagem com textContent, entao ela
        precisa ser texto puro: tag nenhuma aparece formatada ali. */
+    const folhaRec = l.folhaId ? DB.get('folha', l.folhaId) : null;
+    const extra = !folhaRec ? ''
+      : folhaRec.pago
+        ? ` Atenção: a folha de ${_mesLabel(folhaRec.mes)} já foi paga com este acerto. Cancelar aqui não devolve o dinheiro; o ajuste precisa ser feito na folha seguinte.`
+        : ` A folha de ${_mesLabel(folhaRec.mes)} será refeita sem ele.`;
     Confirm.show(
       'Cancelar lançamento',
       `Cancelar "${l.descricao || 'lançamento'}" de ${Utils.formatCurrency(l.valor)}? `
-      + 'Ele sai dos totais mas continua no histórico, riscado. Nada é apagado.',
+      + 'Ele sai dos totais mas continua no histórico, riscado. Nada é apagado.' + extra,
       () => {
         DB.update('func_lancamentos', id, { status: 'cancelado' });
-        Toast.success('Lançamento cancelado');
+        const nota = (folhaRec && !folhaRec.pago) ? _acertarNaFolha(folhaRec.mes, true) : '';
+        Toast.success('Lançamento cancelado.' + nota);
         _render();
       }
     );
@@ -765,7 +909,7 @@ const FuncionarioFicha = (() => {
   return {
     abrir, setAba, setComplexidade, voltar, fechar, recarregarSeAberta, abertaEm,
     editar, editarParametros,
-    novoLancamento, editarLancamento, marcarDescontado, cancelarLancamento,
+    novoLancamento, novoVale, editarLancamento, marcarDescontado, cancelarLancamento,
     metricas, prontidao,
     _explicarTipo,
   };

@@ -65,7 +65,18 @@ const Folha = (() => {
   // Mantido com o nome antigo para não quebrar as chamadas existentes
   function _temFGTS(func) { return _ehCLT(func); }
 
-  function calcFolhaFuncionario(func) {
+  /* O calculo de uma folha.
+
+     Com `mes`, ele puxa os lancamentos da ficha da pessoa daquela competencia
+     (vale, desconto, bonus, comissao, hora extra, reembolso) e o liquido ja
+     sai acertado. Sem `mes`, devolve a folha "de cadastro", que e a estimativa
+     de quanto a pessoa custa num mes comum.
+
+     `bruto` continua sendo so a remuneracao do cadastro, de proposito: o custo
+     de pessoal do mes soma a folha MAIS os lancamentos de custo, e inchar o
+     bruto aqui contaria o mesmo bonus duas vezes no resultado. O que o
+     lancamento muda e o LIQUIDO, que e o que a pessoa recebe. */
+  function calcFolhaFuncionario(func, mes) {
     const bruto = (func.salarioBase || 0)
       + (func.vt || 0)
       + (func.vr || 0)
@@ -76,8 +87,31 @@ const Folha = (() => {
     const fgts = clt ? calcFGTS(func.salarioBase || 0) : 0;
     const planoSaude = func.planoSaude || 0;
     const totalDescontos = inss + irrf + planoSaude;
-    const liquido = bruto - totalDescontos;
-    return { bruto, inss, irrf, fgts, planoSaude, totalDescontos, liquido };
+    const ef = (mes && typeof FinNucleo !== 'undefined' && FinNucleo.efeitoNaFolha)
+      ? FinNucleo.efeitoNaFolha(func.id, mes)
+      : { itens: [], totalProventos: 0, totalDescontos: 0, nAtrasados: 0 };
+    const liquido = Math.round(
+      (bruto + ef.totalProventos - totalDescontos - ef.totalDescontos) * 100) / 100;
+    return {
+      bruto, inss, irrf, fgts, planoSaude, totalDescontos,
+      proventosLanc: ef.totalProventos,
+      descontosLanc: ef.totalDescontos,
+      itensLanc: ef.itens,
+      liquido,
+    };
+  }
+
+  /* Rotulo curto do que os lancamentos fizeram com uma folha. */
+  function _resumoLanc(r) {
+    const mais = Number(r.proventosLanc) || 0;
+    const menos = Number(r.descontosLanc) || 0;
+    if (!mais && !menos) return '<span class="text-muted">—</span>';
+    const detalhe = (r.itensLanc || []).map(i =>
+      (i.desconta ? '- ' : '+ ') + i.descricao + ' ' + Utils.formatCurrency(i.valor)).join(' | ');
+    const partes = [];
+    if (mais) partes.push(`<span style="color:var(--success)">+${Utils.formatCurrency(mais)}</span>`);
+    if (menos) partes.push(`<span style="color:var(--danger)">−${Utils.formatCurrency(menos)}</span>`);
+    return `<span class="text-sm" title="${Utils.escHtml(detalhe)}">${partes.join(' ')}</span>`;
   }
 
   /* =========================================================
@@ -186,7 +220,9 @@ const Folha = (() => {
   }
 
   function funcCard(f) {
-    const calc = calcFolhaFuncionario(f);
+    /* O liquido do mes escolhido, nao o do cadastro: se a pessoa pegou vale,
+       o cartao dela ja mostra quanto ela recebe de verdade. */
+    const calc = calcFolhaFuncionario(f, _mesFolha);
     const ch = (typeof CustoHora !== 'undefined' && (Number(f.salarioBase) || 0) > 0)
       ? CustoHora.custoHoraCheio(f) : null;
     const pr = (typeof CustoHora !== 'undefined' && ch != null) ? CustoHora.precoHora(f) : null;
@@ -206,6 +242,7 @@ const Folha = (() => {
           <div class="func-dept">${Utils.escHtml(f.departamento || '')}${f.departamento && f.regimeContratacao ? ' · ' : ''}${Utils.escHtml(f.regimeContratacao || '')}</div>
           <div class="func-salary">Salário Base: <strong>${Utils.formatCurrency(f.salarioBase)}</strong></div>
           <div class="func-salary" style="color:var(--success)">Líquido: <strong>${Utils.formatCurrency(calc.liquido)}</strong></div>
+          ${(calc.descontosLanc || calc.proventosLanc) ? `<div class="func-salary text-xs" style="color:var(--text-muted)">${calc.proventosLanc ? '+' + Utils.formatCurrency(calc.proventosLanc) + ' em extras' : ''}${calc.proventosLanc && calc.descontosLanc ? ' · ' : ''}${calc.descontosLanc ? '−' + Utils.formatCurrency(calc.descontosLanc) + ' em vale/desconto' : ''}</div>` : ''}
           ${ch != null ? `<div class="func-salary" style="color:var(--info-txt)">Custo/hora: <strong>${Utils.formatCurrency(ch)}</strong>${pv != null ? ` · venda ${Utils.formatCurrency(pv)}` : ''}</div>` : ''}
         </div>
         <div class="func-actions">
@@ -325,6 +362,17 @@ const Folha = (() => {
     const folhaRecords = DB.getAll('folha').filter(r => r.mes === _mesFolha);
     const jaGerada = folhaRecords.length > 0;
 
+    /* O que a ficha de cada pessoa tem lancado e ainda vai bater nesta folha.
+       Mostrado ANTES de gerar, para ninguem gerar folha cheia sem lembrar do
+       vale que entregou dia 20. */
+    const pendentes = [];
+    if (!jaGerada && typeof FinNucleo !== 'undefined' && FinNucleo.efeitoNaFolha) {
+      funcs.forEach(f => {
+        const ef = FinNucleo.efeitoNaFolha(f.id, _mesFolha);
+        if (ef.itens.length) pendentes.push({ f, ef });
+      });
+    }
+
     const totalBruto   = folhaRecords.reduce((s, r) => s + (r.bruto || 0), 0);
     const totalINSS    = folhaRecords.reduce((s, r) => s + (r.inss || 0), 0);
     const totalIRRF    = folhaRecords.reduce((s, r) => s + (r.irrf || 0), 0);
@@ -354,12 +402,12 @@ const Folha = (() => {
           <div class="fin-kpi-cell"><div class="fin-kpi-label">INSS Empregado</div><div class="fin-kpi-val text-danger">${Utils.formatCurrency(totalINSS)}</div></div>
           <div class="fin-kpi-cell"><div class="fin-kpi-label">IRRF</div><div class="fin-kpi-val text-danger">${Utils.formatCurrency(totalIRRF)}</div></div>
           <div class="fin-kpi-cell"><div class="fin-kpi-label">FGTS (encargo)</div><div class="fin-kpi-val text-warning">${Utils.formatCurrency(totalFGTS)}</div></div>
-          <div class="fin-kpi-cell"><div class="fin-kpi-label">Líquido Total</div><div class="fin-kpi-val text-success">${Utils.formatCurrency(totalLiquido)}</div></div>
+          <div class="fin-kpi-cell"><div class="fin-kpi-label">Líquido Total</div><div class="fin-kpi-val text-success">${Utils.formatCurrency(totalLiquido)}</div><div class="fin-kpi-sub">já com vales e extras da ficha</div></div>
         </div>
 
         <div class="table-wrap">
           <table class="tbl">
-            <thead><tr><th>Funcionário</th><th>Cargo</th><th>Salário Base</th><th>Adicionais</th><th>Bruto</th><th>INSS</th><th>IRRF</th><th>FGTS</th><th>Líquido</th><th>Status</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Funcionário</th><th>Cargo</th><th>Salário Base</th><th>Adicionais</th><th>Bruto</th><th>INSS</th><th>IRRF</th><th>FGTS</th><th title="Vale, desconto, bônus e comissão lançados na ficha da pessoa">Lançamentos</th><th>Líquido</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody>
               ${folhaRecords.map(r => {
                 const f = DB.get('funcionarios', r.funcionarioId) || {};
@@ -372,6 +420,7 @@ const Folha = (() => {
                   <td class="text-danger text-sm">${Utils.formatCurrency(r.inss)}</td>
                   <td class="text-danger text-sm">${Utils.formatCurrency(r.irrf)}</td>
                   <td class="text-warning text-sm">${Utils.formatCurrency(r.fgts)}</td>
+                  <td>${_resumoLanc(r)}</td>
                   <td class="font-bold text-success">${Utils.formatCurrency(r.liquido)}</td>
                   <td>${r.pago ? '<span class="badge badge-green">Pago</span>' : '<span class="badge badge-yellow">Pendente</span>'}</td>
                   <td>
@@ -392,11 +441,30 @@ const Folha = (() => {
         <div class="empty-state">
           <div class="empty-icon">📋</div>
           <div class="empty-title">Folha não gerada para ${mesLabel}</div>
-          <div class="empty-sub">Clique em "Gerar Folha" para calcular automaticamente com base nos dados dos funcionários.</div>
+          <div class="empty-sub">Clique em "Gerar Folha" para calcular automaticamente com base nos dados dos funcionários.
+            O que estiver lançado na ficha de cada pessoa entra junto, já descontado.</div>
           <button class="btn btn-primary mt-4" onclick="Folha.gerarFolha()">⚡ Gerar Folha de ${mesLabel}</button>
         </div>
         `}
       </div>
+
+      ${pendentes.length ? `
+      <div class="card mt-4">
+        <div class="card-header">
+          <div class="card-title">Já lançado na ficha e ainda não acertado</div>
+          <span class="text-sm text-muted">entra automaticamente ao gerar a folha</span>
+        </div>
+        <div class="table-wrap"><table class="tbl">
+          <thead><tr><th>Pessoa</th><th>Lançamento</th><th>Competência</th><th class="text-right">Valor</th><th></th></tr></thead>
+          <tbody>${pendentes.map(x => x.ef.itens.map(i => `<tr>
+            <td class="font-semibold text-sm">${Utils.escHtml(x.f.nome || '—')}</td>
+            <td class="text-sm">${i.icone} ${Utils.escHtml(Utils.truncate(i.descricao, 34))}</td>
+            <td class="text-xs ${i.atrasado ? 'text-danger' : 'text-muted'}">${Utils.escHtml(i.competencia)}${i.atrasado ? ' · atrasado' : ''}</td>
+            <td class="text-right font-bold" style="color:${i.desconta ? 'var(--danger)' : 'var(--success)'}">${i.desconta ? '−' : '+'}${Utils.formatCurrency(i.valor)}</td>
+            <td><button class="btn btn-xs btn-ghost" onclick="Folha.verFunc('${x.f.id}')">Ver ficha</button></td>
+          </tr>`).join('')).join('')}</tbody>
+        </table></div>
+      </div>` : ''}
     `;
   }
 
@@ -446,6 +514,13 @@ const Folha = (() => {
     `;
   }
 
+  /* Vale e desconto no holerite: a pessoa precisa ver por que recebeu menos.
+     Um recibo que esconde o adiantamento vira discussao no mes seguinte. */
+  function _linhasDescontoLanc(r) {
+    return (r.itensLanc || []).filter(i => i.desconta).map(i =>
+      `<div class="holerite-row"><span>${Utils.escHtml(i.descricao)}${i.competencia && i.competencia !== r.mes ? ' <span style="font-size:11px;color:#94a3b8">(ref. ' + Utils.escHtml(i.competencia) + ')</span>' : ''}</span><span class="holerite-debit">${Utils.formatCurrency(i.valor)}</span></div>`).join('');
+  }
+
   function renderHoleriteDoc(f, r, cfg, mesLabel) {
     const ini = (f.nome || '?').charAt(0).toUpperCase();
     return `
@@ -480,7 +555,9 @@ const Folha = (() => {
           ${r.vt ? `<div class="holerite-row"><span>Vale Transporte</span><span class="holerite-credit">${Utils.formatCurrency(r.vt)}</span></div>` : ''}
           ${r.vr ? `<div class="holerite-row"><span>Vale Refeição</span><span class="holerite-credit">${Utils.formatCurrency(r.vr)}</span></div>` : ''}
           ${r.outrosAdicionais ? `<div class="holerite-row"><span>Outros Adicionais</span><span class="holerite-credit">${Utils.formatCurrency(r.outrosAdicionais)}</span></div>` : ''}
-          <div class="holerite-total"><span>Total de Proventos</span><span>${Utils.formatCurrency(r.bruto)}</span></div>
+          ${(r.itensLanc || []).filter(i => !i.desconta).map(i =>
+            `<div class="holerite-row"><span>${Utils.escHtml(i.descricao)}</span><span class="holerite-credit">${Utils.formatCurrency(i.valor)}</span></div>`).join('')}
+          <div class="holerite-total"><span>Total de Proventos</span><span>${Utils.formatCurrency(r.bruto + (Number(r.proventosLanc) || 0))}</span></div>
         </div>
 
         ${_ehCLT(f) ? `
@@ -492,12 +569,14 @@ const Folha = (() => {
           </div>
           ${r.irrf > 0 ? `<div class="holerite-row"><span>IRRF</span><span class="holerite-debit">${Utils.formatCurrency(r.irrf)}</span></div>` : ''}
           ${r.planoSaude ? `<div class="holerite-row"><span>Plano de Saúde</span><span class="holerite-debit">${Utils.formatCurrency(r.planoSaude)}</span></div>` : ''}
-          <div class="holerite-total"><span>Total de Descontos</span><span style="color:var(--danger)">${Utils.formatCurrency(r.totalDescontos)}</span></div>
-        </div>` : (r.planoSaude ? `
+          ${_linhasDescontoLanc(r)}
+          <div class="holerite-total"><span>Total de Descontos</span><span style="color:var(--danger)">${Utils.formatCurrency(r.totalDescontos + (Number(r.descontosLanc) || 0))}</span></div>
+        </div>` : ((r.planoSaude || (Number(r.descontosLanc) || 0)) ? `
         <div class="holerite-section">
           <div class="holerite-section-title">Descontos</div>
-          <div class="holerite-row"><span>Plano de Saúde</span><span class="holerite-debit">${Utils.formatCurrency(r.planoSaude)}</span></div>
-          <div class="holerite-total"><span>Total de Descontos</span><span style="color:var(--danger)">${Utils.formatCurrency(r.totalDescontos)}</span></div>
+          ${r.planoSaude ? `<div class="holerite-row"><span>Plano de Saúde</span><span class="holerite-debit">${Utils.formatCurrency(r.planoSaude)}</span></div>` : ''}
+          ${_linhasDescontoLanc(r)}
+          <div class="holerite-total"><span>Total de Descontos</span><span style="color:var(--danger)">${Utils.formatCurrency(r.totalDescontos + (Number(r.descontosLanc) || 0))}</span></div>
         </div>` : `
         <div class="holerite-section">
           <div class="holerite-section-title">Descontos</div>
@@ -515,6 +594,7 @@ const Folha = (() => {
           <div class="holerite-row"><span>FGTS (8%)</span><span>${Utils.formatCurrency(r.fgts)}</span></div>
           <div class="holerite-row"><span>INSS Patronal (estimado 20%)</span><span>${Utils.formatCurrency(Math.round(r.salarioBase * 0.2 * 100) / 100)}</span></div>
           <div class="holerite-total"><span>Custo Total para Empresa</span><span>${Utils.formatCurrency(r.bruto + r.fgts + Math.round(r.salarioBase * 0.2 * 100) / 100)}</span></div>
+          <div class="text-xs text-muted" style="margin-top:4px">Vale e adiantamento não entram aqui: são parte do salário, entregues antes.</div>
         </div>` : `
         <div class="holerite-section">
           <div class="holerite-section-title">Regime: ${Utils.escHtml(f.regimeContratacao || '—')}</div>
@@ -789,9 +869,10 @@ const Folha = (() => {
        ja foi congelado. */
     if (typeof Fechamento !== 'undefined' && !Fechamento.permite(_mesFolha + '-01', 'A folha deste mês')) return;
 
+    const gerados = [];
     funcs.forEach(f => {
-      const calc = calcFolhaFuncionario(f);
-      DB.create('folha', {
+      const calc = calcFolhaFuncionario(f, _mesFolha);
+      const rec = DB.create('folha', {
         mes: _mesFolha,
         funcionarioId: f.id,
         nome: f.nome,
@@ -805,7 +886,15 @@ const Folha = (() => {
         ...calc,
         pago: false,
       });
+      gerados.push({ f, rec, calc });
     });
+
+    /* Os lancamentos que entraram nesta folha ficam marcados com o mes e o id
+       da folha que os acertou. E isso que impede o mesmo vale de ser
+       descontado de novo no mes seguinte, e e o que permite desfazer tudo se
+       a folha for excluida. */
+    let nAcertados = 0;
+    gerados.forEach(g => { nAcertados += _acertarLancamentos(g.calc.itensLanc, g.rec); });
 
     /* A folha vira CONTA A PAGAR, uma por funcionário mais uma de FGTS.
        Antes virava lançamento com status 'a_pagar', e nenhum indicador lê esse
@@ -815,8 +904,11 @@ const Folha = (() => {
        ser paga gera o lançamento com a data real do pagamento. Uma por
        funcionário porque o pagamento é marcado por pessoa. */
     const vencFolha = _mesFolha + '-05';
-    funcs.forEach(f => {
-      const liquido = calcFolhaFuncionario(f).liquido
+    gerados.forEach(({ f, calc }) => {
+      /* O compromisso e o liquido JA abatido do vale: e esse o valor que vai
+         sair da conta no dia 5. Cobrar o liquido cheio aqui faria o caixa
+         prever uma saida que nao vai acontecer. */
+      const liquido = calc.liquido
         || ((f.salarioBase || 0) + (f.vt || 0) + (f.vr || 0));
       const jaTem = DB.getAll('contaspagar').some(c =>
         c.categoria === 'Folha de Pagamento' && c.folhaMes === _mesFolha && c.funcionarioId === f.id);
@@ -827,7 +919,8 @@ const Folha = (() => {
         valor: Math.round(liquido * 100) / 100,
         vencimento: vencFolha, status: 'pendente', recorrente: false,
         folhaMes: _mesFolha, funcionarioId: f.id,
-        observacoes: 'Gerada automaticamente pela folha de pagamento.',
+        observacoes: 'Gerada automaticamente pela folha de pagamento.'
+          + (calc.descontosLanc ? ` Já descontado ${Utils.formatCurrency(calc.descontosLanc)} de vale/desconto lançado na ficha.` : ''),
       });
     });
 
@@ -845,9 +938,76 @@ const Folha = (() => {
       });
     }
     const mesLbl = new Date(_mesFolha + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    Toast.success(`Folha de ${mesLbl} gerada para ${funcs.length} funcionários. Contas a pagar criadas no Financeiro.`);
+    Toast.success(`Folha de ${mesLbl} gerada para ${funcs.length} funcionários.`
+      + (nAcertados ? ` ${nAcertados} lançamento(s) da ficha acertado(s) no pagamento.` : '')
+      + ' Contas a pagar criadas no Financeiro.');
     render();
     if (typeof App !== 'undefined') App.updateNotifBadge();
+  }
+
+  /* Marca os lançamentos da ficha como acertados nesta folha. Devolve
+     quantos foram. */
+  function _acertarLancamentos(itens, rec) {
+    let n = 0;
+    (itens || []).forEach(i => {
+      const l = DB.get('func_lancamentos', i.id);
+      if (!l || l.status === 'cancelado') return;
+      DB.update('func_lancamentos', i.id, {
+        status: i.desconta ? 'descontado' : 'acertado',
+        folhaMes: rec.mes, folhaId: rec.id,
+        dataDesconto: Utils.todayStr(),
+      });
+      n++;
+    });
+    return n;
+  }
+
+  /* Desfaz o acerto. Os lançamentos voltam a ficar em aberto e entram na
+     próxima folha que for gerada. Nada é apagado: vale pago é registro
+     trabalhista e ele continua inteiro na ficha da pessoa. */
+  function _devolverLancamentos(folhaId) {
+    let n = 0;
+    DB.getAll('func_lancamentos')
+      .filter(l => l.folhaId === folhaId && l.status !== 'cancelado')
+      .forEach(l => {
+        DB.update('func_lancamentos', l.id, {
+          status: 'aberto', folhaId: '', folhaMes: '', dataDesconto: '',
+        });
+        n++;
+      });
+    return n;
+  }
+
+  /* Refaz a folha de uma pessoa num mês que ainda não foi pago.
+
+     É o que fecha o ciclo que o usuário pediu: lançou o vale na ficha, o
+     pagamento daquele mês já sai descontado, sem ninguém precisar lembrar de
+     refazer a folha na mão. Mês pago não se mexe — o dinheiro já saiu, e o
+     lançamento novo é cobrado na folha seguinte. */
+  function recalcularFuncionario(mes, funcId, silencioso) {
+    const rec = DB.getAll('folha').find(r => r.mes === mes && r.funcionarioId === funcId);
+    if (!rec) return null;
+    if (rec.pago) {
+      if (!silencioso) Toast.warning('A folha deste mês já foi paga. O lançamento entra na próxima.');
+      return null;
+    }
+    if (typeof Fechamento !== 'undefined' && !Fechamento.permite(mes + '-01', 'A folha deste mês')) return null;
+    const f = DB.get('funcionarios', funcId);
+    if (!f) return null;
+    const calc = calcFolhaFuncionario(f, mes);
+    DB.update('folha', rec.id, { ...calc });
+    /* O acerto tem de acompanhar o recalculo. Sem isto, o vale lancado depois
+       da folha gerada aparecia descontado no pagamento e continuava marcado
+       como "a descontar" na ficha — e seria cobrado DE NOVO no mes seguinte.
+       Devolve primeiro e remarca so o que entrou agora, para quem saiu da
+       conta (cancelado, competencia mudada) voltar a ficar em aberto. */
+    _devolverLancamentos(rec.id);
+    _acertarLancamentos(calc.itensLanc, rec);
+    const conta = DB.getAll('contaspagar').find(c =>
+      c.categoria === 'Folha de Pagamento' && c.folhaMes === mes
+      && c.funcionarioId === funcId && c.status === 'pendente');
+    if (conta) DB.update('contaspagar', conta.id, { valor: Math.round(calc.liquido * 100) / 100 });
+    return calc;
   }
 
   /* Marcar o funcionário como pago também quita a conta a pagar dele, pelo
@@ -890,11 +1050,32 @@ const Folha = (() => {
   }
 
   function excluirFolha(mes) {
-    Confirm.show('Excluir Folha', `Deseja excluir toda a folha de ${new Date(mes + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}? Esta ação não pode ser desfeita.`, () => {
-      const registros = DB.getAll('folha').filter(r => r.mes === mes);
+    const registros = DB.getAll('folha').filter(r => r.mes === mes);
+    const pagos = registros.filter(r => r.pago).length;
+    const lancs = DB.getAll('func_lancamentos')
+      .filter(l => registros.some(r => r.id === l.folhaId) && l.status !== 'cancelado').length;
+    const mesLbl = new Date(mes + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const aviso = 'Excluir a folha de ' + mesLbl + '? '
+      + (lancs ? lancs + ' lançamento(s) da ficha dos funcionários voltam para "a descontar" e entram na próxima folha. ' : '')
+      + 'As contas a pagar ainda pendentes desta folha são canceladas. '
+      + (pagos ? pagos + ' funcionário(s) já constam como pagos: o pagamento feito não é desfeito. ' : '')
+      + 'Os lançamentos da ficha não são apagados.';
+    Confirm.show('Excluir Folha', aviso, () => {
+      let devolvidos = 0;
+      registros.forEach(r => { devolvidos += _devolverLancamentos(r.id); });
+      /* Conta a pagar gerada por esta folha e compromisso que deixou de
+         existir. Cancelar tira do "A Pagar" sem apagar o histórico. */
+      DB.getAll('contaspagar')
+        .filter(c => c.folhaMes === mes && c.status === 'pendente'
+          && (c.categoria === 'Folha de Pagamento' || c.categoria === 'Encargos/FGTS'))
+        .forEach(c => DB.update('contaspagar', c.id, {
+          status: 'cancelado',
+          observacoes: (c.observacoes || '') + ' Cancelada: a folha do mês foi excluída.',
+        }));
       registros.forEach(r => DB.remove('folha', r.id));
-      Toast.success('Folha excluída');
+      Toast.success('Folha excluída' + (devolvidos ? ` · ${devolvidos} lançamento(s) voltaram para a ficha` : ''));
       render();
+      if (typeof App !== 'undefined') App.updateNotifBadge();
     });
   }
 
@@ -1201,5 +1382,6 @@ const Folha = (() => {
     // expostos para o módulo Meu Financeiro calcular a retirada do sócio
     // sem duplicar as regras (fonte única de verdade)
     calcFolhaFuncionario, ehCLT: _ehCLT,
+    recalcularFuncionario,
   };
 })();

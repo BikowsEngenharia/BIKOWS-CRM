@@ -513,20 +513,119 @@ const FinNucleo = (() => {
 
      sinalCusto:  +1 soma ao custo da empresa, 0 não mexe
      descontaLiq: desconta do líquido que a pessoa recebe
+     pagaNaFolha: é dinheiro PARA a pessoa, pago junto com a folha
+
+     Custo da empresa e dinheiro para a pessoa não são a mesma coisa. A botina
+     custa 600 e é custo, mas quem recebe os 600 é a loja, não o funcionário:
+     ela não entra no pagamento dele. O bônus custa e é dele. Sem esta
+     separação, todo EPI comprado viraria provento no holerite.
 
      Um vale é adiantamento: a empresa entrega dinheiro agora e desconta na
      folha. Ele não é custo novo (o custo é o salário), mas é caixa que saiu,
      então entra no fluxo e desconta do líquido. Um EPI é custo de verdade e
      não desconta de ninguém. */
   const TIPOS_FUNC = {
-    vale:         { label: 'Vale / Adiantamento',  sinalCusto: 0,  descontaLiq: true,  icone: '💵' },
-    bonus:        { label: 'Bônus / Prêmio',       sinalCusto: 1,  descontaLiq: false, icone: '🎯' },
-    comissao:     { label: 'Comissão',             sinalCusto: 1,  descontaLiq: false, icone: '📈' },
-    reembolso:    { label: 'Reembolso',            sinalCusto: 1,  descontaLiq: false, icone: '🧾' },
-    custo:        { label: 'Custo (EPI, curso…)',  sinalCusto: 1,  descontaLiq: false, icone: '🦺' },
-    desconto:     { label: 'Desconto',             sinalCusto: 0,  descontaLiq: true,  icone: '➖' },
-    hora_extra:   { label: 'Hora extra',           sinalCusto: 1,  descontaLiq: false, icone: '⏱' },
+    vale:         { label: 'Vale / Adiantamento',  sinalCusto: 0,  descontaLiq: true,  pagaNaFolha: false, icone: '💵' },
+    bonus:        { label: 'Bônus / Prêmio',       sinalCusto: 1,  descontaLiq: false, pagaNaFolha: true,  icone: '🎯' },
+    comissao:     { label: 'Comissão',             sinalCusto: 1,  descontaLiq: false, pagaNaFolha: true,  icone: '📈' },
+    reembolso:    { label: 'Reembolso',            sinalCusto: 1,  descontaLiq: false, pagaNaFolha: true,  icone: '🧾' },
+    custo:        { label: 'Custo (EPI, curso…)',  sinalCusto: 1,  descontaLiq: false, pagaNaFolha: false, icone: '🦺' },
+    desconto:     { label: 'Desconto',             sinalCusto: 0,  descontaLiq: true,  pagaNaFolha: false, icone: '➖' },
+    hora_extra:   { label: 'Hora extra',           sinalCusto: 1,  descontaLiq: false, pagaNaFolha: true,  icone: '⏱' },
   };
+
+  /* A folha de QUAL mes acerta este lancamento.
+
+     Um vale pedido no dia 28/11 e descontado na folha de novembro. Se a
+     pessoa pediu depois que a folha de novembro ja foi paga, quem lanca
+     escolhe dezembro, e o campo manda. Sem campo preenchido, vale o mes da
+     data: e o comportamento de quem nunca escolheu nada. */
+  function competenciaDe(l) {
+    if (!l) return '';
+    return String(l.competencia || l.data || '').substring(0, 7);
+  }
+
+  function _somaMes(m, n) {
+    const partes = String(m || '').split('-').map(Number);
+    const d = new Date(partes[0], (partes[1] - 1) + n, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  /* Em que folha um lancamento de hoje cai de fato. Se a folha do mes
+     corrente ja foi paga, o acerto e na proxima: dizer isso na hora de
+     lancar evita o vale que "some" por ter chegado tarde. */
+  function proximaCompetenciaAberta(funcionarioId, apartirDe) {
+    let mes = String(apartirDe || Utils.todayStr()).substring(0, 7);
+    for (let i = 0; i < 12; i++) {
+      const r = DB.getAll('folha').find(x => x.mes === mes
+        && (!funcionarioId || x.funcionarioId === funcionarioId));
+      if (!r || !r.pago) return mes;
+      mes = _somaMes(mes, 1);
+    }
+    return mes;
+  }
+
+  /* Um lancamento mexe na folha quando o tipo mexe no liquido (vale,
+     desconto) ou quando e um provento marcado para ser pago junto com ela
+     (bonus, comissao, hora extra, reembolso). `naFolha: false` e o lancamento
+     que ja foi acertado por fora e so esta registrado para o historico. */
+  function entraNaFolha(l) {
+    const def = TIPOS_FUNC[l && l.tipo];
+    if (!def) return false;
+    if (l.status === 'cancelado') return false;
+    if (l.naFolha === false) return false;
+    return !!(def.descontaLiq || def.pagaNaFolha);
+  }
+
+  const ACERTADO = ['descontado', 'acertado'];
+
+  /* O QUE OS LANCAMENTOS DA PESSOA FAZEM COM A FOLHA DE UM MES.
+
+     Esta e a funcao que faltava: era o elo entre "lancei um vale na ficha" e
+     "o pagamento ja sai descontado". Folha, holerite, conta a pagar e a
+     propria ficha leem daqui, para os quatro dizerem o mesmo numero.
+
+     Um desconto de competencia ANTERIOR que continua em aberto entra aqui
+     tambem: vale esquecido nao some, cobra na folha seguinte. Ja o que foi
+     acertado so aparece na folha que o acertou, para o holerite antigo
+     continuar contando a verdade do mes dele. */
+  function efeitoNaFolha(funcionarioId, mes) {
+    const proventos = [], descontos = [];
+    if (funcionarioId && mes) {
+      DB.getAll('func_lancamentos').forEach(l => {
+        if (l.funcionarioId !== funcionarioId) return;
+        if (!entraNaFolha(l)) return;
+        const def = TIPOS_FUNC[l.tipo];
+        const comp = competenciaDe(l);
+        const acertado = ACERTADO.includes(l.status);
+        if (acertado) { if ((l.folhaMes || '') !== mes) return; }
+        else if (comp > mes) return;
+        const item = {
+          id: l.id, tipo: l.tipo, label: def.label, icone: def.icone,
+          descricao: l.descricao || def.label, valor: Number(l.valor) || 0,
+          competencia: comp, acertado, atrasado: !acertado && comp < mes,
+          desconta: !!def.descontaLiq,
+        };
+        if (def.descontaLiq) descontos.push(item); else proventos.push(item);
+      });
+    }
+    const soma = arr => Math.round(arr.reduce((t, x) => t + x.valor, 0) * 100) / 100;
+    return {
+      proventos, descontos, itens: proventos.concat(descontos),
+      totalProventos: soma(proventos), totalDescontos: soma(descontos),
+      nAtrasados: descontos.filter(x => x.atrasado).length,
+    };
+  }
+
+  /* Descontos ainda nao acertados em folha nenhuma. E o que a pessoa deve a
+     empresa neste instante. */
+  function descontosEmAberto(funcionarioId) {
+    return DB.getAll('func_lancamentos').filter(l =>
+      (!funcionarioId || l.funcionarioId === funcionarioId)
+      && entraNaFolha(l)
+      && (TIPOS_FUNC[l.tipo] || {}).descontaLiq
+      && !ACERTADO.includes(l.status));
+  }
 
   const CATEGORIAS_CUSTO_FUNC = [
     'EPI / Uniforme', 'Treinamento / Curso', 'Exame médico', 'Ferramenta / Equipamento',
@@ -555,8 +654,12 @@ const FinNucleo = (() => {
 
     if (folha.length) {
       folha.forEach(f => {
-        const custo = (Number(f.bruto) || 0) + (Number(f.fgts) || 0)
-                    + (Number(f.vt) || 0) + (Number(f.vr) || 0);
+        /* `bruto` do registro de folha JA soma salario + VT + VR + adicionais
+           (e assim que calcFolhaFuncionario o monta). Somar VT e VR de novo
+           inflava o custo de pessoal de todo mes com folha gerada. O custo da
+           empresa e o bruto mais o encargo patronal, e nada alem disso: INSS e
+           IRRF sao desconto da pessoa, ja dentro do bruto. */
+        const custo = (Number(f.bruto) || 0) + (Number(f.fgts) || 0);
         totalFolha += custo;
         porFunc.push({
           funcionarioId: f.funcionarioId,
@@ -1250,6 +1353,8 @@ const FinNucleo = (() => {
     carteira, receitaPeriodo, aCobrarSemRecebivel,
     servicoDoLead, leadDoServico, conversaoDoLead, funilRealizado, servicosSemLead,
     lancamentosFunc, custoPessoalMes, TIPOS_FUNC, CATEGORIAS_CUSTO_FUNC,
+    competenciaDe, proximaCompetenciaAberta, entraNaFolha, efeitoNaFolha,
+    descontosEmAberto,
     orcamentoDe, avancoDe, comparativo, corDoAlerta, rotuloDoAlerta,
     existiaEm,
     despesasGerais, receitasGerais, despesasFixasMes, recebidoSemServico,

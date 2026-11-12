@@ -121,7 +121,12 @@ const Pessoal = (() => {
           const folhaMes = folhasDoFunc.find(r => r.mes === m);
           const origemId = folhaMes ? 'folha:' + folhaMes.id : 'retirada-cad:' + meuFuncId + ':' + m;
           if (importados.has(origemId)) continue;               // já puxado
-          const valor = folhaMes ? (folhaMes.liquido || 0) : (calc.liquido || 0);
+          /* Sem folha gerada, calcula o liquido DAQUELE mes: assim o vale que
+             a pessoa pegou aparece no que ela de fato recebeu, em vez do
+             salario cheio do cadastro. */
+          const estimado = (typeof Folha !== 'undefined' && Folha.calcFolhaFuncionario)
+            ? Folha.calcFolhaFuncionario(func, m) : calc;
+          const valor = folhaMes ? (folhaMes.liquido || 0) : (estimado.liquido || 0);
           if (!valor) continue;                                  // sem valor cadastrado
           linhas.push({ mes: m, valor, folhaId: folhaMes?.id || '', origemId });
         }
@@ -292,7 +297,7 @@ const Pessoal = (() => {
     if (folhaMes) {
       valor = folhaMes.liquido || 0;
     } else if (typeof Folha !== 'undefined' && Folha.calcFolhaFuncionario) {
-      valor = Folha.calcFolhaFuncionario(func).liquido || 0;
+      valor = Folha.calcFolhaFuncionario(func, mes).liquido || 0;
     } else {
       valor = func.salarioBase || 0;
     }

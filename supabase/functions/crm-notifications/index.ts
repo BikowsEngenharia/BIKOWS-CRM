@@ -91,14 +91,18 @@ async function credenciaisTelegram(): Promise<{ token: string; chatId: string }>
   return _tgCache
 }
 
-async function sendTelegram(text: string): Promise<void> {
+/* Devolve se a mensagem SAIU mesmo. Antes nao devolvia nada e quem chamava
+   marcava `telegram: true` de qualquer jeito: a resposta dizia que tinha
+   enviado mesmo quando faltava token e nada foi enviado. Falha silenciosa em
+   rotina automatica e pior do que erro: ninguem fica sabendo. */
+async function sendTelegram(text: string): Promise<boolean> {
   const { token: TG_TOKEN, chatId: TG_CHAT_ID } = await credenciaisTelegram()
   if (!TG_TOKEN || !TG_CHAT_ID) {
-    console.warn('[TG] sem token ou chat configurado; mensagem nao enviada')
-    return
+    console.error('[TG] sem token nem chat configurado: mensagem NAO enviada. Defina o secret TELEGRAM_BOT_TOKEN ou a chave `telegram` em crm_config.')
+    return false
   }
   try {
-    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -108,8 +112,14 @@ async function sendTelegram(text: string): Promise<void> {
         disable_web_page_preview: true,
       }),
     })
+    if (!res.ok) {
+      console.error('[TG] Telegram recusou o envio:', res.status, await res.text().catch(() => ''))
+      return false
+    }
+    return true
   } catch (e) {
-    console.warn('[TG] Erro:', e)
+    console.error('[TG] Erro ao enviar:', e)
+    return false
   }
 }
 
@@ -498,19 +508,19 @@ Deno.serve(async(req:Request)=>{
       const html=buildWeeklyEmail(leads,projetos,licitacoes,recebiveis,atividades,dataFmt)
       const tg=buildTelegramWeekly(leads,projetos,licitacoes,recebiveis)
       emailSent=await sendEmail(subject,html)
-      await sendTelegram(tg);tgSent=true
+      tgSent=await sendTelegram(tg)
     }else if(tipo==='urgent'){
       const subject=`🚨 Alertas Urgentes Bikows CRM — ${dataFmt}`
       const html=buildDailyEmail(atividades,leads,recebiveis,contasPagar,licitacoes,projetos,hojeStr,true)
       const tg=buildTelegramUrgent(atividades,leads,recebiveis,contasPagar)
       if(html){emailSent=await sendEmail(subject,html)}
-      if(tg){await sendTelegram(tg);tgSent=true}
+      if(tg){tgSent=await sendTelegram(tg)}
     }else{
       const subject=`📋 Resumo Diário — ${diaSemana}, ${dataFmt}`
       const html=buildDailyEmail(atividades,leads,recebiveis,contasPagar,licitacoes,projetos,hojeStr,false)
       const tg=buildTelegramDaily(atividades,leads,recebiveis,contasPagar,licitacoes,projetos,hojeStr)
       if(html){emailSent=await sendEmail(subject,html)}
-      await sendTelegram(tg);tgSent=true
+      tgSent=await sendTelegram(tg)
     }
     return new Response(JSON.stringify({ok:true,tipo,email:emailSent,telegram:tgSent,via:auth.via}),{headers:JSON_H})
   }catch(e){

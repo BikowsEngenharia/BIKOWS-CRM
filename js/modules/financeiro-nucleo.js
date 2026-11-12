@@ -186,6 +186,61 @@ const FinNucleo = (() => {
       .filter(r => r.projetoId === p.id);
   }
 
+  /* As parcelas de um serviço, venham de onde vierem.
+
+     Por que isto não é simplesmente "ler a tabela de recebíveis":
+     o recebimento pode ter sido registrado em dois lugares, e na base real
+     cada serviço usou um. Uns têm recebível com parcelas; outros têm só o
+     registro dentro de `projeto.financeiro.recebimentos`, sem recebível
+     nenhum. Ler apenas a tabela perdia o dinheiro dos segundos; ler os dois
+     e somar contaria em dobro os que existem nas duas pontas.
+
+     A regra: o recebível manda. O registro de dentro do serviço só entra
+     quando não existe recebível correspondente — ou seja, quando ele é a
+     única memória daquele dinheiro. O vínculo é o campo `recebiveisId`. */
+  function parcelasDoServico(p) {
+    const lista = [];
+    const idsRecebiveis = new Set();
+
+    recebiveisServico(p).forEach(r => {
+      idsRecebiveis.add(r.id);
+      (r.parcelas || []).forEach(pc => lista.push({
+        valor: pc.valor, status: pc.status, vencimento: pc.vencimento,
+        dataPagamento: pc.dataPagamento, fonte: 'recebivel', recebivelId: r.id,
+      }));
+    });
+
+    const fin = _fin(p);
+    (fin.recebimentos || []).forEach(rec => {
+      /* Já existe recebível para este recebimento: ele é espelho, sai fora. */
+      if (rec.recebiveisId && idsRecebiveis.has(rec.recebiveisId)) return;
+      /* Aponta para um recebível que não existe mais (apagado), ou nunca teve:
+         aqui dentro é a única memória do dinheiro, então entra. */
+      if (rec.recebiveisId && DB.get('recebiveis', rec.recebiveisId)) return;
+      lista.push({
+        valor: rec.valor, status: rec.status,
+        vencimento: rec.vencimento,
+        dataPagamento: rec.dataRecebimento || rec.dataPagamento || rec.vencimento,
+        fonte: 'servico', recebimentoId: rec.id,
+      });
+    });
+    return lista;
+  }
+
+  /* Soma um conjunto de parcelas já resolvido por `parcelasDoServico`. */
+  function somarLista(parcelas) {
+    let recebido = 0, aReceber = 0, vencido = 0, nVencidas = 0, semVenc = 0;
+    (parcelas || []).forEach(pc => {
+      const v = Number(pc.valor) || 0;
+      if (pc.status === 'cancelado') return;
+      if (pc.status === 'recebido') { recebido += v; return; }
+      aReceber += v;
+      if (!pc.vencimento) { semVenc += v; return; }
+      if (Utils.isOverdue(pc.vencimento)) { vencido += v; nVencidas++; }
+    });
+    return { recebido, aReceber, vencido, nVencidas, semVenc };
+  }
+
   function somarParcelas(recebiveis) {
     let recebido = 0, aReceber = 0, vencido = 0, nVencidas = 0, semVenc = 0;
     (recebiveis || []).forEach(r => {
@@ -205,7 +260,7 @@ const FinNucleo = (() => {
      O geral recebe o total; o detalhe fica aqui dentro, em `custo.itens`. */
   function linhaServico(p) {
     const custo = custoServico(p);
-    const receb = somarParcelas(recebiveisServico(p));
+    const receb = somarLista(parcelasDoServico(p));
     const contratada = Number(p.valor) || 0;
     const lucro = contratada - custo.total;
     return {
@@ -402,6 +457,29 @@ const FinNucleo = (() => {
     });
   }
 
+  /* Parcelas recebidas de recebíveis que não pertencem a serviço nenhum.
+     Elas são receita de verdade e precisam entrar em algum lugar: sem isto o
+     dinheiro existe em Contas a Receber e some do DRE. Entram como receita
+     fora de serviço, que é o que elas são enquanto ninguém as vincular. */
+  function recebidoSemServico(de, ate) {
+    const ids = new Set(DB.getAll('projetos').map(p => p.id));
+    let total = 0;
+    const itens = [];
+    DB.getAll('recebiveis').filter(r => Utils.recebivelAtivo(r)).forEach(r => {
+      if (r.projetoId && ids.has(r.projetoId)) return;
+      (r.parcelas || []).forEach(pc => {
+        if (pc.status !== 'recebido') return;
+        const d = pc.dataPagamento || pc.vencimento || '';
+        if (de && d < de) return;
+        if (ate && d > ate) return;
+        const v = Number(pc.valor) || 0;
+        total += v;
+        itens.push({ recebivelId: r.id, descricao: r.descricao || '', valor: v, data: d });
+      });
+    });
+    return { total, itens };
+  }
+
   /* Receita que não passa por serviço nenhum. Hoje é raro, mas existe: venda
      avulsa, reembolso de cliente, receita financeira. */
   function receitasGerais(de, ate) {
@@ -460,14 +538,12 @@ const FinNucleo = (() => {
       if (regime === 'caixa') {
         /* Caixa: só as parcelas efetivamente recebidas no período. */
         let recebidoNoPeriodo = 0;
-        recebiveisServico(l.projeto).forEach(r => {
-          (r.parcelas || []).forEach(pc => {
-            if (pc.status !== 'recebido') return;
-            const d = pc.dataPagamento || pc.vencimento || '';
-            if (de && d < de) return;
-            if (ate && d > ate) return;
-            recebidoNoPeriodo += Number(pc.valor) || 0;
-          });
+        parcelasDoServico(l.projeto).forEach(pc => {
+          if (pc.status !== 'recebido') return;
+          const d = pc.dataPagamento || pc.vencimento || '';
+          if (de && d < de) return;
+          if (ate && d > ate) return;
+          recebidoNoPeriodo += Number(pc.valor) || 0;
         });
         /* E só os custos com data dentro do período. */
         let custoNoPeriodo = 0, comissaoNoPeriodo = 0;
@@ -504,7 +580,8 @@ const FinNucleo = (() => {
 
     const gerRec = receitasGerais(de, ate);
     const gerDesp = despesasGerais(de, ate);
-    const recOutras = gerRec.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+    const semServico = recebidoSemServico(de, ate);
+    const recOutras = gerRec.reduce((s, l) => s + (Number(l.valor) || 0), 0) + semServico.total;
     const despGerais = gerDesp.reduce((s, l) => s + (Number(l.valor) || 0), 0);
 
     const pessoal = custoPessoalMes(mes);
@@ -541,6 +618,7 @@ const FinNucleo = (() => {
       resultado,
       resultadoPct: receitaBruta > 0 ? Math.round((resultado / receitaBruta) * 100) : null,
       porServico: porServico.sort((a, b) => b.receitaPeriodo - a.receitaPeriodo),
+      recebidoSemServico: semServico,
       porCategoria,
       lancamentosGerais: gerDesp,
       receitasAvulsas: gerRec,
@@ -812,6 +890,26 @@ const FinNucleo = (() => {
         })));
     }
 
+    /* 4b. Recebimento que mora só dentro do serviço, sem recebível.
+          O dinheiro é contado certo, mas ele não aparece em Contas a Receber,
+          então some do acompanhamento de cobrança e dos lembretes. */
+    const soNoServico = [];
+    servicos().forEach(l => {
+      const soltos = parcelasDoServico(l.projeto).filter(pc => pc.fonte === 'servico');
+      if (!soltos.length) return;
+      soNoServico.push({
+        id: l.id, texto: l.titulo,
+        sub: `${Utils.formatCurrency(soltos.reduce((s, x) => s + (Number(x.valor) || 0), 0))} registrados só dentro do serviço`,
+        ir: 'servico',
+      });
+    });
+    if (soNoServico.length) {
+      push('media', `${soNoServico.length} serviço(s) com recebimento fora de Contas a Receber`,
+        'O recebimento foi registrado dentro do serviço e nunca virou parcela em Contas a Receber. O valor entra no resultado, mas o serviço não aparece na cobrança nem nos alertas de vencimento.',
+        'Abra o financeiro do serviço e use "Lançar no financeiro geral" no recebimento, para ele passar a existir também em Contas a Receber.',
+        soNoServico);
+    }
+
     /* 5. Recebível sem serviço: dinheiro a receber que não sabe de onde veio. */
     const recSemProj = DB.getAll('recebiveis')
       .filter(r => Utils.recebivelAtivo(r) && !r.projetoId);
@@ -936,10 +1034,11 @@ const FinNucleo = (() => {
     ehEspelho, espelhoLanc, contaEhEspelho,
     custoServico, horasServico, recebiveisServico, somarParcelas,
     linhaServico, servicos, margemMediaCarteira, corDaMargem,
+    parcelasDoServico, somarLista,
     lancamentosFunc, custoPessoalMes, TIPOS_FUNC, CATEGORIAS_CUSTO_FUNC,
     orcamentoDe, avancoDe, comparativo, corDoAlerta, rotuloDoAlerta,
     existiaEm,
-    despesasGerais, receitasGerais, despesasFixasMes,
+    despesasGerais, receitasGerais, despesasFixasMes, recebidoSemServico,
     consolidado, pontoEquilibrio, consistencia,
   };
 })();

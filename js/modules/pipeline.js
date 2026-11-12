@@ -508,6 +508,7 @@ const Pipeline = (() => {
         <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
           <button onclick="Pipeline.setVista('kanban')" title="Quadro com colunas (arrastar e soltar)" style="padding:8px 14px;border:none;font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='kanban'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">▦ Quadro</button>
           <button onclick="Pipeline.setVista('foco')" title="Lista vertical com ação direta (indicado para celular)" style="padding:8px 14px;border:none;border-left:1px solid var(--border);font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='foco'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">☰ Foco</button>
+          <button onclick="Pipeline.setVista('conversao')" title="O que o funil diz que fechou contra o que entrou em caixa" style="padding:8px 14px;border:none;border-left:1px solid var(--border);font-size:12.5px;font-weight:600;cursor:pointer;transition:var(--t);${_vistaAtual()==='conversao'?'background:var(--primary);color:#fff;':'background:var(--surface-2);color:var(--text-muted);'}">💰 Conversão</button>
         </div>
       </div>
 
@@ -606,7 +607,8 @@ const Pipeline = (() => {
 
       ${_pipelineTab === 'ativo' && _vistaAtual() === 'kanban' && _agrupamento === 'etapa' ? _renderProbabilidadeLegend() : ''}
 
-      ${_vistaAtual() === 'foco' ? renderFoco(leads) : (() => {
+      ${_vistaAtual() === 'conversao' ? renderConversao(leads)
+        : _vistaAtual() === 'foco' ? renderFoco(leads) : (() => {
         const grupos = _montarGrupos(_aplicarFiltros(leads));
         const quadro = corpo => `<div class="kanban-wrap"><div class="kanban-board" id="kanbanBoard">${corpo}</div></div>`;
 
@@ -673,8 +675,189 @@ const Pipeline = (() => {
     return window.innerWidth <= 760 ? 'foco' : 'kanban';
   }
 
-  function setVista(v) { _vista = (v === 'foco' || v === 'kanban') ? v : null; render(); }
+  function setVista(v) {
+    _vista = ['foco', 'kanban', 'conversao'].includes(v) ? v : null;
+    render();
+  }
 
+  /* ====================================================
+     VISTA CONVERSÃO — o funil confrontado com o caixa
+
+     O quadro e a lista mostram o que se espera vender. Esta vista mostra o
+     que de fato virou dinheiro: para cada negócio ganho, o que o lead diz
+     que fechou, o que o serviço foi contratado e o que entrou em caixa.
+     ==================================================== */
+  function renderConversao(allLeads) {
+    if (typeof FinNucleo === 'undefined') {
+      return '<div class="card"><div class="card-body text-muted">Núcleo financeiro não carregado.</div></div>';
+    }
+    const f = FinNucleo.funilRealizado();
+    const semLead = FinNucleo.servicosSemLead();
+
+    const kpi = (rot, val, sub, cor) => `
+      <div class="kpi" ${cor ? `style="--kc:${cor}"` : ''}>
+        <div class="kpi-rot">${rot}</div><div class="kpi-val">${val}</div>
+        <div class="kpi-sub">${sub}</div>
+      </div>`;
+
+    const corAlerta = {
+      sem_servico: 'var(--ruim-txt)', divergente: '#d97706',
+      nao_recebido: '#d97706', ok: 'var(--ok-txt)', aberto: 'var(--text-muted)',
+    };
+    const rotAlerta = {
+      sem_servico: 'Sem serviço', divergente: 'Valor diverge',
+      nao_recebido: 'Nada recebido', ok: 'Confere', aberto: 'Em aberto',
+    };
+
+    return `
+      ${f.nSemServico ? `<div class="ficha-aviso">
+        <div><strong>${f.nSemServico} de ${f.nGanhos} negócios ganhos não têm serviço vinculado</strong>,
+        somando ${Utils.formatCurrency(f.semServicoValor)}. Sem o vínculo, não dá para saber se esse
+        dinheiro entrou, e o funil conta uma história que o financeiro não confirma.
+        Use o botão "Vincular serviço" em cada um.</div>
+      </div>` : ''}
+
+      <div class="funil-kpis">
+        ${kpi('Ganhos', String(f.nGanhos), `${f.nComServico} com serviço vinculado`)}
+        ${kpi('O funil diz que fechou', Utils.formatCurrency(f.fechadoDeclarado), 'valor registrado nos leads')}
+        ${kpi('Contratado de verdade', Utils.formatCurrency(f.contratadoReal), 'soma dos serviços vinculados')}
+        ${kpi('Entrou em caixa', Utils.formatCurrency(f.recebidoReal), 'recebido nos serviços vinculados', 'var(--ok-txt)')}
+        ${f.nSemServico ? kpi('Sem rastro no caixa', Utils.formatCurrency(f.semServicoValor), `${f.nSemServico} negócio(s)`, 'var(--ruim-txt)') : ''}
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Negócios ganhos × dinheiro</div>
+          <span class="text-sm text-muted">${f.linhas.length} negócio(s)</span>
+        </div>
+        <div class="table-wrap">
+          ${f.linhas.length === 0
+            ? '<div class="empty-state"><div class="empty-icon">🏁</div><div class="empty-title">Nenhum negócio ganho ainda</div></div>'
+            : `<table class="tbl">
+            <thead><tr>
+              <th>Negócio</th><th>Cliente</th><th class="text-right">Estimado</th>
+              <th class="text-right">Fechado</th><th class="text-right">Contratado</th>
+              <th class="text-right">Recebido</th><th>Margem</th><th>Situação</th><th>Ações</th>
+            </tr></thead>
+            <tbody>${f.linhas.map(x => {
+              const cli = Utils.getClientName(x.lead.clienteId);
+              return `<tr>
+                <td><div class="font-semibold text-sm">${Utils.escHtml(Utils.truncate(x.lead.titulo || '—', 32))}</div>
+                    ${x.servico ? `<div class="text-xs text-muted">${Utils.escHtml(Utils.truncate(x.servico.titulo, 28))}</div>` : ''}</td>
+                <td class="text-xs">${cli && cli !== '—' ? Utils.escHtml(Utils.truncate(cli, 18)) : '<span class="text-muted">—</span>'}</td>
+                <td class="text-right text-sm text-muted">${Utils.formatCurrency(x.estimado)}</td>
+                <td class="text-right font-semibold">${x.fechado ? Utils.formatCurrency(x.fechado) : '—'}</td>
+                <td class="text-right ${x.contratado == null ? 'text-muted' : 'font-semibold'}">${x.contratado == null ? 'sem serviço' : Utils.formatCurrency(x.contratado)}</td>
+                <td class="text-right ${x.recebido ? 'font-bold' : 'text-muted'}" ${x.recebido ? 'style="color:var(--ok-txt)"' : ''}>${x.recebido == null ? '—' : Utils.formatCurrency(x.recebido)}</td>
+                <td>${x.margemPct != null ? `<span class="font-bold" style="color:${FinNucleo.corDaMargem(x.margemPct)}">${x.margemPct}%</span>` : '<span class="text-xs text-muted">—</span>'}</td>
+                <td><span class="badge" style="background:${corAlerta[x.alerta]}22;color:${corAlerta[x.alerta]}" title="${Utils.escHtml(x.motivo || '')}">${rotAlerta[x.alerta]}</span></td>
+                <td><div class="tbl-actions">
+                  ${x.servico
+                    ? `<button class="btn btn-xs btn-secondary" onclick="Projetos.view('${x.servico.id}','financeiro')" title="Abrir o financeiro do serviço">💰</button>`
+                    : `<button class="btn btn-xs btn-primary" onclick="Pipeline.vincularServico('${x.lead.id}')">Vincular serviço</button>`}
+                  <button class="btn btn-xs btn-ghost" onclick="Pipeline.viewLead('${x.lead.id}')">Ver</button>
+                </div></td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`}
+        </div>
+      </div>
+
+      ${semLead.length ? `
+      <div class="card mt-4">
+        <div class="card-header">
+          <div class="card-title">Serviços sem negócio de origem</div>
+          <span class="text-sm text-muted">${semLead.length}</span>
+        </div>
+        <div class="card-body">
+          <p class="text-sm text-muted mb-2">Trabalho executado que não aparece em nenhuma conta de conversão.
+            Ou veio de fora do funil (indicação direta, recorrência), ou o vínculo nunca foi feito.</p>
+          <div class="table-wrap"><table class="tbl">
+            <thead><tr><th>Serviço</th><th>Cliente</th><th class="text-right">Valor</th><th>Status</th><th></th></tr></thead>
+            <tbody>${semLead.map(p => {
+              const cli = Utils.getClientName(p.clienteId);
+              return `<tr>
+                <td class="font-semibold text-sm">${Utils.escHtml(Utils.truncate(p.titulo || '—', 34))}</td>
+                <td class="text-xs">${cli && cli !== '—' ? Utils.escHtml(Utils.truncate(cli, 18)) : '—'}</td>
+                <td class="text-right">${Utils.formatCurrency(p.valor)}</td>
+                <td><span class="badge badge-gray">${Utils.escHtml((p.status || '').replace('_', ' '))}</span></td>
+                <td><button class="btn btn-xs btn-secondary" onclick="Projetos.view('${p.id}')">Abrir</button></td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table></div>
+        </div>
+      </div>` : ''}`;
+  }
+
+  /* Liga um negócio ganho a um serviço que já existe. Era o que faltava para
+     o histórico fechar: o caminho "criar projeto" só servia para negócio
+     novo, e nenhum dos ganhos antigos tinha por onde ser amarrado. */
+  function vincularServico(leadId) {
+    const lead = DB.get('leads', leadId);
+    if (!lead) return;
+    const candidatos = DB.getAll('projetos')
+      .filter(p => p.status !== 'cancelado')
+      .filter(p => !FinNucleo.leadDoServico(p) || p.leadOrigemId === leadId || lead.projetoId === p.id)
+      .sort((a, b) => {
+        /* Mesmo cliente primeiro, depois valor parecido com o fechado. */
+        const mesmoA = a.clienteId && a.clienteId === lead.clienteId ? 1 : 0;
+        const mesmoB = b.clienteId && b.clienteId === lead.clienteId ? 1 : 0;
+        if (mesmoA !== mesmoB) return mesmoB - mesmoA;
+        const alvo = Number(lead.valorFechado) || Number(lead.valorEstimado) || 0;
+        return Math.abs((a.valor || 0) - alvo) - Math.abs((b.valor || 0) - alvo);
+      });
+
+    if (!candidatos.length) {
+      Toast.error('Nenhum serviço livre para vincular. Use "Criar projeto" para gerar um a partir deste negócio.');
+      return;
+    }
+    const alvo = Number(lead.valorFechado) || Number(lead.valorEstimado) || 0;
+
+    Modal.open({
+      title: '🔗 Vincular serviço — ' + Utils.escHtml(Utils.truncate(lead.titulo || '', 34)),
+      size: 'modal-md',
+      saveLabel: 'Vincular',
+      body: `
+        <p class="text-sm mb-3">
+          Escolha o serviço que executou este negócio. A partir do vínculo, a vista Conversão
+          passa a comparar o que o lead registra como fechado com o que o serviço contratou
+          e com o que entrou em caixa.
+        </p>
+        <div class="detail-grid mb-3">
+          <div class="detail-field"><div class="detail-label">Cliente do negócio</div>
+            <div class="detail-value">${Utils.escHtml(Utils.getClientName(lead.clienteId))}</div></div>
+          <div class="detail-field"><div class="detail-label">Valor fechado</div>
+            <div class="detail-value font-bold">${alvo ? Utils.formatCurrency(alvo) : '—'}</div></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Serviço *</label>
+          <select class="form-control" id="vsProjeto">
+            <option value="">Escolha...</option>
+            ${candidatos.map(p => {
+              const cli = Utils.getClientName(p.clienteId);
+              const marca = p.clienteId && p.clienteId === lead.clienteId ? '★ ' : '';
+              return `<option value="${p.id}" ${lead.projetoId === p.id ? 'selected' : ''}>${marca}${Utils.escHtml(Utils.truncate(p.titulo, 40))} · ${Utils.formatCurrency(p.valor)}${cli && cli !== '—' ? ' · ' + Utils.escHtml(Utils.truncate(cli, 18)) : ''}</option>`;
+            }).join('')}
+          </select>
+          <div class="form-hint">★ marca os serviços do mesmo cliente do negócio</div>
+        </div>`,
+      saveCb: () => {
+        const pid = document.getElementById('vsProjeto').value;
+        if (!pid) { Toast.error('Escolha um serviço.'); return; }
+        const proj = DB.get('projetos', pid);
+        if (!proj) { Toast.error('Serviço não encontrado.'); return; }
+        /* Grava dos dois lados: foi exatamente a falta disso que deixou o
+           funil e o financeiro sem conversarem. */
+        DB.update('leads', leadId, { projetoId: pid });
+        DB.update('projetos', pid, { leadOrigemId: leadId });
+        if (!proj.clienteId && lead.clienteId) DB.update('projetos', pid, { clienteId: lead.clienteId });
+        Modal.close();
+        Toast.success('Vinculado. A vista Conversão já compara os valores.');
+        render();
+      },
+    });
+  }
+
   function renderFoco(allLeads) {
     const TERMINAL = ['fechado_ganho','executado','fechado_perdido'];
     const stages = _pipelineTab === 'ativo'
@@ -1571,7 +1754,7 @@ const Pipeline = (() => {
         const titulo = document.getElementById('cpTitulo').value.trim();
         const valor = Utils.parseMoney(document.getElementById('cpValor').value);
         if (!titulo) { Toast.error('Título obrigatório'); return; }
-        DB.create('projetos', {
+        const novo = DB.create('projetos', {
           titulo, valor,
           codigo: document.getElementById('cpCodigo').value,
           clienteId: lead.clienteId,
@@ -1584,7 +1767,11 @@ const Pipeline = (() => {
           observacoes: document.getElementById('cpObs').value,
           leadOrigemId: leadId,
         });
-        Toast.success('Projeto criado com sucesso!');
+        /* Grava o vinculo TAMBEM no lead. Antes so o servico sabia de onde
+           tinha vindo, entao o funil nunca conseguia seguir a ligacao e
+           nenhum negocio ganho aparecia ligado ao dinheiro. */
+        DB.update('leads', leadId, { projetoId: novo.id });
+        Toast.success('Projeto criado e vinculado ao negócio!');
         Modal.close();
         App.navigate('projetos');
       },
@@ -2359,6 +2546,7 @@ const Pipeline = (() => {
   }
 
   return {
+    renderConversao, vincularServico,
     render, openForm, saveLead, deleteLead, viewLead, addNew, definirProximaAcao,
     dragStart, dragEnd, dragOver, dragLeave, drop, moverEtapa,
     criarProjeto, criarRecebivel, criarFollowupAutomatico, listaLeadsFrios,

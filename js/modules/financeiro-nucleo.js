@@ -375,6 +375,127 @@ const FinNucleo = (() => {
   }
 
   /* ====================================================
+     FUNIL × DINHEIRO
+
+     O funil dizia uma coisa e o financeiro outra, sobre o mesmo negócio.
+     Treze leads ganhos, onze serviços, e nenhum vínculo entre eles: o
+     caminho "criar projeto a partir do lead" gravava a origem no serviço e
+     nunca de volta no lead, então a ligação existia num sentido só e
+     nenhuma tela conseguia segui-la.
+
+     Daqui para frente o vínculo vale nos dois sentidos, e a leitura aceita
+     qualquer um dos lados para não exigir conserto manual do histórico.
+     ==================================================== */
+
+  /* O serviço que nasceu de um lead. Procura pelos dois lados e, em último
+     caso, por proposta: lead → proposta → serviço. */
+  function servicoDoLead(lead) {
+    if (!lead) return null;
+    if (lead.projetoId) {
+      const p = DB.get('projetos', lead.projetoId);
+      if (p) return p;
+    }
+    const porOrigem = DB.getAll('projetos').find(p => p.leadOrigemId === lead.id);
+    if (porOrigem) return porOrigem;
+    const prop = DB.getAll('propostas').find(x => x.leadId === lead.id && x.projetoId);
+    if (prop) {
+      const p = DB.get('projetos', prop.projetoId);
+      if (p) return p;
+    }
+    return null;
+  }
+
+  function leadDoServico(projeto) {
+    if (!projeto) return null;
+    if (projeto.leadOrigemId) {
+      const l = DB.get('leads', projeto.leadOrigemId);
+      if (l) return l;
+    }
+    return DB.getAll('leads').find(l => l.projetoId === projeto.id) || null;
+  }
+
+  const GANHOS = ['fechado_ganho', 'executado'];
+
+  /* O que o funil prometeu contra o que o dinheiro confirma.
+
+     estimado   o que se achava que valia quando entrou
+     fechado    o que o lead registra como fechado
+     contratado o valor do serviço que executou
+     recebido   o que realmente entrou em caixa
+
+     Enquanto não houver serviço vinculado, contratado e recebido são null e
+     a tela diz isso, em vez de mostrar zero como se nada tivesse entrado. */
+  function conversaoDoLead(lead) {
+    if (!lead) return null;
+    const servico = servicoDoLead(lead);
+    const estimado = Number(lead.valorEstimado) || 0;
+    const fechado = Number(lead.valorFechado) || 0;
+    const ganho = GANHOS.includes(lead.status);
+
+    if (!servico) {
+      return {
+        lead, servico: null, ganho, estimado, fechado,
+        contratado: null, recebido: null, margemPct: null,
+        alerta: ganho ? 'sem_servico' : 'aberto',
+        motivo: ganho
+          ? 'Negócio ganho sem serviço vinculado: não dá para saber se o dinheiro entrou.'
+          : '',
+      };
+    }
+
+    const linha = linhaServico(servico);
+    const contratado = linha.contratada;
+    const recebido = linha.recebido;
+    const difFechado = fechado > 0 ? contratado - fechado : null;
+
+    let alerta = 'ok', motivo = '';
+    if (!ganho) {
+      alerta = 'aberto';
+    } else if (difFechado != null && Math.abs(difFechado) >= 0.01) {
+      alerta = 'divergente';
+      motivo = difFechado < 0
+        ? `O serviço foi contratado por ${Utils.formatCurrency(Math.abs(difFechado))} a menos do que o lead registrou como fechado.`
+        : `O serviço foi contratado por ${Utils.formatCurrency(difFechado)} a mais do que o lead registrou como fechado.`;
+    } else if (contratado > 0 && recebido === 0) {
+      alerta = 'nao_recebido';
+      motivo = 'Negócio ganho e serviço criado, mas nada entrou em caixa ainda.';
+    }
+
+    return {
+      lead, servico, ganho, estimado, fechado, contratado, recebido,
+      aReceber: linha.aReceber, vencido: linha.vencido,
+      margemPct: linha.temCusto ? linha.margemPct : null,
+      difFechado, alerta, motivo,
+    };
+  }
+
+  /* O funil inteiro confrontado com o caixa. É o número que responde
+     "o que eu disse que vendi bate com o que entrou?". */
+  function funilRealizado() {
+    const ganhos = DB.getAll('leads').filter(l => GANHOS.includes(l.status));
+    const linhas = ganhos.map(conversaoDoLead);
+    const comServico = linhas.filter(x => x.servico);
+    const semServico = linhas.filter(x => !x.servico);
+    return {
+      nGanhos: ganhos.length,
+      nComServico: comServico.length,
+      nSemServico: semServico.length,
+      fechadoDeclarado: linhas.reduce((s, x) => s + x.fechado, 0),
+      contratadoReal: comServico.reduce((s, x) => s + (x.contratado || 0), 0),
+      recebidoReal: comServico.reduce((s, x) => s + (x.recebido || 0), 0),
+      semServicoValor: semServico.reduce((s, x) => s + (x.fechado || x.estimado || 0), 0),
+      linhas: linhas.sort((a, b) => (b.fechado || b.estimado || 0) - (a.fechado || a.estimado || 0)),
+    };
+  }
+
+  /* Serviços que ninguém ligou a um negócio. O caminho inverso do anterior:
+     trabalho executado que não aparece em nenhuma conta de conversão. */
+  function servicosSemLead() {
+    return DB.getAll('projetos')
+      .filter(p => p.status !== 'cancelado' && !leadDoServico(p));
+  }
+
+  /* ====================================================
      3. PESSOAL — folha, vales e custos por funcionário
      ==================================================== */
 
@@ -1018,6 +1139,47 @@ const FinNucleo = (() => {
         semBase.map(f => ({ id: f.id, texto: f.nome || 'Sem nome', sub: f.cargo || '', ir: 'funcionario' })));
     }
 
+    /* 6b. Negócio ganho sem serviço vinculado. O funil declara receita que o
+          financeiro não conhece, e ninguém consegue dizer se entrou. */
+    const funil = funilRealizado();
+    const ganhoSemServico = funil.linhas.filter(x => x.alerta === 'sem_servico');
+    if (ganhoSemServico.length) {
+      push('alta', `${ganhoSemServico.length} negócio(s) ganhos sem serviço vinculado`,
+        `${Utils.formatCurrency(funil.semServicoValor)} declarados como fechados no funil sem nenhum serviço correspondente. O comercial conta uma história que o financeiro não confirma, e esse dinheiro não aparece em margem, custo nem caixa.`,
+        'Abra o Pipeline na vista Conversão e use "Vincular serviço" em cada um. Se o serviço ainda não existe, crie a partir do próprio negócio.',
+        ganhoSemServico.slice(0, 15).map(x => ({
+          id: x.lead.id, texto: x.lead.titulo || 'Sem título',
+          sub: Utils.formatCurrency(x.fechado || x.estimado), ir: 'lead',
+        })));
+    }
+
+    /* 6c. Valor fechado no funil diferente do contratado no serviço. */
+    const divergentes = funil.linhas.filter(x => x.alerta === 'divergente');
+    if (divergentes.length) {
+      push('media', `${divergentes.length} negócio(s) com valor diferente do serviço`,
+        'O valor que o lead registra como fechado não bate com o valor contratado no serviço. Um dos dois está desatualizado, e as metas comerciais são medidas pelo do lead.',
+        'Confira qual é o valor real e acerte o outro lado.',
+        divergentes.map(x => ({
+          id: x.lead.id, texto: x.lead.titulo || 'Sem título',
+          sub: `funil ${Utils.formatCurrency(x.fechado)} · serviço ${Utils.formatCurrency(x.contratado)}`,
+          ir: 'lead',
+        })));
+    }
+
+    /* 6d. Negócio perdido com valor fechado preenchido: contradição que
+          infla a receita declarada de quem soma por `valorFechado`. */
+    const perdidoComValor = DB.getAll('leads')
+      .filter(l => l.status === 'fechado_perdido' && (Number(l.valorFechado) || 0) > 0);
+    if (perdidoComValor.length) {
+      push('media', `${perdidoComValor.length} negócio(s) perdidos com valor fechado preenchido`,
+        `${Utils.formatCurrency(perdidoComValor.reduce((s, l) => s + (Number(l.valorFechado) || 0), 0))} aparecem como fechados em negócios marcados como perdidos. Ou foram ganhos e o status ficou errado, ou o valor ficou de um fechamento que não aconteceu.`,
+        'Abra cada um e decida: corrija o status, ou limpe o valor fechado.',
+        perdidoComValor.map(l => ({
+          id: l.id, texto: l.titulo || 'Sem título',
+          sub: Utils.formatCurrency(l.valorFechado), ir: 'lead',
+        })));
+    }
+
     /* 7b. Serviço que já gastou mais do que foi orçado. É o achado que mais
           vale chegar cedo: depois do serviço entregue não há o que fazer. */
     const estourados = [];
@@ -1086,6 +1248,7 @@ const FinNucleo = (() => {
     linhaServico, servicos, margemMediaCarteira, corDaMargem,
     parcelasDoServico, somarLista,
     carteira, receitaPeriodo, aCobrarSemRecebivel,
+    servicoDoLead, leadDoServico, conversaoDoLead, funilRealizado, servicosSemLead,
     lancamentosFunc, custoPessoalMes, TIPOS_FUNC, CATEGORIAS_CUSTO_FUNC,
     orcamentoDe, avancoDe, comparativo, corDoAlerta, rotuloDoAlerta,
     existiaEm,

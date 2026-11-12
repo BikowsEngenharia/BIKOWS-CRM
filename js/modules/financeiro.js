@@ -846,6 +846,7 @@ const Financeiro = (() => {
       receber:     `Financeiro.editRecebivel('${it.id}')`,
       pagar:       `Financeiro.setTab('pagar')`,
       funcionario: `FuncionarioFicha.abrir('${it.id}')`,
+      lead:        `App.navigate('pipeline');setTimeout(()=>Pipeline.viewLead('${it.id}'),150)`,
     };
     const acao = destinos[it.ir];
     if (!acao) return '';

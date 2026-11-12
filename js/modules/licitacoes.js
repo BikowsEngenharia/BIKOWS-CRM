@@ -118,6 +118,12 @@ const Licitacoes = (() => {
   // Filtros da aba PNCP. Sem isso, a coluna "Novas" chegou a 454 cards de uma
   // vez (o monitor acrescenta ~16/dia) e a aba ficava impossível de usar.
   let _pncpFiltro = { relevancia: 0, uf: '', busca: '', somentePrazoAberto: true };
+  /* Descartadas ficam fora da carga por padrao. Elas sao metade da tabela e
+     nunca aparecem na tela inicial, entao trazer todas era pagar banda e
+     memoria por nada — e pior, elas consumiam a cota do limite e empurravam
+     para fora licitacoes abertas que importavam. */
+  let _pncpVerDescartadas = false;
+  let _pncpTotais = { ativas: null, descartadas: null, carregadas: 0, truncado: false };
   let _pncpLimite = 20;        // cards mostrados por coluna (botão "ver mais")
   const _PNCP_IDADE_MAX = 45;  // dias: sem prazo e antiga = descartada automaticamente
   let _pncpLoading = false;
@@ -334,6 +340,16 @@ const Licitacoes = (() => {
 
   let _pncpVisiveis = 0;
 
+  /* Traz (ou devolve) as descartadas, recarregando do banco. Fica explicito
+     na tela que elas nao vem por padrao. */
+  function togglePncpDescartadas() {
+    _pncpVerDescartadas = !_pncpVerDescartadas;
+    _pncpLoading = true;
+    _fetchPncp();
+    const el = document.getElementById('licTabContent');
+    if (el && _tab === 'pncp') el.innerHTML = renderPNCPTab();
+  }
+
   function renderPNCPTab() {
     // Dispara carga assíncrona e retorna skeleton
     if (!_pncpLoading) { _pncpLoading = true; _fetchPncp(); }
@@ -363,8 +379,19 @@ const Licitacoes = (() => {
         <div style="padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div style="flex:1;min-width:220px">
             <div class="font-bold">🔍 PNCP Monitor — Licitações Descobertas Automaticamente</div>
-            <div class="text-xs text-muted">${_pncpData.length} capturadas · ${_pncpVisiveis} no filtro atual · o monitor acrescenta cerca de 16/dia</div>
+            <div class="text-xs text-muted">
+              ${_pncpTotais.ativas != null ? `${_pncpTotais.ativas} em aberto no banco` : `${_pncpData.length} capturadas`}
+              · ${_pncpVisiveis} no filtro atual
+              ${(_pncpTotais.descartadas && !_pncpVerDescartadas) ? ` · ${_pncpTotais.descartadas} descartadas fora da carga` : ''}
+              · o monitor acrescenta cerca de 16/dia
+            </div>
+            ${_pncpTotais.truncado ? `<div class="text-xs" style="color:var(--ruim-txt);font-weight:600;margin-top:3px">
+              Mostrando as ${_pncpTotais.carregadas} mais aderentes: há mais no banco do que cabe numa carga. Use os filtros para estreitar.
+            </div>` : ''}
           </div>
+          <button class="btn btn-sm btn-secondary" onclick="Licitacoes.togglePncpDescartadas()" title="As descartadas não são carregadas por padrão: são metade da tabela e não aparecem na triagem">
+            ${_pncpVerDescartadas ? '🙈 Ocultar descartadas' : '👁 Ver descartadas'}
+          </button>
           <button class="btn btn-sm btn-secondary" onclick="Licitacoes.expirarPncpAgora()" title="Move para Descartada tudo que já venceu ou está parado há muito tempo (nada é excluído)">🧹 Limpar vencidas</button>
           <button class="btn btn-sm btn-secondary" onclick="Licitacoes.recarregarPncp()">🔄 Atualizar</button>
         </div>
@@ -397,7 +424,11 @@ const Licitacoes = (() => {
                 <div style="padding:10px 12px;border-radius:var(--radius);background:var(--surface);border-top:3px solid ${col.color};margin-bottom:8px">
                   <div style="font-size:12px;font-weight:700;color:${col.color}">${col.label}</div>
                   <div style="font-size:11px;color:var(--text-muted)">${cards.length}${cards.length !== todas.length ? ' de ' + todas.length : ''} licitação(ões)</div>
-                  ${col.key === 'descartada' && todas.length > 0 ? `<button class="btn btn-xs btn-danger" style="margin-top:6px;width:100%;font-size:10px" onclick="Licitacoes.limparDescartadasPncp()">🗑 Excluir descartadas (${todas.length})</button>` : ''}
+                  ${col.key === 'descartada' && !_pncpVerDescartadas ? `<div class="text-xs text-muted" style="padding:8px;text-align:center">
+                    ${_pncpTotais.descartadas != null ? _pncpTotais.descartadas : '—'} descartada(s) no banco, fora da carga.<br>
+                    <button class="btn btn-xs btn-ghost" style="margin-top:4px" onclick="Licitacoes.togglePncpDescartadas()">Carregar para ver</button>
+                  </div>` : ''}
+                  ${col.key === 'descartada' && _pncpVerDescartadas && todas.length > 0 ? `<button class="btn btn-xs btn-danger" style="margin-top:6px;width:100%;font-size:10px" onclick="Licitacoes.limparDescartadasPncp()">🗑 Excluir descartadas (${todas.length})</button>` : ''}
                 </div>
                 ${visiveis.map(l => _renderPncpCard(l, kanbanCols)).join('')}
                 ${cards.length > visiveis.length ? `<button class="btn btn-xs btn-secondary" style="width:100%;font-size:10px" onclick="Licitacoes.verMaisPncp()">▼ Ver mais (${cards.length - visiveis.length} restantes)</button>` : ''}
@@ -485,17 +516,37 @@ const Licitacoes = (() => {
       </div>`;
   }
 
+  const _PNCP_LIMITE = 800;
+
   async function _fetchPncp() {
     try {
-      // Limite explícito: a tabela passou de 450 registros e o PostgREST
-      // devolvia tudo a cada abertura da aba.
-      const { data, error } = await _supabase
-        .from('crm_licitacoes')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(600);
+      /* Conta antes de trazer: e o que permite dizer na tela quantas existem
+         de verdade, em vez de mostrar o que coube e calar sobre o resto. */
+      const [ativasCount, descCount] = await Promise.all([
+        _supabase.from('crm_licitacoes').select('*', { count: 'exact', head: true })
+          .neq('data->>kanban', 'descartada'),
+        _supabase.from('crm_licitacoes').select('*', { count: 'exact', head: true })
+          .eq('data->>kanban', 'descartada'),
+      ]);
+      _pncpTotais.ativas = ativasCount?.count ?? null;
+      _pncpTotais.descartadas = descCount?.count ?? null;
+
+      /* Ordena por relevancia e depois por prazo: o que decide se a licitacao
+         importa e o quanto ela casa com o que a Bikows faz e quando fecha,
+         nao a ordem em que o monitor a capturou. */
+      let q = _supabase.from('crm_licitacoes').select('*')
+        .order('data->relevancia', { ascending: false })
+        .order('data->>dataEncerramento', { ascending: true })
+        .limit(_PNCP_LIMITE);
+      if (!_pncpVerDescartadas) q = q.neq('data->>kanban', 'descartada');
+      const { data, error } = await q;
       if (!error && data) {
         _pncpData = data;
+        _pncpTotais.carregadas = data.length;
+        const esperado = _pncpVerDescartadas
+          ? (_pncpTotais.ativas || 0) + (_pncpTotais.descartadas || 0)
+          : (_pncpTotais.ativas || 0);
+        _pncpTotais.truncado = data.length >= _PNCP_LIMITE && esperado > data.length;
         // Re-render aba se estiver ativa
         const el = document.getElementById('licTabContent');
         if (el && _tab === 'pncp') el.innerHTML = renderPNCPTab();
@@ -1440,7 +1491,7 @@ const Licitacoes = (() => {
     render();
   }
 
-  return {
+  return { togglePncpDescartadas,
     render, openForm, saveLic, deleteLic, view, setFilter, setTab,
     changeStatus, toggleChecklist, saveNotas, criarProjeto, criarRecebivel, addNew,
     lancarNoPipeline, importCSV, downloadCSVTemplate, setPeriodo,

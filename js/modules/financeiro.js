@@ -7,7 +7,7 @@ const Financeiro = (() => {
   let _filtPagar = { status:'', categoria:'' };
   let _dremes = Utils.todayStr().substring(0, 7);
   let _regime = 'caixa';          // 'caixa' | 'competencia'
-  let _filtServ = { status:'', busca:'', semCusto:false };
+  let _filtServ = { status:'', busca:'', semCusto:false, orcamento:'' };
   const _consAberto = {};         // quais achados da consistencia estao expandidos
   const _dreAberto = { serv:false, custo:false, pessoal:false };
 
@@ -599,6 +599,12 @@ const Financeiro = (() => {
       linhas = linhas.filter(l => (l.titulo || '').toLowerCase().includes(t));
     }
     if (_filtServ.semCusto) linhas = linhas.filter(l => !l.temCusto);
+    /* O comparativo é caro o suficiente para não valer calcular duas vezes:
+       calcula uma vez por serviço e carrega junto da linha. */
+    linhas.forEach(l => { l.comp = FinNucleo.comparativo(l.projeto); });
+    if (_filtServ.orcamento === 'estouro')   linhas = linhas.filter(l => l.comp && l.comp.alerta === 'estouro');
+    if (_filtServ.orcamento === 'risco')     linhas = linhas.filter(l => l.comp && (l.comp.alerta === 'estouro' || l.comp.alerta === 'atencao'));
+    if (_filtServ.orcamento === 'sem')       linhas = linhas.filter(l => l.comp && !l.comp.temOrcamento);
 
     const tot = linhas.reduce((a, l) => ({
       contratada: a.contratada + l.contratada,
@@ -645,11 +651,17 @@ const Financeiro = (() => {
               ${['em_andamento','concluido','pausado','planejado'].map(st => `<option value="${st}" ${_filtServ.status === st ? 'selected' : ''}>${st.replace('_', ' ')}</option>`).join('')}
             </select>
             <input class="form-control" style="max-width:170px;padding:5px 10px;font-size:12px" placeholder="Buscar serviço..." value="${Utils.escHtml(_filtServ.busca)}" oninput="Financeiro.setFiltServ('busca',this.value)">
+            <select class="filter-select" onchange="Financeiro.setFiltServ('orcamento',this.value)" title="Situação do orçamento previsto">
+              <option value="">Qualquer orçamento</option>
+              <option value="estouro" ${_filtServ.orcamento === 'estouro' ? 'selected' : ''}>Só os que estouraram</option>
+              <option value="risco" ${_filtServ.orcamento === 'risco' ? 'selected' : ''}>Estourados e em risco</option>
+              <option value="sem" ${_filtServ.orcamento === 'sem' ? 'selected' : ''}>Sem orçamento previsto</option>
+            </select>
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
               <input type="checkbox" ${_filtServ.semCusto ? 'checked' : ''} onchange="Financeiro.setFiltServ('semCusto',this.checked)">
               só sem custo
             </label>
-            ${(_filtServ.status || _filtServ.busca || _filtServ.semCusto) ? `<button class="btn btn-xs btn-ghost" onclick="Financeiro.limparFiltServ()">✕ Limpar</button>` : ''}
+            ${(_filtServ.status || _filtServ.busca || _filtServ.semCusto || _filtServ.orcamento) ? `<button class="btn btn-xs btn-ghost" onclick="Financeiro.limparFiltServ()">✕ Limpar</button>` : ''}
           </div>
           <span class="text-sm text-muted">${media != null ? 'margem média da carteira: ' + media + '%' : 'sem margem de referência'}</span>
         </div>
@@ -667,11 +679,12 @@ const Financeiro = (() => {
                 ? `<span class="text-xs text-muted" title="Nenhum custo lançado neste serviço">sem custo</span>`
                 : `<span class="font-bold" style="color:${FinNucleo.corDaMargem(l.margemPct)}">${l.margemPct}%</span>`;
               return `<tr>
-                <td><div class="font-semibold text-sm">${Utils.escHtml(Utils.truncate(l.titulo, 34))}</div>
+                <td><div class="font-semibold text-sm">${pontoAlerta(l)}${Utils.escHtml(Utils.truncate(l.titulo, 34))}</div>
                     <div class="text-xs text-muted">${Utils.escHtml(l.projeto.ordemServico || l.projeto.codigo || '')}</div></td>
                 <td class="text-xs">${cli ? Utils.escHtml(Utils.truncate(cli.empresa || cli.nome || '', 20)) : '<span class="text-muted">—</span>'}</td>
                 <td class="font-semibold">${Utils.formatCurrency(l.contratada)}</td>
-                <td class="${l.custoDireto ? 'text-danger' : 'text-muted'}">${l.custoDireto ? Utils.formatCurrency(l.custoDireto) : '—'}</td>
+                <td class="${l.custoDireto ? 'text-danger' : 'text-muted'}">${l.custoDireto ? Utils.formatCurrency(l.custoDireto) : '—'}
+                    ${orcCel(l)}</td>
                 <td class="${l.comissoes ? 'text-danger' : 'text-muted'}">${l.comissoes ? Utils.formatCurrency(l.comissoes) : '—'}</td>
                 <td class="font-bold">${l.temCusto ? Utils.formatCurrency(l.lucro) : '—'}</td>
                 <td>${margemCel}</td>
@@ -699,6 +712,25 @@ const Financeiro = (() => {
           </table>`}
         </div>
       </div>`;
+  }
+
+  /* Quanto do orçamento previsto já foi consumido, em cima da própria célula
+     de custo: é ali que a pergunta nasce. */
+  function orcCel(l) {
+    const c = l.comp;
+    if (!c || !c.temOrcamento || c.consumidoPct == null) return '';
+    const cor = FinNucleo.corDoAlerta(c.alerta);
+    return `<div class="orc-mini" title="${Utils.escHtml(c.motivo || 'Dentro do previsto.')} Previsto: ${Utils.formatCurrency(c.previsto.custoTotal)}">
+      <span style="color:${cor}">${c.consumidoPct}% do orçado</span>
+      <div class="barrinha"><span style="width:${Math.min(100, c.consumidoPct)}%;background:${cor}"></span></div>
+    </div>`;
+  }
+
+  function pontoAlerta(l) {
+    const c = l.comp;
+    if (!c || !c.temOrcamento) return '';
+    if (c.alerta !== 'estouro' && c.alerta !== 'atencao') return '';
+    return `<span class="orc-ponto" style="background:${FinNucleo.corDoAlerta(c.alerta)}" title="${Utils.escHtml(c.motivo)}"></span>`;
   }
 
   /* O detalhado por trás do total: de onde saiu cada real do custo. */
@@ -881,7 +913,7 @@ const Financeiro = (() => {
   function setRegime(r){_regime=r;renderTab();}
   function toggleDre(k){_dreAberto[k]=!_dreAberto[k];renderTab();}
   function setFiltServ(k,v){_filtServ[k]=v;renderTab();if(k==='busca'){const i=document.querySelector('#finContent input[placeholder^="Buscar servi"]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}}}
-  function limparFiltServ(){_filtServ={status:'',busca:'',semCusto:false};renderTab();}
+  function limparFiltServ(){_filtServ={status:'',busca:'',semCusto:false,orcamento:''};renderTab();}
 
   /* ---- CRUD LANÇAMENTOS ---- */
   function novoLancamento(){openFormLanc(null,'receita');}

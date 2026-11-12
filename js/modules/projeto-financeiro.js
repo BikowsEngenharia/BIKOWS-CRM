@@ -106,7 +106,11 @@ const ProjetoFinanceiro = (() => {
   function _buildBody(p) {
     const dre = calcDRE(p);
     const fin = _fin(p);
-    const margemColor = dre.margemPct >= 40 ? '#10b981' : dre.margemPct >= 20 ? '#f59e0b' : '#ef4444';
+    /* A cor sai da margem media da propria carteira, calculada na hora. Um
+       limiar fixo no codigo seria meta de negocio em repositorio publico. */
+    const margemColor = (typeof FinNucleo !== 'undefined')
+      ? FinNucleo.corDaMargem(dre.margemPct)
+      : 'var(--text)';
 
     return `
       <!-- Tabs -->
@@ -127,6 +131,10 @@ const ProjetoFinanceiro = (() => {
           style="padding:8px 18px;border:none;background:none;color:var(--text-muted);cursor:pointer;margin-bottom:-2px">
           🤝 Parceiros
         </button>
+        <button class="pf-tab" onclick="ProjetoFinanceiro._switchTab('orc','${p.id}')" id="pftab-orc"
+          style="padding:8px 18px;border:none;background:none;color:var(--text-muted);cursor:pointer;margin-bottom:-2px">
+          🎯 Orçado × Realizado${_seloOrcado(p)}
+        </button>
       </div>
 
       <!-- DRE -->
@@ -140,11 +148,25 @@ const ProjetoFinanceiro = (() => {
 
       <!-- Parceiros -->
       <div id="pfpanel-parceiros" style="display:none">${_renderParceiros(p, fin, dre)}</div>
+
+      <!-- Orçado × Realizado -->
+      <div id="pfpanel-orc" style="display:none">${_renderOrcado(p)}</div>
     `;
   }
 
+  /* Pastilha no proprio botao da aba: quem estourou o orcamento precisa
+     descobrir isso sem ter de clicar em lugar nenhum. */
+  function _seloOrcado(p) {
+    if (typeof FinNucleo === 'undefined') return '';
+    const c = FinNucleo.comparativo(p);
+    if (!c || !c.temOrcamento) return '';
+    if (c.alerta !== 'estouro' && c.alerta !== 'atencao') return '';
+    const cor = FinNucleo.corDoAlerta(c.alerta);
+    return ` <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cor};vertical-align:middle"></span>`;
+  }
+
   function _switchTab(tab, projetoId) {
-    ['dre','rec','custos','parceiros'].forEach(t => {
+    ['dre','rec','custos','parceiros','orc'].forEach(t => {
       const panel = document.getElementById('pfpanel-' + t);
       const btn   = document.getElementById('pftab-' + t);
       if (!panel || !btn) return;
@@ -1017,6 +1039,194 @@ const ProjetoFinanceiro = (() => {
     rec.lancadoFinanceiro = true;
   }
 
+  /* ====================================================
+     ORÇADO × REALIZADO
+     Responde, enquanto o serviço ainda está acontecendo: "está dando certo?"
+     Depois de entregue, responde outra: "o que eu errei na estimativa?" —
+     que é o que faz o próximo orçamento sair melhor.
+     ==================================================== */
+  function _renderOrcado(p) {
+    if (typeof FinNucleo === 'undefined') {
+      return '<div class="text-sm text-muted p-3">Núcleo financeiro não carregado.</div>';
+    }
+    const c = FinNucleo.comparativo(p);
+    if (!c) return '<div class="text-sm text-muted p-3">Serviço não encontrado.</div>';
+
+    if (!c.temOrcamento) {
+      return `
+        <div class="empty-state">
+          <div class="empty-icon">🎯</div>
+          <div class="empty-title">Nenhum orçamento previsto</div>
+          <div class="empty-sub">Sem o custo previsto gravado, só dá para ver o resultado depois que o serviço acaba.
+            Com ele, o sistema avisa enquanto ainda dá para fazer alguma coisa.<br><br>
+            Até aqui este serviço consumiu <strong>${Utils.formatCurrency(c.realizado.custoTotal)}</strong>
+            ${c.avanco != null ? ` com ${c.avanco}% das etapas concluídas` : ''}.</div>
+          <button class="btn btn-primary mt-4" onclick="ProjetoFinanceiro.definirOrcamento('${p.id}')">Definir orçamento</button>
+        </div>`;
+    }
+
+    const cor = FinNucleo.corDoAlerta(c.alerta);
+    const rot = FinNucleo.rotuloDoAlerta(c.alerta);
+    const consumido = c.consumidoPct == null ? 0 : c.consumidoPct;
+
+    /* Linha de comparação. Gastar menos é bom em todos os campos de custo,
+       então o desvio negativo é verde — MENOS quando o realizado é zero. Zero
+       não é economia, é dado que ninguém lançou, e pintar isso de verde
+       entregaria uma boa notícia que não existe. */
+    const linha = (rotulo, prev, real, fmt, sub) => {
+      const d = real - prev;
+      const pct = prev > 0 ? Math.round((d / prev) * 100) : null;
+      const vazio = real === 0 && prev > 0;
+      const cor = (d === 0 || vazio) ? 'var(--text-muted)'
+        : (d < 0 ? 'var(--ok-txt)' : 'var(--ruim-txt)');
+      return `<tr>
+        <td class="text-sm">${rotulo}${sub ? `<div class="text-xs text-muted">${sub}</div>` : ''}</td>
+        <td class="text-right">${fmt(prev)}</td>
+        <td class="text-right font-semibold ${vazio ? 'text-muted' : ''}">${fmt(real)}</td>
+        <td class="text-right font-bold" style="color:${cor}">
+          ${vazio ? '<span class="text-xs" style="font-weight:600">nada lançado</span>'
+            : (d === 0 ? '—' : (d > 0 ? '+' : '') + fmt(d))}
+          ${(pct != null && d !== 0 && !vazio) ? `<div class="text-xs" style="font-weight:600">${pct > 0 ? '+' : ''}${pct}%</div>` : ''}
+        </td>
+      </tr>`;
+    };
+    const moeda = v => Utils.formatCurrency(v);
+    const horas = v => (Math.round(v * 10) / 10).toLocaleString('pt-BR') + ' h';
+
+    /* Equipe: quem foi orçado contra quem realmente apontou hora. */
+    const prevPorPessoa = (c.orcamento.equipe || []);
+    const realPorPessoa = FinNucleo.custoServico(p).horasPorPessoa || [];
+    const nomes = [...new Set([...prevPorPessoa.map(x => x.nome), ...realPorPessoa.map(x => x.nome)])];
+
+    return `
+      <div class="orc-topo" style="--oc:${cor}">
+        <div class="orc-selo">
+          <div class="orc-rot">${rot}</div>
+          <div class="orc-motivo">${Utils.escHtml(c.motivo || 'O gasto está dentro do previsto.')}</div>
+        </div>
+        <div class="orc-barras">
+          <div class="orc-barra-linha">
+            <span class="orc-barra-lb">Orçamento consumido</span>
+            <div class="orc-barra"><span style="width:${Math.min(100, consumido)}%;background:${cor}"></span></div>
+            <span class="orc-barra-val">${c.consumidoPct == null ? '—' : c.consumidoPct + '%'}</span>
+          </div>
+          <div class="orc-barra-linha">
+            <span class="orc-barra-lb">Trabalho entregue</span>
+            <div class="orc-barra"><span style="width:${c.avanco || 0}%;background:var(--info-txt)"></span></div>
+            <span class="orc-barra-val">${c.avanco == null ? 'sem etapas' : c.avanco + '%'}</span>
+          </div>
+        </div>
+      </div>
+
+      ${c.projecao ? `
+      <div class="ficha-aviso">
+        No ritmo atual, este serviço termina custando <strong>${Utils.formatCurrency(c.projecao.custoFinal)}</strong>
+        e fechando com margem de <strong>${c.projecao.margemFinal}%</strong>.
+        ${c.projecao.estouroPrevisto > 0
+          ? `Isso é ${Utils.formatCurrency(c.projecao.estouroPrevisto)} acima do orçado.`
+          : `Isso é ${Utils.formatCurrency(Math.abs(c.projecao.estouroPrevisto))} abaixo do orçado.`}
+        <br><span class="text-xs">A projeção parte do custo já gasto dividido pelo avanço das etapas. Ela muda conforme você atualiza o percentual de cada etapa.</span>
+      </div>` : ''}
+
+      <table class="tbl mb-4">
+        <thead><tr><th>O quê</th><th class="text-right">Previsto</th><th class="text-right">Realizado</th><th class="text-right">Desvio</th></tr></thead>
+        <tbody>
+          ${linha('Horas de equipe', c.previsto.horas, c.realizado.horas, horas,
+                  c.realizado.horas === 0 ? 'nenhuma hora apontada ainda' : '')}
+          ${linha('Custo de pessoas', c.previsto.custoPessoas, c.realizado.custoPessoas, moeda)}
+          ${linha('Custos diretos', c.previsto.custoDiretos, c.realizado.custoDiretos, moeda,
+                  'material, deslocamento, subcontratação')}
+          <tr style="border-top:1px solid var(--border)">
+            <td class="font-bold">Subtotal comparável</td>
+            <td class="text-right font-bold">${moeda(c.previsto.custoTotal)}</td>
+            <td class="text-right font-bold">${moeda(c.custoComparavel)}</td>
+            <td class="text-right font-bold" style="color:${c.desvio.custoTotal.valor <= 0 ? 'var(--ok-txt)' : 'var(--ruim-txt)'}">
+              ${c.desvio.custoTotal.valor === 0 ? '—' : (c.desvio.custoTotal.valor > 0 ? '+' : '') + moeda(c.desvio.custoTotal.valor)}
+            </td>
+          </tr>
+          ${c.realizado.comissoes ? `<tr>
+            <td class="text-sm">Comissões e parcerias
+              <div class="text-xs text-muted">não estavam no orçamento previsto: o parceiro costuma entrar depois</div></td>
+            <td class="text-right text-muted">não previsto</td>
+            <td class="text-right font-semibold">${moeda(c.realizado.comissoes)}</td>
+            <td class="text-right text-muted">—</td>
+          </tr>` : ''}
+          <tr style="border-top:2px solid var(--border)">
+            <td class="font-bold">Custo total do serviço</td>
+            <td class="text-right">${moeda(c.previsto.custoTotal)}</td>
+            <td class="text-right font-bold" style="font-size:15px">${moeda(c.realizado.custoTotal)}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Preço e margem</div></div>
+          <div class="card-body" style="padding:0">
+            <table class="tbl"><tbody>
+              <tr><td class="text-sm">Preço sugerido pelo custo</td>
+                  <td class="text-right font-semibold">${c.previsto.preco ? moeda(c.previsto.preco) : '—'}</td></tr>
+              <tr><td class="text-sm">Preço fechado com o cliente</td>
+                  <td class="text-right font-semibold">${moeda(c.realizado.receita)}</td></tr>
+              ${c.desvio.desconto != null ? `<tr>
+                  <td class="text-sm">${c.desvio.desconto < 0 ? 'Desconto dado na negociação' : 'Acima do sugerido'}</td>
+                  <td class="text-right font-bold" style="color:${c.desvio.desconto < 0 ? 'var(--ruim-txt)' : 'var(--ok-txt)'}">${c.desvio.desconto > 0 ? '+' : ''}${c.desvio.desconto}%</td>
+                </tr>` : ''}
+              <tr style="border-top:1px solid var(--border)">
+                  <td class="text-sm">Margem que se esperava</td>
+                  <td class="text-right font-semibold">${c.previsto.margemPct != null ? c.previsto.margemPct + '%' : '—'}</td></tr>
+              <tr><td class="text-sm font-bold">Margem realizada
+                    ${p.status === 'concluido' ? '' : '<div class="text-xs text-muted">provisória: o serviço não terminou e ainda há custo por lançar</div>'}</td>
+                  <td class="text-right font-bold" style="font-size:15px;color:${FinNucleo.corDaMargem(c.realizado.margemPct)}">${c.realizado.margemPct != null ? c.realizado.margemPct + '%' : '—'}</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Quem foi orçado × quem trabalhou</div></div>
+          <div class="card-body" style="padding:0">
+            ${nomes.length === 0
+              ? '<div class="text-sm text-muted p-3">Nenhuma pessoa no orçamento nem no apontamento.</div>'
+              : `<table class="tbl">
+              <thead><tr><th>Pessoa</th><th class="text-right">Horas previstas</th><th class="text-right">Horas apontadas</th></tr></thead>
+              <tbody>${nomes.map(n => {
+                const pv = prevPorPessoa.find(x => x.nome === n);
+                const rl = realPorPessoa.find(x => x.nome === n);
+                const hp = pv ? pv.horas : 0, hr = rl ? rl.horas : 0;
+                return `<tr>
+                  <td class="text-sm font-semibold">${Utils.escHtml(n)}
+                    ${!pv ? '<div class="text-xs" style="color:var(--ruim-txt)">não estava no orçamento</div>' : ''}
+                    ${pv && !rl ? '<div class="text-xs text-muted">orçada, sem hora apontada</div>' : ''}</td>
+                  <td class="text-right">${hp ? horas(hp) : '—'}</td>
+                  <td class="text-right font-semibold" style="${hr > hp && hp > 0 ? 'color:var(--ruim-txt)' : ''}">${hr ? horas(hr) : '—'}</td>
+                </tr>`;
+              }).join('')}</tbody></table>`}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 mt-4" style="flex-wrap:wrap">
+        <button class="btn btn-sm btn-secondary" onclick="ProjetoFinanceiro.definirOrcamento('${p.id}')">✏ Rever orçamento</button>
+        <span class="text-xs text-muted" style="align-self:center">
+          definido em ${Utils.formatDate(c.orcamento.definidoEm)} ·
+          complexidade ${Utils.escHtml((CustoHora.COMPLEXIDADES.find(x => x.id === c.orcamento.complexidade) || {}).label || '—')} ·
+          margem alvo ${c.orcamento.margem != null ? Math.round(c.orcamento.margem * 100) + '%' : '—'}
+        </span>
+      </div>`;
+  }
+
+  /* Abre a calculadora amarrada a este serviço. O que for salvo lá vira o
+     previsto daqui. */
+  function definirOrcamento(projetoId) {
+    if (typeof Orcamento === 'undefined') { Toast.error('Módulo de orçamento não carregado.'); return; }
+    Orcamento.abrirCalculadora(null, projetoId);
+  }
+
+  /* Reabre o financeiro no lugar de onde o usuário saiu (aba da ficha ou
+     janela separada). Usada por quem abre um formulário por cima. */
+  function reabrir(projetoId) { _voltarAoFinanceiro(projetoId); }
+
   /* Depois de um formulario que ocupou o modal inteiro, volta para onde o
      financeiro estava: a aba dentro da ficha do servico, ou a janela
      separada. Antes era sempre a janela, o que tirava o usuario da ficha
@@ -1074,6 +1284,9 @@ const ProjetoFinanceiro = (() => {
     removeParceiro,
     // Hooks
     sugerirConfiguracaoPagamentos,
+    // Orçado × Realizado
+    definirOrcamento,
+    reabrir,
     // Internos expostos para inline events
     _switchTab,
     _toggleTipoParceiro,

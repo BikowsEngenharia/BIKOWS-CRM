@@ -559,7 +559,162 @@ const FinNucleo = (() => {
   }
 
   /* ====================================================
-     6. CONSISTÊNCIA — o que não fecha
+     7. ORÇADO × REALIZADO
+     ==================================================== */
+
+  /* O orçamento previsto de um serviço fica em `projeto.orcamento`, gravado
+     pela calculadora de preço. Formato:
+
+       { definidoEm, complexidade, margem, aliquota,
+         horasPrevistas, custoPessoasPrevisto, custoDiretosPrevisto,
+         custoTotalPrevisto, precoSugerido,
+         equipe: [{ funcionarioId, nome, horas, custoHora, custo }],
+         diretos: [{ descricao, valor }] }
+
+     O preço FECHADO não mora aqui: é `projeto.valor`. Separar os dois é o que
+     permite ver quanto se deu de desconto na negociação. */
+  function orcamentoDe(p) {
+    const o = p && p.orcamento;
+    if (!o || !(Number(o.custoTotalPrevisto) > 0 || Number(o.horasPrevistas) > 0)) return null;
+    return o;
+  }
+
+  /* Avanço físico do serviço: média do percentual das etapas. É o que permite
+     dizer "consumiu 80% do custo tendo entregue 40%", que é o alerta que
+     chega a tempo de fazer alguma coisa. Sem etapas, não há avanço conhecido
+     e a projeção não é inventada: fica null. */
+  function avancoDe(p) {
+    const etapas = (p && p.etapas) || [];
+    if (!etapas.length) return null;
+    const soma = etapas.reduce((s, e) => s + (Number(e.pct) || 0), 0);
+    return Math.round(soma / etapas.length);
+  }
+
+  /* Compara o que foi previsto com o que aconteceu, linha a linha.
+
+     Comissão quase nunca é orçada (o parceiro entra depois), então ela aparece
+     como "não previsto" em vez de virar um estouro que não é culpa da
+     estimativa. */
+  function comparativo(p) {
+    if (!p) return null;
+    const orc = orcamentoDe(p);
+    const custo = custoServico(p);
+    const receita = Number(p.valor) || 0;
+    const avanco = avancoDe(p);
+
+    const realizado = {
+      horas: custo.horasQtd || 0,
+      custoPessoas: custo.horas || 0,
+      custoDiretos: custo.diretos || 0,
+      comissoes: custo.comissoes || 0,
+      custoTotal: custo.total || 0,
+      receita,
+      lucro: receita - custo.total,
+      margemPct: receita > 0 ? Math.round(((receita - custo.total) / receita) * 100) : null,
+    };
+
+    if (!orc) {
+      return {
+        temOrcamento: false, avanco, realizado,
+        alerta: 'sem_orcamento',
+        motivo: 'Este serviço não tem orçamento previsto, então não há com o que comparar o que foi gasto.',
+      };
+    }
+
+    const previsto = {
+      horas: Number(orc.horasPrevistas) || 0,
+      custoPessoas: Number(orc.custoPessoasPrevisto) || 0,
+      custoDiretos: Number(orc.custoDiretosPrevisto) || 0,
+      custoTotal: Number(orc.custoTotalPrevisto) || 0,
+      preco: Number(orc.precoSugerido) || 0,
+      margemPct: null,
+    };
+    /* Margem prevista: com o preço que foi efetivamente fechado, não com o
+       sugerido. É a margem que se esperava ter ao assinar. */
+    const impostoPrev = receita * (Number(orc.aliquota) || 0);
+    previsto.margemPct = receita > 0
+      ? Math.round(((receita - impostoPrev - previsto.custoTotal) / receita) * 100)
+      : null;
+
+    const dif = (r, pv) => ({ valor: r - pv, pct: pv > 0 ? Math.round(((r - pv) / pv) * 100) : null });
+    const desvio = {
+      horas: dif(realizado.horas, previsto.horas),
+      custoPessoas: dif(realizado.custoPessoas, previsto.custoPessoas),
+      custoDiretos: dif(realizado.custoDiretos, previsto.custoDiretos),
+      /* Comissão fora da comparação de custo: ela não estava no orçamento. */
+      custoTotal: dif(realizado.custoPessoas + realizado.custoDiretos, previsto.custoTotal),
+      desconto: previsto.preco > 0 ? Math.round(((receita - previsto.preco) / previsto.preco) * 100) : null,
+    };
+
+    const custoComparavel = realizado.custoPessoas + realizado.custoDiretos;
+    const consumidoPct = previsto.custoTotal > 0
+      ? Math.round((custoComparavel / previsto.custoTotal) * 100) : null;
+
+    /* Projeção: se consumiu X% do custo tendo entregue Y% do trabalho, no
+       ritmo atual o serviço termina custando custoAtual ÷ (Y/100). */
+    let projecao = null;
+    if (avanco != null && avanco > 0 && custoComparavel > 0 && avanco < 100) {
+      const custoFinal = custoComparavel / (avanco / 100) + realizado.comissoes;
+      projecao = {
+        custoFinal,
+        lucroFinal: receita - custoFinal,
+        margemFinal: receita > 0 ? Math.round(((receita - custoFinal) / receita) * 100) : null,
+        estouroPrevisto: custoFinal - (previsto.custoTotal + realizado.comissoes),
+      };
+    }
+
+    /* Alerta. As faixas são tolerâncias técnicas de acompanhamento, não meta
+       de negócio: 100% é estouro por definição, e consumir muito mais rápido
+       do que se entrega é o sinal que chega cedo o bastante para agir. */
+    let alerta = 'ok', motivo = '';
+    /* Zero gasto não é "dentro do previsto": é não se saber nada ainda.
+       Dizer que vai bem quando ninguém lançou custo seria dar uma garantia
+       que o dado não sustenta. */
+    if (consumidoPct == null || custoComparavel === 0) {
+      alerta = 'sem_custo';
+      motivo = previsto.custoTotal > 0
+        ? `Nada foi lançado como custo ainda. O previsto é ${Utils.formatCurrency(previsto.custoTotal)}.`
+        : 'O orçamento previsto está zerado, então não há com o que comparar.';
+    } else if (consumidoPct > 100) {
+      alerta = 'estouro';
+      motivo = `O custo já passou do previsto em ${Utils.formatCurrency(custoComparavel - previsto.custoTotal)}.`;
+    } else if (avanco != null && avanco > 0 && consumidoPct - avanco >= 15) {
+      alerta = 'atencao';
+      motivo = `Consumiu ${consumidoPct}% do orçamento tendo entregue ${avanco}% do trabalho.`;
+    } else if (consumidoPct >= 85) {
+      alerta = 'atencao';
+      motivo = `Restam ${Utils.formatCurrency(previsto.custoTotal - custoComparavel)} de orçamento.`;
+    }
+
+    return {
+      temOrcamento: true, orcamento: orc,
+      previsto, realizado, desvio, consumidoPct, avanco, projecao,
+      custoComparavel, alerta, motivo,
+    };
+  }
+
+  function corDoAlerta(alerta) {
+    return {
+      estouro: 'var(--ruim-txt)',
+      atencao: '#d97706',
+      ok: 'var(--ok-txt)',
+      sem_custo: 'var(--text-muted)',
+      sem_orcamento: 'var(--text-muted)',
+    }[alerta] || 'var(--text-muted)';
+  }
+
+  function rotuloDoAlerta(alerta) {
+    return {
+      estouro: 'Estourou',
+      atencao: 'Atenção',
+      ok: 'Dentro',
+      sem_custo: 'Sem custo',
+      sem_orcamento: 'Sem orçamento',
+    }[alerta] || '—';
+  }
+
+  /* ====================================================
+     8. CONSISTÊNCIA — o que não fecha
      ==================================================== */
 
   /* Cada achado tem: gravidade, título, o que significa na prática e o que
@@ -699,6 +854,47 @@ const FinNucleo = (() => {
         semBase.map(f => ({ id: f.id, texto: f.nome || 'Sem nome', sub: f.cargo || '', ir: 'funcionario' })));
     }
 
+    /* 7b. Serviço que já gastou mais do que foi orçado. É o achado que mais
+          vale chegar cedo: depois do serviço entregue não há o que fazer. */
+    const estourados = [];
+    const correndoRisco = [];
+    servicos().forEach(l => {
+      const c = comparativo(l.projeto);
+      if (!c || !c.temOrcamento) return;
+      if (c.alerta === 'estouro') {
+        estourados.push({
+          id: l.id, texto: l.titulo,
+          sub: `gastou ${Utils.formatCurrency(c.custoComparavel)} de ${Utils.formatCurrency(c.previsto.custoTotal)} previstos`,
+          ir: 'servico',
+        });
+      } else if (c.alerta === 'atencao') {
+        correndoRisco.push({ id: l.id, texto: l.titulo, sub: c.motivo, ir: 'servico' });
+      }
+    });
+    if (estourados.length) {
+      push('alta', `${estourados.length} serviço(s) gastaram mais do que o orçado`,
+        'O custo real passou do previsto. Em serviço concluído isso é margem que já se perdeu; em serviço em andamento ainda dá para conter.',
+        'Abra o orçado × realizado de cada um e veja onde estourou: horas ou custo direto. É assim que a próxima estimativa sai melhor.',
+        estourados);
+    }
+    if (correndoRisco.length) {
+      push('media', `${correndoRisco.length} serviço(s) caminhando para estourar`,
+        'Estão consumindo o orçamento mais rápido do que entregam trabalho, ou já chegaram perto do limite previsto.',
+        'Confira o avanço das etapas e o que ainda falta gastar antes de aceitar mais escopo.',
+        correndoRisco);
+    }
+
+    /* 7c. Serviço em andamento sem orçamento previsto: não há como saber se
+          está dando certo enquanto está acontecendo. */
+    const semOrcamento = servicos().filter(l =>
+      l.status === 'em_andamento' && l.contratada > 0 && !orcamentoDe(l.projeto));
+    if (semOrcamento.length) {
+      push('media', `${semOrcamento.length} serviço(s) em andamento sem orçamento previsto`,
+        'Sem o custo previsto gravado, o sistema não consegue avisar quando o serviço começa a gastar demais: só dá para ver o estrago no fim.',
+        'Abra o financeiro do serviço e use "Definir orçamento" para registrar horas e custos previstos.',
+        semOrcamento.map(l => ({ id: l.id, texto: l.titulo, sub: Utils.formatCurrency(l.contratada), ir: 'servico' })));
+    }
+
     /* 8. Serviço em andamento sem recebível: trabalho rodando e ninguém
           programou a cobrança. */
     const semCobranca = servicos().filter(l =>
@@ -725,6 +921,7 @@ const FinNucleo = (() => {
     custoServico, horasServico, recebiveisServico, somarParcelas,
     linhaServico, servicos, margemMediaCarteira, corDaMargem,
     lancamentosFunc, custoPessoalMes, TIPOS_FUNC, CATEGORIAS_CUSTO_FUNC,
+    orcamentoDe, avancoDe, comparativo, corDoAlerta, rotuloDoAlerta,
     despesasGerais, receitasGerais, despesasFixasMes,
     consolidado, pontoEquilibrio, consistencia,
   };

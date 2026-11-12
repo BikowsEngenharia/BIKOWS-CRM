@@ -375,9 +375,13 @@ const Orcamento = (() => {
      orçamento tem no meio: "por quanto eu posso vender isto sem perder
      dinheiro, e quanto sobra se o cliente só aceitar pagar X?"
   ========================================================= */
-  function abrirCalculadora(servicoId) {
+  /* Abre a calculadora. Com `projetoId`, ela deixa de ser só uma conta de
+     bolso e vira o orçamento PREVISTO daquele serviço: o que for salvo aqui
+     é o que o orçado × realizado vai usar como régua depois. */
+  function abrirCalculadora(servicoId, projetoId) {
     if (typeof CustoHora === 'undefined') { Toast.error('Módulo de custo/hora não carregado.'); return; }
     const s = servicoId ? DB.get('catalogo_servicos', servicoId) : null;
+    const proj = projetoId ? DB.get('projetos', projetoId) : null;
     const pessoas = DB.getAll('funcionarios')
       .filter(f => f.ativo !== false && (Number(f.salarioBase) || 0) > 0);
 
@@ -386,35 +390,70 @@ const Orcamento = (() => {
       return;
     }
 
-    /* Se vier de um serviço do catálogo, distribui as horas estimadas dele
-       para a primeira pessoa, só para o cálculo já nascer com conteúdo. */
-    const horasIniciais = s?.horasEstimadas || 0;
+    /* Ordem de preenchimento: o orçamento já gravado no serviço ganha de
+       tudo, porque é o que a pessoa montou antes. Depois o serviço do
+       catálogo. Por último, vazio. */
+    const orcSalvo = proj && typeof FinNucleo !== 'undefined' ? FinNucleo.orcamentoDe(proj) : null;
+    const horasDe = (fid) => {
+      if (orcSalvo) {
+        const e = (orcSalvo.equipe || []).find(x => x.funcionarioId === fid);
+        return e ? e.horas : '';
+      }
+      return '';
+    };
+    const horasPrimeira = (!orcSalvo && s?.horasEstimadas) ? s.horasEstimadas : '';
+    const diretosIni = orcSalvo ? orcSalvo.custoDiretosPrevisto : (s?.custosPrevistos || 0);
+    const complIni = (orcSalvo?.complexidade) || s?.complexidade || 'simples';
+    const margemIni = orcSalvo?.margem != null
+      ? Math.round(orcSalvo.margem * 100)
+      : (CustoHora.margemReferencia().valor != null ? Math.round(CustoHora.margemReferencia().valor * 100) : '');
+
+    const catalogo = DB.getAll('catalogo_servicos').filter(x => x.ativo !== false && (x.horasEstimadas || x.custosPrevistos));
 
     Modal.open({
-      title: '🧮 Calculadora de preço' + (s ? ' — ' + Utils.escHtml(s.nome) : ''),
+      title: proj
+        ? '🎯 Orçamento previsto — ' + Utils.escHtml(Utils.truncate(proj.titulo, 38))
+        : '🧮 Calculadora de preço' + (s ? ' — ' + Utils.escHtml(s.nome) : ''),
       size: 'modal-lg',
-      saveLabel: null,
+      saveLabel: proj ? 'Salvar orçamento do serviço' : null,
       cancelLabel: 'Fechar',
+      saveCb: proj ? () => _salvarOrcamento(projetoId) : null,
       body: `
+        ${proj ? `<div class="ficha-aviso">
+          O que você salvar aqui vira a régua deste serviço. Depois, a aba
+          Orçado × Realizado mostra onde o gasto real ficou acima ou abaixo —
+          por horas e por custo direto, separadamente.
+          ${orcSalvo ? `<br><strong>Orçamento atual definido em ${Utils.formatDate(orcSalvo.definidoEm)}.</strong> Salvar substitui.` : ''}
+        </div>` : ''}
+
+        ${(proj && catalogo.length) ? `
+        <div class="form-group">
+          <label class="form-label">Partir de um serviço do catálogo</label>
+          <select class="form-control" id="calcDoCatalogo" onchange="Orcamento._puxarDoCatalogo(this.value)">
+            <option value="">—</option>
+            ${catalogo.map(x => `<option value="${x.id}">${Utils.escHtml(x.nome)} · ${x.horasEstimadas || 0} h</option>`).join('')}
+          </select>
+          <div class="form-hint">Puxa horas, custo direto e complexidade já cadastrados naquele serviço</div>
+        </div>` : ''}
+
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Complexidade</label>
             <select class="form-control" id="calcCompl" onchange="Orcamento._calcular()">
               ${CustoHora.COMPLEXIDADES.map(c =>
-                `<option value="${c.id}" ${(s?.complexidade || 'simples') === c.id ? 'selected' : ''}>${Utils.escHtml(c.label)} — ${Utils.escHtml(c.descricao)}</option>`).join('')}
+                `<option value="${c.id}" ${complIni === c.id ? 'selected' : ''}>${Utils.escHtml(c.label)} — ${Utils.escHtml(c.descricao)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
             <label class="form-label">Margem desejada (%)</label>
             <input class="form-control" id="calcMargem" type="number" min="0" max="99" step="1"
-              value="${CustoHora.margemReferencia().valor != null ? Math.round(CustoHora.margemReferencia().valor * 100) : ''}"
-              placeholder="da configuração" oninput="Orcamento._calcular()">
+              value="${margemIni}" placeholder="da configuração" oninput="Orcamento._calcular()">
             <div class="form-hint">${Utils.escHtml(CustoHora.margemReferencia().fonte)}</div>
           </div>
           <div class="form-group">
             <label class="form-label">Custos diretos previstos (R$)</label>
             <input class="form-control" id="calcDiretos" type="text" inputmode="decimal"
-              value="${s?.custosPrevistos ? Utils.moneyToInput(s.custosPrevistos) : ''}"
+              value="${diretosIni ? Utils.moneyToInput(diretosIni) : ''}"
               placeholder="0,00" oninput="Orcamento._calcular()">
             <div class="form-hint">Deslocamento, material, subcontratação, ART</div>
           </div>
@@ -430,7 +469,7 @@ const Orcamento = (() => {
                   <div class="text-xs text-muted">${Utils.escHtml(f.cargo || '')}</div></td>
                 <td class="text-sm">${Utils.formatCurrency(CustoHora.custoHoraCheio(f))}</td>
                 <td><input class="form-control calc-h" data-fid="${f.id}" type="number" min="0" step="0.5"
-                  value="${i === 0 && horasIniciais ? horasIniciais : ''}" placeholder="0"
+                  value="${horasDe(f.id) || (i === 0 ? horasPrimeira : '')}" placeholder="0"
                   style="padding:4px 8px;font-size:12px" oninput="Orcamento._calcular()"></td>
               </tr>`).join('')}
             </tbody>
@@ -440,14 +479,82 @@ const Orcamento = (() => {
         <div id="calcResultado"></div>
 
         <div class="form-group mt-3">
-          <label class="form-label">E se o cliente só aceitar pagar… (R$)</label>
+          <label class="form-label">${proj ? `Preço fechado com o cliente: ${Utils.formatCurrency(proj.valor)}` : 'E se o cliente só aceitar pagar… (R$)'}</label>
           <input class="form-control" id="calcProposto" type="text" inputmode="decimal"
-            placeholder="Teste um valor de negociação" oninput="Orcamento._calcular()">
+            value="${proj && proj.valor ? Utils.moneyToInput(proj.valor) : ''}"
+            placeholder="${proj ? 'valor do serviço' : 'Teste um valor de negociação'}" oninput="Orcamento._calcular()">
+          ${proj ? '<div class="form-hint">Já preenchido com o valor do serviço. Mude só para simular outro cenário.</div>' : ''}
         </div>
         <div id="calcNegociacao"></div>
       `,
     });
     setTimeout(_calcular, 40);
+  }
+
+  /* Puxa horas e custo de um serviço do catálogo para dentro da calculadora.
+     Joga as horas na primeira pessoa da lista; quem distribui é o usuário. */
+  function _puxarDoCatalogo(servicoId) {
+    const s = servicoId ? DB.get('catalogo_servicos', servicoId) : null;
+    if (!s) return;
+    const campos = [...document.querySelectorAll('.calc-h')];
+    campos.forEach((el, i) => { el.value = i === 0 ? (s.horasEstimadas || '') : ''; });
+    const d = document.getElementById('calcDiretos');
+    if (d) d.value = s.custosPrevistos ? Utils.moneyToInput(s.custosPrevistos) : '';
+    const c = document.getElementById('calcCompl');
+    if (c && s.complexidade) c.value = s.complexidade;
+    _calcular();
+    Toast.success(`Puxado de "${s.nome}". Distribua as horas entre quem vai executar.`);
+  }
+
+  /* Grava o previsto no serviço. Guarda a equipe linha a linha porque o
+     orçado × realizado precisa saber de QUEM eram as horas, não só o total:
+     é a diferença entre "estourei" e "estourei porque mandei o engenheiro
+     onde cabia o técnico". */
+  function _salvarOrcamento(projetoId) {
+    const p = DB.get('projetos', projetoId);
+    if (!p) { Toast.error('Serviço não encontrado.'); return; }
+    const entrada = _lerCalculadora();
+    if (!entrada.equipe.length && !(entrada.diretos[0] && entrada.diretos[0].valor)) {
+      Toast.error('Informe as horas de ao menos uma pessoa, ou um custo direto previsto.');
+      return;
+    }
+    const r = CustoHora.orcarServico(entrada);
+    const par = CustoHora.params();
+
+    const orcamento = {
+      definidoEm: Utils.todayStr(),
+      complexidade: r.complexidade.id,
+      margem: r.margem,
+      aliquota: par.aliquota,
+      horasPrevistas: r.totalHoras,
+      custoPessoasPrevisto: Math.round(r.custoPessoas * 100) / 100,
+      custoDiretosPrevisto: Math.round(r.custoDiretos * 100) / 100,
+      custoTotalPrevisto: Math.round(r.custoTotal * 100) / 100,
+      precoSugerido: r.preco != null ? Math.round(r.preco * 100) / 100 : 0,
+      /* Monta a equipe a partir da entrada, nao do resultado: assim o id da
+         pessoa vem direto do campo, sem depender de casar pelo nome (dois
+         homonimos quebrariam a amarracao). */
+      equipe: entrada.equipe.map(e => {
+        const f = DB.get('funcionarios', e.funcionarioId);
+        const ch = f ? CustoHora.custoHoraCheio(f) : 0;
+        return {
+          funcionarioId: e.funcionarioId,
+          nome: f ? f.nome : 'Sem nome',
+          horas: e.horas, custoHora: ch,
+          custo: Math.round(ch * e.horas * 100) / 100,
+        };
+      }),
+      diretos: entrada.diretos.filter(d => d.valor > 0),
+    };
+
+    DB.update('projetos', projetoId, { orcamento });
+    Modal.close();
+    Toast.success('Orçamento previsto salvo. A aba Orçado × Realizado já compara com o que foi gasto.');
+    if (typeof ProjetoFinanceiro !== 'undefined' && ProjetoFinanceiro.reabrir) {
+      ProjetoFinanceiro.reabrir(projetoId);
+    } else {
+      Utils.voltarAposSalvar(render);
+    }
   }
 
   function _lerCalculadora() {
@@ -1119,7 +1226,7 @@ const Orcamento = (() => {
     else { _tab = 'catalogo'; render(); openFormServico(); }
   }
 
-  return { abrirCalculadora, _calcular, _recalcSugestao, _usarSugestao,
+  return { abrirCalculadora, _calcular, _puxarDoCatalogo, _salvarOrcamento, _recalcSugestao, _usarSugestao,
     render, setTab, addNew,
     adicionar, remover, limpar, gerar,
     setCliente, setLead, setTitulo, setObs, setDesconto, setQtd, setValor, setBusca,

@@ -157,6 +157,52 @@ const Config = (() => {
           </div>
         </div>
 
+        <!-- Precificação: a base de todo preço de hora -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">⏱ Precificação e custo/hora</div></div>
+          <div class="card-body">
+            <p class="text-sm text-muted mb-3">
+              Estes quatro parâmetros definem o custo e o preço da hora de toda a equipe, e por consequência
+              o preço de todo orçamento. Em branco, o sistema usa um padrão técnico e avisa na tela que está usando padrão.
+            </p>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Jornada mensal (horas)</label>
+                <input class="form-control" id="cfgJornada" type="number" step="1" min="1" value="${cfg.precificacao?.jornada || ''}" placeholder="padrão: 176">
+                <div class="text-xs text-muted mt-1">176 h = 22 dias úteis × 8 h</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Ocupação técnica (%)</label>
+                <input class="form-control" id="cfgOcupacao" type="number" step="1" min="1" max="100" value="${cfg.precificacao?.ocupacao || ''}" placeholder="padrão: 70">
+                <div class="text-xs text-muted mt-1">Fatia da jornada que vira hora de serviço. O resto é proposta, deslocamento e administrativo</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Margem desejada (%)</label>
+                <input class="form-control" id="cfgMargem" type="number" step="1" min="0" max="99" value="${cfg.precificacao?.margemDesejada || ''}" placeholder="usa a média da carteira">
+                <div class="text-xs text-muted mt-1">Em branco, o sistema usa a margem que os seus serviços entregam de verdade</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fator de encargo por regime de contratação</label>
+              <div class="cfg-encargos">
+                ${['CLT','Sócio','PJ','Autônomo','Estágio','Parceria'].map(r => `
+                  <div>
+                    <div class="text-xs text-muted mb-1">${r}</div>
+                    <input class="form-control" id="cfgEnc${r.replace(/[^A-Za-z]/g,'')}" type="number" step="0.0001" min="1"
+                      value="${cfg.precificacao?.encargos?.[r] || ''}"
+                      placeholder="${r === 'CLT' ? '1,3333' : '1,0000'}" style="padding:5px 8px;font-size:12px">
+                  </div>`).join('')}
+              </div>
+              <div class="text-xs text-muted mt-2">
+                Quanto o custo real supera a remuneração. CLT 1,3333 cobre FGTS, 13º e férias com 1/3.
+                Empresa no Simples Nacional, Anexo III, não recolhe contribuição patronal sobre a folha —
+                se o seu enquadramento recolhe, aumente o fator. Confira com o seu contador: é daqui que sai todo preço.
+              </div>
+            </div>
+            <button class="btn btn-primary w-full" onclick="Config.savePrecificacao()">Salvar Precificação</button>
+          </div>
+        </div>
+
         <!-- Backup e Restauração (consolidado) -->
         <div class="card">
           <div class="card-header"><div class="card-title">💾 Backup e Restauração</div></div>
@@ -357,6 +403,34 @@ const Config = (() => {
     if (isNaN(aliquota) || aliquota < 0 || aliquota > 100) { Toast.error('Alíquota inválida (0–100%)'); return; }
     DB.saveConfig({ regimeTributario: document.getElementById('cfgRegime').value, aliquotaImpostos: aliquota });
     Toast.success('Configurações financeiras salvas');
+  }
+
+  /* A precificacao mora no banco, nunca no codigo: margem desejada e
+     informacao de negocio e este repositorio e publico. */
+  function savePrecificacao() {
+    const num = (id) => { const v = document.getElementById(id)?.value; return v === '' || v == null ? null : Number(v); };
+    const jornada = num('cfgJornada');
+    const ocupacao = num('cfgOcupacao');
+    const margem = num('cfgMargem');
+    if (jornada != null && (isNaN(jornada) || jornada <= 0 || jornada > 744)) { Toast.error('Jornada mensal inválida.'); return; }
+    if (ocupacao != null && (isNaN(ocupacao) || ocupacao <= 0 || ocupacao > 100)) { Toast.error('A ocupação tem de ficar entre 1% e 100%.'); return; }
+    if (margem != null && (isNaN(margem) || margem < 0 || margem > 99)) { Toast.error('A margem tem de ficar entre 0% e 99%.'); return; }
+
+    const aliq = Number(DB.getConfig().aliquotaImpostos) || 0;
+    if (margem != null && margem + aliq >= 100) {
+      Toast.error(`Margem de ${margem}% somada ao imposto de ${aliq}% chega a 100% do preço. Reduza a margem.`);
+      return;
+    }
+
+    const encargos = {};
+    ['CLT','Sócio','PJ','Autônomo','Estágio','Parceria'].forEach(r => {
+      const v = num('cfgEnc' + r.replace(/[^A-Za-z]/g, ''));
+      if (v != null && !isNaN(v) && v >= 1) encargos[r] = v;
+    });
+
+    DB.saveConfig({ precificacao: { jornada, ocupacao, margemDesejada: margem, encargos } });
+    Toast.success('Precificação salva. O custo/hora de toda a equipe foi recalculado.');
+    render();
   }
 
   function saveUsuario() {
@@ -819,7 +893,7 @@ const Config = (() => {
   function getRolePages() { return ROLE_PAGES; }
   function getRoles() { return ROLES; }
 
-  return {
+  return { savePrecificacao,
     render, saveEmpresa, saveUsuario, saveFinanceiro,
     addResponsavel, removeResponsavel, addSegmento, removeSegmento, addServico, removeServico,
     resetData, saveNotificacoes, toggleEmailDest, exportBackup, importBackup,

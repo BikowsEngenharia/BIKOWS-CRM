@@ -461,6 +461,7 @@ const Utils = (() => {
   function voltarAposSalvar(renderDaLista) {
     try {
       if (typeof ClienteFicha !== 'undefined' && ClienteFicha.recarregarSeAberta()) return;
+      if (typeof FuncionarioFicha !== 'undefined' && FuncionarioFicha.recarregarSeAberta()) return;
     } catch (e) { /* se a ficha falhar, a lista ainda tem de aparecer */ }
     if (typeof renderDaLista === 'function') renderDaLista();
   }

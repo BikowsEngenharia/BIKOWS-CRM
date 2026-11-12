@@ -667,9 +667,14 @@ const ProjetoFinanceiro = (() => {
           </div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px">
-          <input type="checkbox" id="pfCustoLancar" checked>
-          <span class="text-sm">Lançar como despesa no financeiro geral (Contas a Pagar)</span>
+          <input type="checkbox" id="pfCustoLancar">
+          <span class="text-sm">Preciso pagar isto a um fornecedor numa data (cria uma conta a pagar)</span>
         </label>
+        <div class="text-xs text-muted mt-1">
+          O custo já entra no resultado deste serviço e no total que vai para o financeiro geral.
+          Marque acima só quando houver alguém esperando o pagamento e você quiser controlar a data:
+          a conta a pagar é apenas o controle de quando e a quem pagar, e o valor não é contado duas vezes.
+        </div>
       `,
       saveCb: () => _saveCusto(projetoId),
     });

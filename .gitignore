@@ -29,3 +29,6 @@ npm-debug.log*
 
 # Auditorias e notas internas: NÃO publicar (o repositório é público via GitHub Pages)
 docs/
+
+# Supabase CLI (cache local, nao e codigo)
+supabase/.temp/

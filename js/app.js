@@ -319,6 +319,7 @@ const App = (() => {
        encerra a ficha: sem isso um save em outro módulo a redesenharia por
        cima da tela nova. */
     if (typeof ClienteFicha !== 'undefined') ClienteFicha.fechar();
+    if (typeof FuncionarioFicha !== 'undefined') FuncionarioFicha.fechar();
 
     const grupo = _grupoDe(page);
 

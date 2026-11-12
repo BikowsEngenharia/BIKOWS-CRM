@@ -394,8 +394,16 @@ const Projetos = (() => {
     const totalCusto = lancamentos.reduce((s, t) => s + ((t.horas || 0) * (t.custoHora || 0)), 0);
     const custoVsValor = p.valor > 0 ? Math.round((totalCusto / p.valor) * 100) : 0;
 
-    const respOpts = [...cfg.responsaveis, ...funcionarios.map(f => f.nome)].filter(Boolean)
-      .map(r => `<option value="${Utils.escHtml(r)}">${Utils.escHtml(r)}</option>`).join('');
+    /* O apontamento agora guarda QUEM trabalhou, nao so um nome em texto.
+       Com o id da pessoa o sistema sabe o custo/hora real dela e preenche o
+       campo sozinho, que e o que faz a margem do servico ficar verdadeira. */
+    const funcOpts = funcionarios.filter(f => f.ativo !== false).map(f => {
+      const ch = (typeof CustoHora !== 'undefined' && (Number(f.salarioBase) || 0) > 0)
+        ? CustoHora.custoHoraCheio(f) : 0;
+      return `<option value="${f.id}" data-ch="${ch}">${Utils.escHtml(f.nome)}${f.cargo ? ' — ' + Utils.escHtml(f.cargo) : ''}</option>`;
+    }).join('');
+    const respOpts = (cfg.responsaveis || []).filter(Boolean)
+      .map(r => `<option value="nome:${Utils.escHtml(r)}" data-ch="0">${Utils.escHtml(r)}</option>`).join('');
 
     const el = document.getElementById('viewProjetoTabContent');
     if (!el) return;
@@ -422,8 +430,10 @@ const Projetos = (() => {
         <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 2fr auto;gap:8px;align-items:end">
           <div>
             <div class="text-xs text-muted mb-1">Funcionário / Responsável</div>
-            <select class="form-control" id="tsFunc" style="height:34px;padding:4px 8px">
-              <option value="">—</option>${respOpts}
+            <select class="form-control" id="tsFunc" style="height:34px;padding:4px 8px" onchange="Projetos._preencherCustoHora()">
+              <option value="" data-ch="0">—</option>
+              ${funcOpts ? `<optgroup label="Equipe (custo/hora calculado)">${funcOpts}</optgroup>` : ''}
+              ${respOpts ? `<optgroup label="Outros responsáveis">${respOpts}</optgroup>` : ''}
             </select>
           </div>
           <div>
@@ -436,7 +446,7 @@ const Projetos = (() => {
           </div>
           <div>
             <div class="text-xs text-muted mb-1">Custo/h (R$)</div>
-            <input class="form-control" id="tsCusto" type="text" inputmode="decimal" placeholder="Ex: 120" style="height:34px;padding:4px 8px">
+            <input class="form-control" id="tsCusto" type="text" inputmode="decimal" placeholder="automático" style="height:34px;padding:4px 8px" title="Vem do custo/hora cheio da pessoa. Pode sobrescrever.">
           </div>
           <div>
             <div class="text-xs text-muted mb-1">Descrição</div>
@@ -466,14 +476,32 @@ const Projetos = (() => {
     `;
   }
 
+  /* Ao escolher a pessoa, o custo/hora dela aparece sozinho. O usuario ainda
+     pode sobrescrever: uma hora de fim de semana pode custar outra coisa. */
+  function _preencherCustoHora() {
+    const sel = document.getElementById('tsFunc');
+    const campo = document.getElementById('tsCusto');
+    if (!sel || !campo) return;
+    const ch = Number(sel.selectedOptions[0]?.dataset.ch) || 0;
+    campo.value = ch > 0 ? Utils.moneyToInput(ch) : '';
+  }
+
   function salvarTimesheet(projetoId) {
-    const funcionarioNome = document.getElementById('tsFunc')?.value.trim();
+    const bruto = document.getElementById('tsFunc')?.value || '';
+    /* O valor do select e o id da pessoa, ou "nome:Fulano" para quem nao
+       esta cadastrado como funcionario. */
+    const ehNome = bruto.startsWith('nome:');
+    const funcionarioId = ehNome ? '' : bruto;
+    const funcionarioNome = ehNome
+      ? bruto.substring(5)
+      : (DB.get('funcionarios', funcionarioId)?.nome || '');
     const data = document.getElementById('tsData')?.value;
     const horas = Number(document.getElementById('tsHoras')?.value) || 0;
     const custoHora = Utils.parseMoney(document.getElementById('tsCusto')?.value) || 0;
     const descricao = document.getElementById('tsDesc')?.value.trim() || '';
     if (!data || horas <= 0) { Toast.error('Data e horas são obrigatórios'); return; }
-    DB.create('timesheet', { projetoId, funcionarioNome, data, horas, custoHora, descricao });
+    if (!custoHora) Toast.warning('Hora lançada sem custo: a margem deste serviço vai sair maior do que é de verdade.', 6000);
+    DB.create('timesheet', { projetoId, funcionarioId, funcionarioNome, data, horas, custoHora, descricao });
     Toast.success(`${horas}h lançada(s) com sucesso!`);
     _renderTimesheetTab(projetoId);
   }
@@ -1845,7 +1873,7 @@ const Projetos = (() => {
 
   function addNew() { openForm(); }
 
-  return {
+  return { _preencherCustoHora,
     render, openForm, saveProjeto, deleteProjeto, view, setFilter, addEtapa, addNew,
     novaTarefa, concluirTarefa, encerrarProjeto, _salvarEncerramento,
     addEquipamentoNoEncerramento,

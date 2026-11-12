@@ -89,9 +89,9 @@ const Folha = (() => {
         <h2 class="sec-title">RH / Folha de Pagamento</h2>
       </div>
       <div class="fin-tabs" id="folhaTabs">
-        ${['funcionarios','folha','holerite','historico'].map(t => `
+        ${['funcionarios','custo','folha','holerite','historico'].map(t => `
           <button class="fin-tab ${_tab === t ? 'active' : ''}" onclick="Folha.setTab('${t}')">
-            ${{ funcionarios:'👥 Funcionários', folha:'📋 Folha Mensal', holerite:'🧾 Holerite', historico:'📊 Histórico' }[t]}
+            ${{ funcionarios:'👥 Funcionários', custo:'⏱ Base de custo', folha:'📋 Folha Mensal', holerite:'🧾 Holerite', historico:'📊 Histórico' }[t]}
           </button>
         `).join('')}
       </div>
@@ -107,6 +107,7 @@ const Folha = (() => {
     if (!el) return;
     const map = {
       funcionarios: buildFuncionarios,
+      custo: buildBaseCusto,
       folha: buildFolhaMensal,
       holerite: buildHolerite,
       historico: buildHistorico,
@@ -123,12 +124,19 @@ const Folha = (() => {
 
     const totalBruto = funcs.reduce((s, f) => s + (f.salarioBase || 0), 0);
     const totalFGTS  = funcs.reduce((s, f) => s + (_temFGTS(f) ? calcFGTS(f.salarioBase || 0) : 0), 0);
+    /* Custo real: remuneracao e salario bruto nao sao a mesma coisa que custo.
+       Encargos, provisoes e vales entram, e e esse numero que o orcamento usa. */
+    const totalCusto = (typeof CustoHora !== 'undefined')
+      ? funcs.reduce((s, f) => s + CustoHora.custoMensal(f).total, 0) : totalBruto;
+    const horasEq = (typeof CustoHora !== 'undefined') ? CustoHora.horasProdutivasEquipe() : 0;
 
     return `
-      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:20px">
         <div class="kpi-card" style="--kpi-color:#1a56db"><div class="kpi-label">Funcionários Ativos</div><div class="kpi-value">${funcs.length}</div><div class="kpi-icon">👥</div></div>
         <div class="kpi-card" style="--kpi-color:#059669"><div class="kpi-label">Folha Bruta Mensal</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalBruto)}</div><div class="kpi-icon">💰</div></div>
         <div class="kpi-card" style="--kpi-color:#f59e0b"><div class="kpi-label">FGTS Mensal</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalFGTS)}</div><div class="kpi-icon">🏦</div></div>
+        <div class="kpi-card" style="--kpi-color:#C42B2B;cursor:pointer" title="Remuneracao + encargos + beneficios. Clique para abrir a base de custo." onclick="Folha.setTab('custo')"><div class="kpi-label">Custo Real da Equipe</div><div class="kpi-value" style="font-size:18px">${Utils.formatCurrency(totalCusto)}</div><div class="kpi-sub">com encargos e benefícios</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi-card" style="--kpi-color:#1D4F8C;cursor:pointer" onclick="Folha.setTab('custo')"><div class="kpi-label">Horas Produtivas</div><div class="kpi-value" style="font-size:18px">${horasEq.toLocaleString('pt-BR')} h</div><div class="kpi-sub">base de rateio por mês</div><div class="kpi-icon">⏱</div></div>
       </div>
 
       <div class="card">
@@ -179,6 +187,10 @@ const Folha = (() => {
 
   function funcCard(f) {
     const calc = calcFolhaFuncionario(f);
+    const ch = (typeof CustoHora !== 'undefined' && (Number(f.salarioBase) || 0) > 0)
+      ? CustoHora.custoHoraCheio(f) : null;
+    const pr = (typeof CustoHora !== 'undefined' && ch != null) ? CustoHora.precoHora(f) : null;
+    const pv = pr && pr.valor != null ? pr.valor : null;
     const ini = (f.nome || '?').charAt(0).toUpperCase();
     const cores = ['#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2'];
     const cor = cores[(f.nome || '').charCodeAt(0) % cores.length];
@@ -194,9 +206,10 @@ const Folha = (() => {
           <div class="func-dept">${Utils.escHtml(f.departamento || '')}${f.departamento && f.regimeContratacao ? ' · ' : ''}${Utils.escHtml(f.regimeContratacao || '')}</div>
           <div class="func-salary">Salário Base: <strong>${Utils.formatCurrency(f.salarioBase)}</strong></div>
           <div class="func-salary" style="color:var(--success)">Líquido: <strong>${Utils.formatCurrency(calc.liquido)}</strong></div>
+          ${ch != null ? `<div class="func-salary" style="color:var(--info-txt)">Custo/hora: <strong>${Utils.formatCurrency(ch)}</strong>${pv != null ? ` · venda ${Utils.formatCurrency(pv)}` : ''}</div>` : ''}
         </div>
         <div class="func-actions">
-          <button class="btn btn-xs btn-secondary" onclick="Folha.verFunc('${f.id}')">Ver</button>
+          <button class="btn btn-xs btn-primary" onclick="Folha.verFunc('${f.id}')">Abrir ficha</button>
           <button class="btn btn-xs btn-secondary" onclick="Folha.imprimirHolerite('${f.id}','${_mesFolha}')" title="Imprimir Holerite">🖨 Holerite</button>
           <button class="btn btn-xs btn-secondary" onclick="Folha.openFormFunc('${f.id}')">✏</button>
           ${f.ativo !== false
@@ -207,6 +220,101 @@ const Folha = (() => {
         </div>
       </div>
     `;
+  }
+
+  /* =========================================================
+     TAB — BASE DE CUSTO
+     O banco de informação para precificar: quanto custa a hora de cada
+     pessoa e por quanto ela precisa ser vendida. É daqui que o orçamento
+     tira o preço, em vez de sair de memória.
+  ========================================================= */
+  function buildBaseCusto() {
+    if (typeof CustoHora === 'undefined') {
+      return '<div class="card"><div class="card-body text-muted">Módulo de custo/hora não carregado.</div></div>';
+    }
+    const b = CustoHora.baseDeCusto();
+    const p = b.params;
+
+    const avisoPadrao = !p.configurado ? `
+      <div class="ficha-aviso">
+        Jornada de ${p.jornada} h, ocupação de ${Math.round(p.ocupacao * 100)}% e encargos por regime estão nos
+        valores padrão do sistema. Confira com o seu contador e ajuste em Configurações → Precificação:
+        todo preço de hora sai desses três parâmetros.
+      </div>` : '';
+
+    const avisoMargem = b.margem.valor == null ? `
+      <div class="ficha-aviso">
+        Nenhuma margem definida e nenhum serviço com custo lançado, então o sistema não tem como sugerir preço de
+        venda. Defina a margem desejada em Configurações → Precificação, ou lance custo em pelo menos um serviço
+        para o cálculo passar a usar a margem que a carteira entrega de verdade.
+      </div>` : '';
+
+    const semBase = b.pessoas.filter(x => x.semBase);
+
+    return `
+      ${avisoPadrao}${avisoMargem}
+      <div class="funil-kpis">
+        <div class="kpi"><div class="kpi-rot">Custo de pessoal</div><div class="kpi-val">${Utils.formatCurrency(b.custoPessoalMensal)}</div><div class="kpi-sub">por mês, com encargos e benefícios</div></div>
+        <div class="kpi"><div class="kpi-rot">Estrutura</div><div class="kpi-val">${Utils.formatCurrency(b.estrutura.total)}</div><div class="kpi-sub">fixas + despesas do mês</div></div>
+        <div class="kpi"><div class="kpi-rot">Horas produtivas</div><div class="kpi-val">${b.horasEquipe.toLocaleString('pt-BR')} h</div><div class="kpi-sub">da equipe, por mês</div></div>
+        <div class="kpi"><div class="kpi-rot">Estrutura por hora</div><div class="kpi-val">${Utils.formatCurrency(b.custoIndiretoHora)}</div><div class="kpi-sub">que toda hora tem de pagar</div></div>
+        <div class="kpi" style="--kc:var(--ok-txt)"><div class="kpi-rot">Margem em uso</div><div class="kpi-val">${b.margem.valor != null ? Math.round(b.margem.valor * 100) + '%' : '—'}</div><div class="kpi-sub">${Utils.escHtml(b.margem.fonte)}</div></div>
+      </div>
+
+      ${semBase.length ? `<div class="ficha-aviso">${semBase.length} pessoa(s) sem valor de referência: ${Utils.escHtml(semBase.map(x => x.nome).join(', '))}. Sem isso elas não entram em nenhum orçamento por hora.</div>` : ''}
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Custo e preço da hora, por pessoa</div>
+          <span class="text-xs text-muted">clique no nome para abrir a ficha</span>
+        </div>
+        <div class="table-wrap"><table class="tbl">
+          <thead><tr>
+            <th>Pessoa</th><th>Regime</th><th>Custo mensal</th><th>Horas/mês</th>
+            <th>Custo/h direto</th><th>Custo/h cheio</th><th>Preço/h simples</th><th>Preço/h crítica</th>
+          </tr></thead>
+          <tbody>${b.pessoas.map(x => {
+            const pc = CustoHora.precoHora(x.funcionario, { complexidade: 'critica' });
+            return `<tr>
+              <td><a href="javascript:void(0)" onclick="FuncionarioFicha.abrir('${x.id}')" class="font-semibold">${Utils.escHtml(x.nome)}</a>
+                  <div class="text-xs text-muted">${Utils.escHtml(x.cargo || '—')}</div></td>
+              <td class="text-xs">${Utils.escHtml(x.regime)}</td>
+              <td>${x.semBase ? '<span class="text-xs text-muted">sem base</span>' : Utils.formatCurrency(x.custoMensal)}</td>
+              <td class="text-sm">${x.horas} h</td>
+              <td>${x.semBase ? '—' : Utils.formatCurrency(x.custoHoraDireto)}</td>
+              <td class="font-semibold">${x.semBase ? '—' : Utils.formatCurrency(x.custoHoraCheio)}</td>
+              <td class="font-bold" style="color:var(--ok-txt)">${x.preco.valor != null ? Utils.formatCurrency(x.preco.valor) : '—'}</td>
+              <td class="font-bold">${pc.valor != null ? Utils.formatCurrency(pc.valor) : '—'}</td>
+            </tr>`;
+          }).join('') || '<tr><td colspan="8" class="text-muted p-3">Nenhuma pessoa ativa cadastrada.</td></tr>'}</tbody>
+        </table></div>
+      </div>
+
+      <div class="grid-2 mt-4">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Como o preço é calculado</div></div>
+          <div class="card-body">
+            <div class="calc-passos">
+              <div class="calc-passo"><span class="calc-n">1</span><div><strong>Custo da pessoa</strong><div class="text-xs text-muted">remuneração + encargos do regime + vales + custos lançados na ficha</div></div></div>
+              <div class="calc-passo"><span class="calc-n">2</span><div><strong>÷ horas produtivas</strong><div class="text-xs text-muted">jornada × ocupação técnica. O resto da jornada é proposta, deslocamento e administrativo: hora paga que não se fatura</div></div></div>
+              <div class="calc-passo"><span class="calc-n">3</span><div><strong>+ estrutura rateada</strong><div class="text-xs text-muted">${Utils.formatCurrency(b.estrutura.total)} ÷ ${b.horasEquipe.toLocaleString('pt-BR')} h = ${Utils.formatCurrency(b.custoIndiretoHora)} por hora</div></div></div>
+              <div class="calc-passo"><span class="calc-n">4</span><div><strong>× complexidade</strong><div class="text-xs text-muted">de 1,00 a 1,60 conforme a responsabilidade técnica do trabalho</div></div></div>
+              <div class="calc-passo"><span class="calc-n">5</span><div><strong>÷ (1 − margem − imposto)</strong><div class="text-xs text-muted">margem e imposto incidem sobre o preço. Quem quer 30% e multiplica o custo por 1,30 termina com 23%</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Fatores de complexidade</div></div>
+          <div class="card-body" style="padding:0">
+            <table class="tbl"><thead><tr><th>Nível</th><th>Fator</th><th>Quando usar</th></tr></thead>
+            <tbody>${b.complexidades.map(c => `<tr>
+              <td class="font-semibold">${Utils.escHtml(c.label)}</td>
+              <td>${c.fator.toFixed(2)}</td>
+              <td class="text-xs text-muted">${Utils.escHtml(c.descricao)}</td>
+            </tr>`).join('')}</tbody></table>
+          </div>
+        </div>
+      </div>`;
   }
 
   /* =========================================================
@@ -623,41 +731,12 @@ const Folha = (() => {
     render();
   }
 
+  /* A janela de detalhes que existia aqui virou a ficha do funcionario, uma
+     tela inteira em funcionario-ficha.js. Esta funcao continua existindo
+     porque a busca global e os cartoes da equipe chamam Folha.verFunc(id). */
   function verFunc(id) {
-    const f = DB.get('funcionarios', id);
-    if (!f) return;
-    const calc = calcFolhaFuncionario(f);
-    const ini = (f.nome || '?').charAt(0).toUpperCase();
-    Modal.open({
-      title: 'Detalhes do Funcionário',
-      size: 'modal-lg',
-      body: `
-        <div style="display:flex;gap:16px;align-items:center;margin-bottom:20px;padding:16px;background:var(--bg);border-radius:var(--radius)">
-          <div class="func-avatar" style="width:56px;height:56px;font-size:24px;background:var(--primary)">${ini}</div>
-          <div>
-            <div style="font-size:20px;font-weight:700">${Utils.escHtml(f.nome)}</div>
-            <div class="text-muted">${Utils.escHtml(f.cargo || '—')} ${f.departamento ? '· ' + f.departamento : ''}</div>
-            <div class="text-xs text-muted">${Utils.escHtml(f.regimeContratacao || 'CLT')} ${f.dataAdmissao ? '· Admissão: ' + Utils.formatDate(f.dataAdmissao) : ''}</div>
-          </div>
-        </div>
-        <div class="detail-grid mb-4">
-          <div class="detail-field"><div class="detail-label">Salário Base</div><div class="detail-value font-bold text-primary">${Utils.formatCurrency(f.salarioBase)}</div></div>
-          <div class="detail-field"><div class="detail-label">Líquido Estimado</div><div class="detail-value font-bold text-success">${Utils.formatCurrency(calc.liquido)}</div></div>
-          <div class="detail-field"><div class="detail-label">INSS</div><div class="detail-value text-danger">${Utils.formatCurrency(calc.inss)}</div></div>
-          <div class="detail-field"><div class="detail-label">IRRF</div><div class="detail-value text-danger">${Utils.formatCurrency(calc.irrf)}</div></div>
-          <div class="detail-field"><div class="detail-label">FGTS (encargo)</div><div class="detail-value text-warning">${Utils.formatCurrency(calc.fgts)}</div></div>
-          <div class="detail-field"><div class="detail-label">Vale Transporte</div><div class="detail-value">${Utils.formatCurrency(f.vt || 0)}</div></div>
-          <div class="detail-field"><div class="detail-label">Vale Refeição</div><div class="detail-value">${Utils.formatCurrency(f.vr || 0)}</div></div>
-          <div class="detail-field"><div class="detail-label">Plano de Saúde</div><div class="detail-value">${Utils.formatCurrency(f.planoSaude || 0)}</div></div>
-          <div class="detail-field"><div class="detail-label">CPF</div><div class="detail-value">${Utils.escHtml(f.cpf || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Banco / Ag / Conta</div><div class="detail-value">${Utils.escHtml([f.banco, f.agencia, f.conta].filter(Boolean).join(' / ') || '—')}</div></div>
-        </div>
-        <div class="flex gap-2">
-          <button class="btn btn-primary btn-sm" onclick="Modal.close();Folha.openFormFunc('${id}')">✏ Editar</button>
-          <button class="btn btn-ghost btn-sm" onclick="Modal.close()">Fechar</button>
-        </div>
-      `,
-    });
+    if (typeof FuncionarioFicha !== 'undefined') { FuncionarioFicha.abrir(id); return; }
+    Toast.error('A ficha do funcionario nao esta disponivel: recarregue a pagina.');
   }
 
   function deleteFunc(id) {
@@ -1107,7 +1186,7 @@ const Folha = (() => {
   function addNew() { openFormFunc(); }
 
   return {
-    render, setTab, setMes, setMesEIrParaFolha,
+    render, setTab, setMes, setMesEIrParaFolha, buildBaseCusto,
     openFormFunc, saveFunc, verFunc, deleteFunc, toggleAtivo,
     gerarFolha, marcarPago, marcarTodosPagos, excluirFolha,
     verHolerite, setHoleirteFunc, setHoleitreRef,

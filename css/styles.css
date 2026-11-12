@@ -2725,3 +2725,110 @@ html[data-theme="dark"] .propostas-alerta {
 html[data-theme="dark"] .ficha-aviso {
   background: #3b2f12; border-color: #7c5c17; color: #fcd34d;
 }
+
+/* ==========================================================
+   FINANCEIRO REESTRUTURADO + FICHA DO FUNCIONÁRIO
+   ========================================================== */
+
+/* Faixa de números da ficha do funcionário: mais colunas que a do cliente,
+   porque custo e preço andam em par e separá-los faria perder a comparação. */
+.ff-nums .kpi { flex: 1 1 130px; }
+.ff-compl {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin: -4px 0 12px; padding: 0 2px;
+}
+
+/* ---- DRE ---- */
+/* Linha filha de um grupo expansível: recuada e menor, para a leitura descer
+   do total para o detalhe sem confundir os dois níveis. */
+.dre-row.dre-sub {
+  padding-left: 26px; font-size: 12.5px;
+  background: var(--surface-2); color: var(--text-muted);
+}
+.dre-row.dre-sub .dre-value { font-weight: 600; }
+.dre-toggle { display: inline-flex; gap: 2px; }
+
+.pe-val {
+  font-family: var(--font-display); font-size: 28px; font-weight: 800;
+  letter-spacing: -.5px; color: var(--text); font-feature-settings: "tnum";
+  line-height: 1.1;
+}
+
+/* ---- Para onde foi o dinheiro: barras em vez de donut ----
+   Com poucas categorias o donut vira legenda ilegível; barra deitada deixa
+   ler nome, valor e proporção na mesma linha. */
+.cat-linha {
+  display: grid; grid-template-columns: minmax(90px, 1.3fr) 1fr auto;
+  align-items: center; gap: 10px; padding: 5px 0;
+}
+.cat-nome {
+  font-size: 12.5px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cat-barra {
+  height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden;
+}
+.cat-barra > span {
+  display: block; height: 100%; background: var(--primary); border-radius: 4px;
+}
+.cat-valor {
+  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  font-feature-settings: "tnum";
+}
+
+/* ---- Consistência ---- */
+.cons-card { border-left: 3px solid var(--cc, var(--border)); }
+.cons-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .4px; color: #fff; vertical-align: middle;
+}
+.cons-itens {
+  margin-top: 10px; border-top: 1px solid var(--border);
+}
+.cons-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.cons-item:last-child { border-bottom: none; }
+
+/* ---- Como o preço é calculado: passos numerados ---- */
+.calc-passos { display: flex; flex-direction: column; gap: 10px; }
+.calc-passo { display: flex; gap: 10px; align-items: flex-start; }
+.calc-n {
+  flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  font-size: 11px; font-weight: 800; line-height: 22px; text-align: center;
+}
+
+/* ---- Fatores de encargo na configuração ---- */
+.cfg-encargos {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px;
+}
+
+/* ---- Sugestão de preço no catálogo de serviços ---- */
+.cs-sugestao {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px; margin-bottom: 14px;
+}
+.cs-sug-linha {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 3px 0; font-size: 12.5px;
+}
+.cs-sug-linha > span:first-child {
+  min-width: 130px; color: var(--text-muted); font-weight: 600;
+}
+.cs-sug-linha strong { font-feature-settings: "tnum"; }
+
+@media (max-width: 640px) {
+  .cat-linha { grid-template-columns: 1fr auto; }
+  .cat-barra { display: none; }
+  .cons-item { flex-direction: column; align-items: flex-start; }
+  .pe-val { font-size: 23px; }
+  .cs-sug-linha > span:first-child { min-width: 0; flex: 1 1 100%; }
+}
+
+/* Tabela de horas da calculadora: coluna estreita no fim, para o campo de
+   horas nao esticar e empurrar o nome da pessoa. */
+.calc-equipe td, .calc-equipe th { padding: 6px 8px; }
+.calc-equipe input { text-align: right; }

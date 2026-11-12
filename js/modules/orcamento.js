@@ -338,6 +338,7 @@ const Orcamento = (() => {
           <div class="card-title">Catálogo de serviços</div>
           <div class="flex gap-2" style="flex-wrap:wrap">
             ${servicos.length === 0 ? `<button class="btn btn-sm btn-secondary" onclick="Orcamento.popularModelos()">✨ Criar os ${Object.keys(_todosModelos()).length} modelos Bikows</button>` : ''}
+            <button class="btn btn-sm btn-secondary" onclick="Orcamento.abrirCalculadora()" title="Monta o preço a partir de quem executa, por quantas horas e com que complexidade">🧮 Calculadora de preço</button>
             <button class="btn btn-sm btn-primary" onclick="Orcamento.openFormServico()">+ Novo Serviço</button>
           </div>
         </div>
@@ -356,6 +357,7 @@ const Orcamento = (() => {
                 <td>${s.ativo === false ? Utils.badge('Inativo', 'badge-gray') : Utils.badge('Ativo', 'badge-green')}</td>
                 <td><div class="tbl-actions">
                   <button class="btn btn-xs btn-secondary" onclick="Orcamento.openFormServico('${s.id}')" title="Editar">✏</button>
+                  <button class="btn btn-xs btn-secondary" onclick="Orcamento.abrirCalculadora('${s.id}')" title="Calcular o preço deste serviço pelo custo da equipe">🧮</button>
                   <button class="btn btn-xs btn-secondary" onclick="Orcamento.duplicarServico('${s.id}')" title="Duplicar">⧉</button>
                   <button class="btn btn-xs btn-danger" onclick="Orcamento.deleteServico('${s.id}')" title="Excluir">🗑</button>
                 </div></td>
@@ -363,6 +365,169 @@ const Orcamento = (() => {
             </tbody>
           </table>`}
         </div>
+      </div>`;
+  }
+
+  /* =========================================================
+     CALCULADORA DE PREÇO
+     Monta o preço de um trabalho a partir de quem executa e por quantas
+     horas, mais os custos diretos previstos. Resolve a pergunta que todo
+     orçamento tem no meio: "por quanto eu posso vender isto sem perder
+     dinheiro, e quanto sobra se o cliente só aceitar pagar X?"
+  ========================================================= */
+  function abrirCalculadora(servicoId) {
+    if (typeof CustoHora === 'undefined') { Toast.error('Módulo de custo/hora não carregado.'); return; }
+    const s = servicoId ? DB.get('catalogo_servicos', servicoId) : null;
+    const pessoas = DB.getAll('funcionarios')
+      .filter(f => f.ativo !== false && (Number(f.salarioBase) || 0) > 0);
+
+    if (!pessoas.length) {
+      Toast.error('Nenhuma pessoa com custo cadastrado. Informe o valor de referência da equipe em RH primeiro.');
+      return;
+    }
+
+    /* Se vier de um serviço do catálogo, distribui as horas estimadas dele
+       para a primeira pessoa, só para o cálculo já nascer com conteúdo. */
+    const horasIniciais = s?.horasEstimadas || 0;
+
+    Modal.open({
+      title: '🧮 Calculadora de preço' + (s ? ' — ' + Utils.escHtml(s.nome) : ''),
+      size: 'modal-lg',
+      saveLabel: null,
+      cancelLabel: 'Fechar',
+      body: `
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Complexidade</label>
+            <select class="form-control" id="calcCompl" onchange="Orcamento._calcular()">
+              ${CustoHora.COMPLEXIDADES.map(c =>
+                `<option value="${c.id}" ${(s?.complexidade || 'simples') === c.id ? 'selected' : ''}>${Utils.escHtml(c.label)} — ${Utils.escHtml(c.descricao)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Margem desejada (%)</label>
+            <input class="form-control" id="calcMargem" type="number" min="0" max="99" step="1"
+              value="${CustoHora.margemReferencia().valor != null ? Math.round(CustoHora.margemReferencia().valor * 100) : ''}"
+              placeholder="da configuração" oninput="Orcamento._calcular()">
+            <div class="form-hint">${Utils.escHtml(CustoHora.margemReferencia().fonte)}</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Custos diretos previstos (R$)</label>
+            <input class="form-control" id="calcDiretos" type="text" inputmode="decimal"
+              value="${s?.custosPrevistos ? Utils.moneyToInput(s.custosPrevistos) : ''}"
+              placeholder="0,00" oninput="Orcamento._calcular()">
+            <div class="form-hint">Deslocamento, material, subcontratação, ART</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Horas de cada pessoa</label>
+          <table class="tbl calc-equipe">
+            <thead><tr><th>Pessoa</th><th>Custo/hora cheio</th><th style="width:110px">Horas</th></tr></thead>
+            <tbody>
+              ${pessoas.map((f, i) => `<tr>
+                <td class="text-sm font-semibold">${Utils.escHtml(f.nome)}
+                  <div class="text-xs text-muted">${Utils.escHtml(f.cargo || '')}</div></td>
+                <td class="text-sm">${Utils.formatCurrency(CustoHora.custoHoraCheio(f))}</td>
+                <td><input class="form-control calc-h" data-fid="${f.id}" type="number" min="0" step="0.5"
+                  value="${i === 0 && horasIniciais ? horasIniciais : ''}" placeholder="0"
+                  style="padding:4px 8px;font-size:12px" oninput="Orcamento._calcular()"></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div id="calcResultado"></div>
+
+        <div class="form-group mt-3">
+          <label class="form-label">E se o cliente só aceitar pagar… (R$)</label>
+          <input class="form-control" id="calcProposto" type="text" inputmode="decimal"
+            placeholder="Teste um valor de negociação" oninput="Orcamento._calcular()">
+        </div>
+        <div id="calcNegociacao"></div>
+      `,
+    });
+    setTimeout(_calcular, 40);
+  }
+
+  function _lerCalculadora() {
+    const equipe = [...document.querySelectorAll('.calc-h')].map(el => ({
+      funcionarioId: el.dataset.fid, horas: Number(el.value) || 0,
+    })).filter(x => x.horas > 0);
+    const margemCampo = document.getElementById('calcMargem')?.value;
+    return {
+      equipe,
+      diretos: [{ descricao: 'Custos diretos previstos',
+                  valor: Utils.parseMoney(document.getElementById('calcDiretos')?.value) || 0 }],
+      complexidade: document.getElementById('calcCompl')?.value || 'simples',
+      margem: margemCampo === '' || margemCampo == null ? null : Number(margemCampo),
+    };
+  }
+
+  function _calcular() {
+    const el = document.getElementById('calcResultado');
+    if (!el || typeof CustoHora === 'undefined') return;
+    const entrada = _lerCalculadora();
+    const r = CustoHora.orcarServico(entrada);
+
+    if (!r.linhas.length) {
+      el.innerHTML = '<div class="text-sm text-muted">Informe as horas de ao menos uma pessoa, ou um custo direto.</div>';
+      const neg = document.getElementById('calcNegociacao');
+      if (neg) neg.innerHTML = '';
+      return;
+    }
+
+    el.innerHTML = `
+      <table class="tbl">
+        <tbody>
+          ${r.linhas.map(l => `<tr>
+            <td class="text-sm">${Utils.escHtml(l.nome)}${l.horas ? ` <span class="text-xs text-muted">${l.horas} h × ${Utils.formatCurrency(l.custoHora)}</span>` : ''}</td>
+            <td class="text-right font-semibold">${Utils.formatCurrency(l.custo)}</td>
+          </tr>`).join('')}
+          <tr style="border-top:1px solid var(--border)">
+            <td class="font-bold">Custo total${r.totalHoras ? ` <span class="text-xs text-muted">${r.totalHoras} h de equipe</span>` : ''}</td>
+            <td class="text-right font-bold">${Utils.formatCurrency(r.custoTotal)}</td>
+          </tr>
+          <tr>
+            <td class="text-sm">× complexidade ${Utils.escHtml(r.complexidade.label)} (${r.complexidade.fator.toFixed(2)})
+              <div class="text-xs text-muted">o fator incide só na mão de obra: comprar material não fica mais difícil num trabalho crítico</div></td>
+            <td class="text-right">${Utils.formatCurrency(r.custoComComplexidade)}</td>
+          </tr>
+          ${r.preco != null ? `
+          <tr>
+            <td class="text-sm">÷ (1 − margem ${Math.round(r.margem * 100)}% − imposto ${(r.aliquota * 100).toFixed(1)}%)</td>
+            <td class="text-right text-sm text-muted">${r.divisor.toFixed(4)}</td>
+          </tr>
+          <tr style="border-top:2px solid var(--border)">
+            <td class="font-bold" style="font-size:14px">= Preço sugerido</td>
+            <td class="text-right font-bold" style="font-size:17px;color:var(--ok-txt)">${Utils.formatCurrency(r.preco)}</td>
+          </tr>
+          <tr><td class="text-sm text-muted">Imposto sobre o preço</td><td class="text-right">${Utils.formatCurrency(r.imposto)}</td></tr>
+          <tr><td class="text-sm text-muted">Sobra depois de custo e imposto</td>
+              <td class="text-right font-semibold">${Utils.formatCurrency(r.lucro)} <span class="text-xs text-muted">(${r.margemReal}%)</span></td></tr>
+          ${r.precoHoraMedio != null ? `<tr><td class="text-sm text-muted">Preço por hora de equipe</td>
+              <td class="text-right font-semibold">${Utils.formatCurrency(r.precoHoraMedio)}</td></tr>` : ''}
+          ` : `<tr><td colspan="2" class="text-sm" style="color:var(--ruim-txt)">${Utils.escHtml(r.motivo)}</td></tr>`}
+        </tbody>
+      </table>`;
+
+    /* Caminho inverso: o cliente dá o número, o sistema diz o que sobra. */
+    const neg = document.getElementById('calcNegociacao');
+    if (!neg) return;
+    const proposto = Utils.parseMoney(document.getElementById('calcProposto')?.value) || 0;
+    if (!proposto) { neg.innerHTML = ''; return; }
+    const av = CustoHora.avaliarPreco(proposto, r.custoTotal);
+    const abaixo = av.referenciaPct != null && av.margemPct < av.referenciaPct;
+    neg.innerHTML = `
+      <div class="cs-sugestao">
+        <div class="cs-sug-linha"><span>Fechando a ${Utils.formatCurrency(proposto)}</span>
+          <strong style="color:${av.margemPct > 0 ? (abaixo ? '#d97706' : 'var(--ok-txt)') : 'var(--ruim-txt)'}">${av.margemPct}% de margem</strong>
+          <span class="text-xs text-muted">${Utils.formatCurrency(av.lucro)} de sobra</span></div>
+        ${av.referenciaPct != null ? `<div class="cs-sug-linha"><span>Referência</span>
+          <strong>${av.referenciaPct}%</strong><span class="text-xs text-muted">${Utils.escHtml(av.referenciaFonte)}</span></div>` : ''}
+        ${av.margemPct <= 0
+          ? '<div class="cs-sug-linha" style="color:var(--ruim-txt)"><span></span><strong>Este preço não paga o custo do trabalho.</strong></div>'
+          : abaixo ? '<div class="cs-sug-linha" style="color:#d97706"><span></span><strong>Abaixo da referência: dá lucro, mas menos do que a carteira costuma entregar.</strong></div>' : ''}
       </div>`;
   }
 
@@ -593,6 +758,27 @@ const Orcamento = (() => {
             <input class="form-control" id="csPrazo" type="number" min="0" value="${s?.prazoDias || ''}" placeholder="0">
           </div>
         </div>
+        <!-- Base de custo: transforma o preco de chute em conta -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Horas técnicas estimadas</label>
+            <input class="form-control" id="csHoras" type="number" step="0.5" min="0" value="${s?.horasEstimadas || ''}" placeholder="0" oninput="Orcamento._recalcSugestao()">
+            <div class="form-hint">Quantas horas de equipe este serviço consome, do levantamento à entrega</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Custos diretos previstos (R$)</label>
+            <input class="form-control" id="csDiretos" type="text" inputmode="decimal" value="${s?.custosPrevistos ? Utils.moneyToInput(s.custosPrevistos) : ''}" placeholder="0,00" oninput="Orcamento._recalcSugestao()">
+            <div class="form-hint">Deslocamento, hospedagem, material, subcontratação, taxa de ART</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Complexidade</label>
+            <select class="form-control" id="csComplexidade" onchange="Orcamento._recalcSugestao()">
+              ${(typeof CustoHora !== 'undefined' ? CustoHora.COMPLEXIDADES : []).map(c =>
+                `<option value="${c.id}" ${(s?.complexidade || 'simples') === c.id ? 'selected' : ''} title="${Utils.escHtml(c.descricao)}">${Utils.escHtml(c.label)} (${c.fator.toFixed(2)})</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div id="csSugestao" class="cs-sugestao"></div>
         <div class="form-group">
           <label class="form-label">Forma de pagamento padrão</label>
           <input class="form-control" id="csPagamento" value="${Utils.escHtml(s?.formaPagamento || '')}" placeholder="Ex.: 50% na assinatura + 50% na entrega">
@@ -620,6 +806,11 @@ const Orcamento = (() => {
       `,
       saveCb: () => salvarServico(id),
     });
+    setTimeout(() => {
+      const preco = document.getElementById('csPreco');
+      if (preco) preco.addEventListener('input', _recalcSugestao);
+      _recalcSugestao();
+    }, 40);
   }
 
   /* ---- Texto ⇄ estrutura ---- */
@@ -643,6 +834,54 @@ const Orcamento = (() => {
     }).filter(e => e.nome);
   }
 
+  /* Preco sugerido ao vivo: horas x custo/hora cheio da equipe, com
+     complexidade, margem e imposto. Mostra tambem o que o preco digitado
+     entrega de margem, que e a pergunta real na hora de fechar. */
+  function _recalcSugestao() {
+    const el = document.getElementById('csSugestao');
+    if (!el) return;
+    if (typeof CustoHora === 'undefined') { el.innerHTML = ''; return; }
+    const horas = Number(document.getElementById('csHoras')?.value) || 0;
+    const diretos = Utils.parseMoney(document.getElementById('csDiretos')?.value) || 0;
+    const compl = document.getElementById('csComplexidade')?.value || 'simples';
+    const precoDigitado = Utils.parseMoney(document.getElementById('csPreco')?.value) || 0;
+
+    if (!horas && !diretos) {
+      el.innerHTML = '<div class="text-xs text-muted">Informe as horas estimadas para o sistema sugerir um preço com base no custo real da equipe.</div>';
+      return;
+    }
+    const eq = CustoHora.precoHoraEquipe({ complexidade: compl });
+    const chMedio = (eq.custoHoraMedio != null ? eq.custoHoraMedio : 0) + CustoHora.custoIndiretoHora();
+    const custoPessoas = horas * chMedio;
+    const custoTotal = custoPessoas + diretos;
+    const fator = (CustoHora.COMPLEXIDADES.find(c => c.id === compl) || { fator: 1 }).fator;
+    const par = CustoHora.params();
+    const ref = CustoHora.margemReferencia();
+    const divisor = ref.valor == null ? null : 1 - ref.valor - par.aliquota;
+    const sugerido = (divisor && divisor > 0) ? (custoPessoas * fator + diretos) / divisor : null;
+    const aval = precoDigitado > 0 ? CustoHora.avaliarPreco(precoDigitado, custoTotal) : null;
+
+    el.innerHTML = `
+      <div class="cs-sug-linha"><span>Custo estimado</span><strong>${Utils.formatCurrency(custoTotal)}</strong>
+        <span class="text-xs text-muted">${horas ? horas + ' h a ' + Utils.formatCurrency(chMedio) + '/h + ' : ''}${Utils.formatCurrency(diretos)} de custo direto</span></div>
+      ${sugerido != null
+        ? `<div class="cs-sug-linha"><span>Preço sugerido</span><strong style="color:var(--ok-txt)">${Utils.formatCurrency(sugerido)}</strong>
+             <span class="text-xs text-muted">margem ${Math.round(ref.valor * 100)}% (${Utils.escHtml(ref.fonte)}) + imposto ${(par.aliquota * 100).toFixed(1)}%</span>
+             <button type="button" class="btn btn-xs btn-secondary" onclick="Orcamento._usarSugestao(${sugerido.toFixed(2)})">usar</button></div>`
+        : `<div class="cs-sug-linha"><span>Preço sugerido</span><strong>—</strong>
+             <span class="text-xs text-muted">defina a margem desejada em Configurações → Precificação</span></div>`}
+      ${aval ? `<div class="cs-sug-linha"><span>O preço digitado entrega</span>
+          <strong style="color:${aval.margemPct >= (aval.referenciaPct || 0) ? 'var(--ok-txt)' : 'var(--ruim-txt)'}">${aval.margemPct}% de margem</strong>
+          <span class="text-xs text-muted">${Utils.formatCurrency(aval.lucro)} de sobra depois de custo e imposto</span></div>` : ''}`;
+  }
+
+  function _usarSugestao(valor) {
+    const campo = document.getElementById('csPreco');
+    if (!campo) return;
+    campo.value = Utils.moneyToInput(valor);
+    _recalcSugestao();
+  }
+
   function salvarServico(id) {
     const nome = document.getElementById('csNome').value.trim();
     if (!nome) { Toast.error('Informe o nome do serviço'); return; }
@@ -655,6 +894,9 @@ const Orcamento = (() => {
       unidade: document.getElementById('csUnidade').value,
       precoBase: Utils.parseMoney(document.getElementById('csPreco').value) || 0,
       prazoDias: Number(document.getElementById('csPrazo').value) || 0,
+      horasEstimadas: Number(document.getElementById('csHoras')?.value) || 0,
+      custosPrevistos: Utils.parseMoney(document.getElementById('csDiretos')?.value) || 0,
+      complexidade: document.getElementById('csComplexidade')?.value || 'simples',
       formaPagamento: document.getElementById('csPagamento').value.trim(),
       inclui: document.getElementById('csInclui').value.split('\n').map(s => s.trim()).filter(Boolean),
       escopo: _textoParaEscopo(document.getElementById('csEscopo').value),
@@ -877,7 +1119,7 @@ const Orcamento = (() => {
     else { _tab = 'catalogo'; render(); openFormServico(); }
   }
 
-  return {
+  return { abrirCalculadora, _calcular, _recalcSugestao, _usarSugestao,
     render, setTab, addNew,
     adicionar, remover, limpar, gerar,
     setCliente, setLead, setTitulo, setObs, setDesconto, setQtd, setValor, setBusca,
